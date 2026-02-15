@@ -243,6 +243,7 @@
           v: 1,
           input: inputTA.value,
           removeDupes: dupesCB.checked,
+          dedupeAfter: afterCB.checked,
           output: outputTA.value,
           copiedSinceChange,
           lastCopyAt,
@@ -275,6 +276,7 @@
         if (typeof s.input === "string") inputTA.value = s.input;
         if (typeof s.output === "string") outputTA.value = s.output;
         dupesCB.checked = !!s.removeDupes;
+        afterCB.checked = !!s.dedupeAfter;
         copiedSinceChange = !!s.copiedSinceChange;
         lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
       } catch {}
@@ -333,8 +335,18 @@
     dupesLbl.style.margin = "0";
     dupesLbl.textContent = "Remove duplicates";
 
-    dupesWrap.append(dupesCB, dupesLbl);
+    // NEW checkbox
+    const afterCB = document.createElement("input");
+    afterCB.type = "checkbox";
+    afterCB.id = `sorter-after-${Math.random().toString(16).slice(2)}`;
 
+    const afterLbl = document.createElement("label");
+    afterLbl.setAttribute("for", afterCB.id);
+    afterLbl.style.margin = "0";
+    afterLbl.textContent = "After sorting";
+
+    dupesWrap.append(dupesCB, dupesLbl, afterCB, afterLbl);
+    
     const outputWrap = document.createElement("div");
     outputWrap.className = "result-row";
 
@@ -366,15 +378,21 @@
         return;
       }
 
-      let out = lines;
+let out = lines;
 
-      if (dupesCB.checked) {
-        // preserve first-seen order pre-sort? (Your original de-dupes before sorting)
-        // We'll keep your behaviour: de-dupe BEFORE sort.
-        out = [...new Set(out)];
-      }
+// Dedupe BEFORE sort (default behaviour)
+if (dupesCB.checked && !afterCB.checked) {
+  out = [...new Set(out)];
+}
 
-      out = sortLines(out, type);
+// Sort
+out = sortLines(out, type);
+
+// Dedupe AFTER sort (optional behaviour)
+if (dupesCB.checked && afterCB.checked) {
+  out = [...new Set(out)];
+}
+      
       outputTA.value = out.join("\n");
 
       markChanged();
@@ -442,6 +460,10 @@
       saveStateDebounced();
     });
     dupesCB.addEventListener("change", () => {
+      markChanged();
+      saveStateDebounced();
+    });
+    afterCB.addEventListener("change", () => {
       markChanged();
       saveStateDebounced();
     });
