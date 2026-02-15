@@ -35,9 +35,13 @@
 }
 [data-app="palette"] .pe-uploader.pe-drag{ border-color:rgba(0,0,0,.55); background:rgba(0,0,0,.04); }
 [data-app="palette"] .pe-file{
-  position:absolute; inset:0;
-  opacity:0; cursor:pointer;
+  position:absolute;
+  opacity:0;
+  width:1px;
+  height:1px;
+  pointer-events:none; /* IMPORTANT for iOS */
 }
+
 [data-app="palette"] .pe-drop-help strong{ display:block; font-size:1.05rem; margin-bottom:4px; }
 [data-app="palette"] .pe-cta{ text-decoration:underline; font-weight:800; }
 [data-app="palette"] .pe-sub{ opacity:.75; font-size:.92rem; }
@@ -348,7 +352,7 @@
     // Build DOM (single instance, scoped)
     container.innerHTML = `
 <div class="pe-app">
-  <div class="pe-uploader" aria-label="Image uploader">
+  <div class="pe-uploader" aria-label="Image uploader" role="button" tabindex="0">
     <input class="pe-file" type="file" accept="image/*" aria-label="Choose a photo">
     <div class="pe-drop-help">
       <strong>Drop a photo here</strong> or <span class="pe-cta">click to upload</span>
@@ -447,7 +451,12 @@
 
     async function loadFile(file) {
       if (!file) return;
+let lastObjectUrl = null;
 
+if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
+lastObjectUrl = URL.createObjectURL(file);
+imgEl.src = lastObjectUrl;
+      
       const url = URL.createObjectURL(file);
       imgEl.style.display = "none";
       imgEl.src = url;
@@ -493,7 +502,23 @@
       const file = e.dataTransfer?.files?.[0];
       if (file) loadFile(file);
     });
-    dropzone.addEventListener("click", () => fileInput.click());
+//    dropzone.addEventListener("click", () => fileInput.click());
+function openPicker() {
+  // iOS: ensure selecting the same file twice still triggers "change"
+  fileInput.value = "";
+  fileInput.click();
+}
+
+dropzone.addEventListener("click", openPicker);
+
+// keyboard support (nice on desktop)
+dropzone.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    openPicker();
+  }
+});
+    
     fileInput.addEventListener("change", () => loadFile(fileInput.files?.[0]));
 
     // Palette state
