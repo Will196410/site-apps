@@ -1,3 +1,4 @@
+window.SiteApps = window.SiteApps || {};
 (() => {
   "use strict";
 
