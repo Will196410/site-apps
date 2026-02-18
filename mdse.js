@@ -1,1001 +1,843 @@
-window.SiteApps = window.SiteApps || {};
 (() => {
   "use strict";
 
-  // ============================================================
-  // Markdown Structure Editor (Squarespace Footer) — Multi-instance
-  //
-  // Embed anywhere:
-  //   <div class="markdown-structure-editor"></div>
-  //
-  // Optional stable storage per instance:
-  //   <div class="markdown-structure-editor" data-storage-key="my-outline"></div>
-  //
-  // v10:
-  // - Bodies hidden by default (per node), 👁 toggle, 📝 body indicator
-  // - Reliable move via PIN + DROP button
-  // - Duplicate node + children
-  // - localStorage autosave + restore
-  // - NEW: Copied flag (Copied ✓ / Not copied) persists across refresh
-  // ============================================================
+  // ---- SiteApps registry (works with your loader.js) ----
+  window.SiteApps = window.SiteApps || {};
+  window.SiteApps.registry = window.SiteApps.registry || {};
+  window.SiteApps.register =
+    window.SiteApps.register ||
+    function (name, initFn) {
+      window.SiteApps.registry[name] = initFn;
+    };
 
-  const APP_CLASS = "markdown-structure-editor";
-  const STYLE_ID = "mdse-style-v10";
-  const INIT_FLAG = "mdseInit";
-  const STORAGE_PREFIX = "mdse:v7:";
+  const STYLE_ID = "siteapps-mdse-style-v1";
 
-  const SAVE_DEBOUNCE_MS = 600;
-  const SAVE_PULSE_MS = 2000;
-
-  // ----------------------------
-  // High-readability CSS
-  // ----------------------------
-  const APP_CSS = `
-.${APP_CLASS}{
-  font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  background:#fff;
-  border:2px solid #111;
-  padding:18px;
-  border-radius:14px;
-  color:#111;
-  max-width:980px;
-  margin:14px auto;
-}
-.${APP_CLASS} .header-top{
-  display:flex;
-  align-items:baseline;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:10px;
-}
-.${APP_CLASS} .app-title{
-  margin:0;
-  font-size:20px;
-  font-weight:900;
-  letter-spacing:0.2px;
-}
-
-.${APP_CLASS} .status-row{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-}
-.${APP_CLASS} .status-badge{
-  font-size:14px;
-  font-weight:900;
-  padding:6px 10px;
-  border:2px solid #111;
-  border-radius:999px;
-  background:#fff;
-  color:#111;
-}
-.${APP_CLASS} .status-badge.dim{ color:#444; border-color:#444; }
-.${APP_CLASS} .status-badge.good{ color:#0b3d0b; border-color:#0b3d0b; }
-.${APP_CLASS} .status-badge.warn{ color:#7a0000; border-color:#7a0000; }
-
-.${APP_CLASS} .md-input{
-  width:100%;
-  height:120px;
-  margin:10px 0 14px;
-  border:2px solid #111;
-  border-radius:10px;
-  padding:12px;
-  box-sizing:border-box;
-  font-size:16px;
-  line-height:1.35;
-  color:#111;
-  background:#fff;
-}
-
-.${APP_CLASS} .button-group{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-bottom:6px;
-}
-.${APP_CLASS} .button-group button{
-  border-radius:10px;
-  border:2px solid #111;
-  cursor:pointer;
-  padding:10px 12px;
-  font-weight:900;
-  font-size:14px;
-  background:#fff;
-  color:#111;
-}
-.${APP_CLASS} .load-btn{ background:#0b5fff; color:#fff; border-color:#0b5fff; flex:1; }
-.${APP_CLASS} .save-back-btn{ background:#6f42c1; color:#fff; border-color:#6f42c1; flex:1; }
-.${APP_CLASS} .export-btn{ background:#111; color:#fff; border-color:#111; flex:1; }
-.${APP_CLASS} .reset-btn{ background:#fff; color:#7a0000; border-color:#7a0000; flex:0.8; }
-
-.${APP_CLASS} .editor-canvas{ margin-top:10px; }
-
-.${APP_CLASS} .node-item{
-  background:#fff;
-  margin:10px 0;
-  padding:14px;
-  border:2px solid #111;
-  border-radius:12px;
-}
-.${APP_CLASS} .node-header-row{
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
-  margin-bottom:10px;
-}
-
-.${APP_CLASS} .drag-handle{
-  cursor:pointer;
-  background:#f0f0f0;
-  border:2px solid #111;
-  border-radius:10px;
-  padding:10px 12px;
-  font-size:16px;
-  font-weight:900;
-  color:#111;
-  flex-shrink:0;
-}
-
-.${APP_CLASS} .collapse-toggle{
-  cursor:pointer;
-  width:34px;
-  height:40px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#f7f7f7;
-  border-radius:10px;
-  border:2px solid #111;
-  font-size:16px;
-  font-weight:900;
-  flex-shrink:0;
-}
-
-.${APP_CLASS} .level-label{
-  font-size:12px;
-  color:#111;
-  font-weight:900;
-  min-width:28px;
-  padding-top:12px;
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-.${APP_CLASS} .has-body-icon{
-  display:inline-block;
-  font-size:16px;
-  line-height:1;
-}
-
-.${APP_CLASS} .title-area{
-  flex-grow:1;
-  border:2px solid #111;
-  font-size:18px;
-  padding:8px 10px;
-  background:#fff;
-  font-weight:900;
-  resize:none;
-  overflow:hidden;
-  min-height:1.2em;
-  line-height:1.25;
-  font-family:inherit;
-  width:100%;
-  border-radius:10px;
-}
-
-.${APP_CLASS} .body-preview{
-  width:100%;
-  border:2px solid #111;
-  border-radius:10px;
-  padding:10px 12px;
-  font-size:15px;
-  line-height:1.35;
-  color:#111;
-  background:#fbfbfb;
-  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-}
-
-.${APP_CLASS} .btn-tools{
-  display:flex;
-  gap:6px;
-  padding-top:2px;
-  flex-shrink:0;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-}
-
-.${APP_CLASS} .tool-btn{
-  border:2px solid #111;
-  border-radius:10px;
-  padding:10px 10px;
-  font-size:14px;
-  font-weight:900;
-  cursor:pointer;
-  min-width:44px;
-  background:#fff;
-  color:#111;
-}
-
-.${APP_CLASS} .tool-btn.drop{
-  background:#0b7a2b;
-  color:#fff;
-  border-color:#0b7a2b;
-  min-width:68px;
-}
-
-.${APP_CLASS} .tool-btn:active,
-.${APP_CLASS} .button-group button:active,
-.${APP_CLASS} .drag-handle:active,
-.${APP_CLASS} .collapse-toggle:active{
-  transform:translateY(1px);
-}
-
-.${APP_CLASS} .moving-source{
-  border-color:#0b5fff !important;
-  box-shadow:0 6px 24px rgba(0,0,0,0.18);
-  background:#f3f8ff !important;
-}
-.${APP_CLASS} .moving-source .title-area{
-  border-color:#0b5fff !important;
-  background:#0b5fff !important;
-  color:#fff !important;
-}
-.${APP_CLASS} .moving-child-visual{
-  background:#f6f6f6 !important;
-  opacity:0.55;
-  border-style:dashed !important;
-}
-.${APP_CLASS} .move-target-hint{
-  border-color:#0b7a2b !important;
-  background:#f2fff4 !important;
-}
-.${APP_CLASS} .is-collapsed-node{
-  background:#fff7d1 !important;
-  border-color:#8a6a00 !important;
-}
-.${APP_CLASS} .folded-note{
-  font-size:13px;
-  font-weight:900;
-  color:#5a4800;
-  padding-left:44px;
-  margin-top:4px;
-}
-.${APP_CLASS} .version-footer{
-  text-align:right;
-  font-size:12px;
-  color:#444;
-  margin-top:14px;
-  font-style:italic;
-}
-`;
-
-  function ensureStyleInjected() {
+  function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
-    style.textContent = APP_CSS;
+    style.textContent = `
+[data-app="mdse"]{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  max-width: 980px;
+  margin: 14px auto;
+  border: 2px solid #111;
+  border-radius: 16px;
+  padding: 18px;
+  background: #fff;
+  color: #111;
+}
+[data-app="mdse"] *{ box-sizing:border-box; }
+[data-app="mdse"] h3{ margin:0 0 10px; font-size: 18px; }
+[data-app="mdse"] .muted{ color:#444; font-size: 13px; font-weight: 700; }
+
+[data-app="mdse"] textarea{
+  width:100%;
+  border:2px solid #111;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+  line-height: 1.35;
+  background: #fbfbfb;
+  color:#111;
+}
+[data-app="mdse"] textarea:focus,
+[data-app="mdse"] button:focus,
+[data-app="mdse"] select:focus{
+  outline: 3px solid rgba(11,95,255,.35);
+  outline-offset: 2px;
+}
+
+[data-app="mdse"] .topbar{
+  display:flex;
+  gap: 12px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  margin-bottom: 10px;
+}
+[data-app="mdse"] .topbar .left{ flex: 1 1 520px; }
+[data-app="mdse"] .topbar .right{ flex: 1 1 220px; display:flex; justify-content:flex-end; }
+
+[data-app="mdse"] .btnrow{
+  display:flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 10px;
+}
+[data-app="mdse"] button{
+  border: 2px solid #111;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 900;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+}
+[data-app="mdse"] button.primary{ background:#111; color:#fff; }
+[data-app="mdse"] button.warn{ border-color:#7a0000; color:#7a0000; }
+[data-app="mdse"] button:disabled{ opacity:.55; cursor:not-allowed; }
+
+[data-app="mdse"] .badges{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+}
+[data-app="mdse"] .badge{
+  border:2px solid #111;
+  border-radius:999px;
+  padding: 6px 10px;
+  font-weight: 900;
+  font-size: 13px;
+  background:#fff;
+}
+[data-app="mdse"] .badge.good{ border-color:#0b3d0b; color:#0b3d0b; }
+[data-app="mdse"] .badge.warn{ border-color:#7a0000; color:#7a0000; }
+[data-app="mdse"] .badge.dim{ border-color:#444; color:#444; }
+
+[data-app="mdse"] .levelFilter{
+  display:flex;
+  gap: 8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top: 10px;
+}
+[data-app="mdse"] .levelFilter label{
+  font-weight: 900;
+  font-size: 13px;
+}
+[data-app="mdse"] select{
+  border:2px solid #111;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-weight: 900;
+  background:#fff;
+}
+
+[data-app="mdse"] .canvas{ margin-top: 14px; }
+
+[data-app="mdse"] .node{
+  background:#fff;
+  border: 2px solid rgba(0,0,0,.15);
+  border-radius: 14px;
+  padding: 12px;
+  margin: 10px 0;
+}
+[data-app="mdse"] .node.level-1{ border-left: 10px solid #111; margin-left:0; }
+[data-app="mdse"] .node.level-2{ border-left: 10px solid #444; margin-left:18px; }
+[data-app="mdse"] .node.level-3{ border-left: 10px solid #777; margin-left:36px; }
+[data-app="mdse"] .node.level-4{ border-left: 10px solid #999; margin-left:54px; }
+[data-app="mdse"] .node.level-5{ border-left: 10px solid #bbb; margin-left:72px; }
+[data-app="mdse"] .node.level-6{ border-left: 10px solid #ddd; margin-left:90px; }
+
+[data-app="mdse"] .hdr{
+  display:flex;
+  gap: 10px;
+  align-items:flex-start;
+}
+[data-app="mdse"] .pill{
+  border:2px solid #111;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-weight: 900;
+  font-size: 13px;
+  background:#fff;
+  flex: 0 0 auto;
+  user-select: none;
+}
+[data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
+[data-app="mdse"] .pill.green{ border-color:#0b3d0b; color:#0b3d0b; }
+[data-app="mdse"] .pill.warn{ border-color:#7a0000; color:#7a0000; }
+[data-app="mdse"] .title{
+  flex: 1 1 auto;
+  border:2px solid rgba(0,0,0,.15);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 900;
+  resize: none;
+  overflow:hidden;
+  min-height: 44px;
+  background: #fbfbfb;
+}
+[data-app="mdse"] .tools{
+  display:flex;
+  gap: 6px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:flex-start;
+  flex: 0 0 auto;
+}
+[data-app="mdse"] .tools button{
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+[data-app="mdse"] .body{
+  margin-top: 10px;
+  display:none;
+}
+[data-app="mdse"] .body.show{ display:block; }
+
+[data-app="mdse"] .hint{
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color:#444;
+}
+
+[data-app="mdse"] .movingSource{
+  border-color: #0b5fff !important;
+  box-shadow: 0 8px 28px rgba(11,95,255,.18);
+  background: #f6f9ff !important;
+}
+[data-app="mdse"] .moveTarget{
+  cursor:pointer;
+  border-color:#0b3d0b !important;
+  background:#f1fff1 !important;
+}
+[data-app="mdse"] .collapsed{
+  border-color:#9a7b00 !important;
+  background:#fffbe6 !important;
+}
+[data-app="mdse"] .footer{
+  margin-top: 14px;
+  font-size: 12px;
+  color:#666;
+  font-weight: 700;
+  text-align:right;
+}
+`;
     document.head.appendChild(style);
   }
 
-  function ensureMarkup(container) {
-    if (container.querySelector(".md-input") && container.querySelector(".editor-canvas")) return;
+  // ---- Utilities ----
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
-    container.innerHTML = "";
-
-    const header = document.createElement("div");
-    header.className = "header-section";
-
-    const headerTop = document.createElement("div");
-    headerTop.className = "header-top";
-
-    const title = document.createElement("h3");
-    title.className = "app-title";
-    title.textContent = "Markdown Structure Editor";
-
-    const statusRow = document.createElement("div");
-    statusRow.className = "status-row";
-
-    const saveBadge = document.createElement("span");
-    saveBadge.className = "status-badge dim";
-    saveBadge.textContent = "";
-
-    const copyBadge = document.createElement("span");
-    copyBadge.className = "status-badge dim";
-    copyBadge.textContent = "";
-
-    statusRow.append(saveBadge, copyBadge);
-    headerTop.append(title, statusRow);
-
-    const input = document.createElement("textarea");
-    input.className = "md-input";
-    input.placeholder = "Paste Markdown here...";
-
-    const btnGroup = document.createElement("div");
-    btnGroup.className = "button-group";
-
-    const mkTopBtn = (cls, label) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = cls;
-      b.textContent = label;
-      return b;
-    };
-
-    btnGroup.append(
-      mkTopBtn("load-btn", "Load Markdown"),
-      mkTopBtn("save-back-btn", "Update Input Area"),
-      mkTopBtn("export-btn", "Copy Result"),
-      mkTopBtn("reset-btn", "Reset Everything")
-    );
-
-    const canvas = document.createElement("div");
-    canvas.className = "editor-canvas";
-
-    const footer = document.createElement("div");
-    footer.className = "version-footer";
-    footer.textContent = "v10 (copied flag + bodies hidden by default + 📝 + 👁 + DROP move)";
-
-    header.append(headerTop, input, btnGroup);
-    container.append(header, canvas, footer);
+  function autoResizeTA(ta) {
+    ta.style.height = "auto";
+    ta.style.height = Math.max(44, ta.scrollHeight) + "px";
   }
 
   function safeJsonParse(s) {
     try { return JSON.parse(s); } catch { return null; }
   }
 
-  function getInstanceStorageKey(container, instanceIndexOnPage) {
-    const explicit = container.getAttribute("data-storage-key");
-    if (explicit && explicit.trim()) return STORAGE_PREFIX + explicit.trim();
-    const path = (location.pathname || "/").replace(/\s+/g, "");
-    return `${STORAGE_PREFIX}${path}#${instanceIndexOnPage}`;
+  function storageKey(container) {
+    const k = container.getAttribute("data-storage-key");
+    if (k && k.trim()) return `siteapps:mdse:${k.trim()}`;
+    // fallback: page-based (safe enough)
+    return `siteapps:mdse:${location.pathname || "/"}`;
   }
 
-  function initInstance(container, instanceIndexOnPage) {
-    if (container.dataset[INIT_FLAG] === "1") return;
-    container.dataset[INIT_FLAG] = "1";
-
-    ensureStyleInjected();
-    ensureMarkup(container);
-
-    // Node shape:
-    // { id:number, level:number, title:string, body:string, isCollapsed:boolean, showBody:boolean }
-    let nodes = [];
-    let idCounter = 1;
-
-    let sourceId = null;
-    let revealId = null;
-
-    // NEW copied-flag state
-    let copiedSinceChange = false;
-    let lastCopyAt = null; // ISO string or null
-
-    const storageKey = getInstanceStorageKey(container, instanceIndexOnPage);
-
-    const inputEl = () => container.querySelector(".md-input");
-    const canvasEl = () => container.querySelector(".editor-canvas");
-    const saveBadgeEl = () => container.querySelector(".status-row .status-badge:nth-child(1)");
-    const copyBadgeEl = () => container.querySelector(".status-row .status-badge:nth-child(2)");
-
-    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-
-    // ---- status badges ----
-    let dirty = false;
-
-    function setSaveBadge(text, mode = "dim") {
-      const el = saveBadgeEl();
-      if (!el) return;
-      el.textContent = text || "";
-      el.classList.remove("dim", "good", "warn");
-      el.classList.add(mode);
-    }
-
-    function setCopyBadge() {
-      const el = copyBadgeEl();
-      if (!el) return;
-
-      if (copiedSinceChange) {
-        el.textContent = "Copied ✓";
-        el.classList.remove("dim", "warn");
-        el.classList.add("good");
-        if (lastCopyAt) el.title = `Last copied: ${lastCopyAt}`;
-      } else {
-        el.textContent = "Not copied";
-        el.classList.remove("good");
-        el.classList.add("warn");
-        el.title = "You’ve changed something since last copy.";
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return !!ok;
+      } catch {
+        return false;
       }
     }
+  }
 
-    function noteChanged() {
-      // Any structural or text change means “not copied”
-      copiedSinceChange = false;
-      lastCopyAt = lastCopyAt; // keep old timestamp visible in tooltip if desired
-      setCopyBadge();
-    }
+  // ---- Core app ----
+  window.SiteApps.register("mdse", (container) => {
+    ensureStyle();
 
-    function markDirty() {
-      dirty = true;
-      setSaveBadge("Unsaved…", "dim");
-      noteChanged();
-      scheduleSave();
-    }
+    const KEY = storageKey(container);
 
-    function markSaved() {
-      dirty = false;
-      setSaveBadge("Saved ✓", "good");
-    }
+    // State
+    let nodes = []; // {id, level, title, body, isCollapsed, showBody}
+    let sourceId = null;          // pinned node id
+    let lastCreatedId = null;     // autofocus
+    let maxVisibleLevel = 6;      // global depth filter
+    let copiedSinceChange = false;
+    let lastCopyAt = null;
 
-    function markStorageBlocked() {
-      setSaveBadge("Not saved (storage blocked)", "warn");
-    }
-
-    // ---- autosave ----
     let saveTimer = null;
 
-    function getSerializableState() {
-      return {
-        v: 1,
-        md: inputEl() ? inputEl().value : "",
-        nodes,
-        idCounter,
-        copiedSinceChange,
-        lastCopyAt
-      };
+    // Build UI
+    container.innerHTML = "";
+    container.setAttribute("data-app", "mdse");
+
+    container.innerHTML = `
+<div class="topbar">
+  <div class="left">
+    <h3>Markdown Structure Editor</h3>
+    <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
+    <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
+
+    <div class="btnrow">
+      <button class="primary btnLoad" type="button">Load Markdown</button>
+      <button class="btnUpdate" type="button">Update Input Area</button>
+      <button class="primary btnCopy" type="button">Copy Result</button>
+      <button class="warn btnReset" type="button">Reset Everything</button>
+      <button class="btnAddTop" type="button">+ Add H1</button>
+    </div>
+
+    <div class="levelFilter">
+      <label for="mdseMaxLevel">Show up to:</label>
+      <select id="mdseMaxLevel">
+        <option value="1">H1</option>
+        <option value="2">H2</option>
+        <option value="3">H3</option>
+        <option value="4">H4</option>
+        <option value="5">H5</option>
+        <option value="6">H6 (All)</option>
+      </select>
+
+      <button type="button" class="btnLvl1">H1</button>
+      <button type="button" class="btnLvl2">H1–H2</button>
+      <button type="button" class="btnLvl3">H1–H3</button>
+      <button type="button" class="btnLvlAll">All</button>
+    </div>
+
+    <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
+  </div>
+
+  <div class="right">
+    <div class="badges">
+      <span class="badge dim badgeSave">Unsaved…</span>
+      <span class="badge warn badgeCopy">Not copied</span>
+    </div>
+  </div>
+</div>
+
+<div class="canvas"></div>
+<div class="footer">v5.0 — Level Filter + Duplicate + Stable Moves + Persistent State</div>
+`;
+
+    const $ = (sel) => container.querySelector(sel);
+
+    const taInput = $(".mdInput");
+    const canvas = $(".canvas");
+
+    const badgeSave = $(".badgeSave");
+    const badgeCopy = $(".badgeCopy");
+
+    const btnLoad = $(".btnLoad");
+    const btnUpdate = $(".btnUpdate");
+    const btnCopy = $(".btnCopy");
+    const btnReset = $(".btnReset");
+    const btnAddTop = $(".btnAddTop");
+
+    const selMax = $("#mdseMaxLevel");
+    const btnLvl1 = $(".btnLvl1");
+    const btnLvl2 = $(".btnLvl2");
+    const btnLvl3 = $(".btnLvl3");
+    const btnLvlAll = $(".btnLvlAll");
+
+    // ---- Persistence ----
+    function setCopiedFlag(flag) {
+      copiedSinceChange = !!flag;
+      if (copiedSinceChange) lastCopyAt = new Date().toISOString();
+      badgeCopy.className = "badge " + (copiedSinceChange ? "good" : "warn");
+      badgeCopy.textContent = copiedSinceChange ? "Copied ✓" : "Not copied";
+      badgeCopy.title = copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
+    }
+
+    function markChanged() {
+      setCopiedFlag(false);
+      saveDebounced();
     }
 
     function saveNow() {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(getSerializableState()));
-        markSaved();
+        const state = {
+          v: 1,
+          nodes,
+          input: taInput.value,
+          sourceId,
+          maxVisibleLevel,
+          copiedSinceChange,
+          lastCopyAt,
+        };
+        localStorage.setItem(KEY, JSON.stringify(state));
+        badgeSave.className = "badge good badgeSave";
+        badgeSave.textContent = "Saved ✓";
       } catch {
-        markStorageBlocked();
+        badgeSave.className = "badge warn badgeSave";
+        badgeSave.textContent = "Not saved";
       }
     }
 
-    function scheduleSave() {
+    function saveDebounced() {
+      badgeSave.className = "badge dim badgeSave";
+      badgeSave.textContent = "Unsaved…";
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
         saveTimer = null;
         saveNow();
-      }, SAVE_DEBOUNCE_MS);
+      }, 500);
     }
 
-    const pulse = setInterval(() => { if (dirty) saveNow(); }, SAVE_PULSE_MS);
+    function loadPref() {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      const s = safeJsonParse(raw);
+      if (!s || typeof s !== "object") return;
 
-    // ---- helpers ----
-    function clearMoveState() { sourceId = null; }
-    function revealAfterRender(nodeId) { revealId = nodeId; }
+      if (Array.isArray(s.nodes)) nodes = s.nodes;
+      if (typeof s.input === "string") taInput.value = s.input;
+      if (typeof s.sourceId === "string" || s.sourceId === null) sourceId = s.sourceId;
+      if (typeof s.maxVisibleLevel === "number") maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
+      copiedSinceChange = !!s.copiedSinceChange;
+      lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
 
-    function autoResize(el) {
-      if (!el) return;
-      el.style.height = "auto";
-      el.style.height = el.scrollHeight + "px";
+      // sanitise nodes a bit
+      nodes = nodes
+        .filter((n) => n && typeof n === "object")
+        .map((n) => ({
+          id: typeof n.id === "string" ? n.id : uid(),
+          level: clamp(parseInt(n.level, 10) || 1, 1, 6),
+          title: typeof n.title === "string" ? n.title : "",
+          body: typeof n.body === "string" ? n.body : "",
+          isCollapsed: !!n.isCollapsed,
+          showBody: !!n.showBody,
+        }));
     }
 
-    function indexOfId(id) {
-      return nodes.findIndex(n => n.id === id);
+    // ---- Markdown parse / export ----
+    function parseMarkdown(text) {
+      const lines = (text || "").split("\n");
+      const out = [];
+      let current = null;
+
+      for (const line of lines) {
+        const m = line.match(/^(#{1,6})\s+(.*)/);
+        if (m) {
+          current = {
+            id: uid(),
+            level: m[1].length,
+            title: m[2] || "",
+            body: "",
+            isCollapsed: false,
+            showBody: false, // body hidden by default
+          };
+          out.push(current);
+        } else if (current) {
+          current.body += line + "\n";
+        }
+      }
+      return out;
     }
 
-    function getFamilyByIndex(index) {
-      const fam = [index];
-      if (index < 0 || index >= nodes.length) return fam;
-      const pLevel = nodes[index].level;
-      for (let i = index + 1; i < nodes.length; i++) {
+    function toMarkdown() {
+      return nodes
+        .map((n) => {
+          const head = "#".repeat(n.level) + " " + (n.title || "");
+          const body = (n.body || "").trimEnd();
+          return body ? head + "\n" + body : head;
+        })
+        .join("\n\n");
+    }
+
+    // ---- Outline structure helpers (based on levels) ----
+    function indexById(id) {
+      return nodes.findIndex((n) => n.id === id);
+    }
+
+    function familyIndices(startIdx) {
+      const fam = [startIdx];
+      if (startIdx < 0 || startIdx >= nodes.length) return fam;
+      const pLevel = nodes[startIdx].level;
+      for (let i = startIdx + 1; i < nodes.length; i++) {
         if (nodes[i].level > pLevel) fam.push(i);
         else break;
       }
       return fam;
     }
 
-    function newNode(level, title = "", body = "", isCollapsed = false, showBody = false) {
-      return { id: idCounter++, level, title, body, isCollapsed, showBody };
+    function familyIds(startId) {
+      const idx = indexById(startId);
+      if (idx < 0) return [];
+      return familyIndices(idx).map((i) => nodes[i].id);
     }
 
-    function normalizeNodesInPlace() {
-      for (const n of nodes) {
-        if (typeof n.showBody !== "boolean") n.showBody = false;
-        if (typeof n.isCollapsed !== "boolean") n.isCollapsed = false;
-        if (typeof n.body !== "string") n.body = "";
-        if (typeof n.title !== "string") n.title = "";
-        if (typeof n.level !== "number") n.level = 1;
-      }
+    function hasChildren(idx) {
+      const fam = familyIndices(idx);
+      return fam.length > 1;
     }
 
-    function computeMovingFamilyIdSet() {
-      if (sourceId === null) return new Set();
-      const sIdx = indexOfId(sourceId);
-      if (sIdx < 0) return new Set();
-      const famIdxs = getFamilyByIndex(sIdx);
-      const set = new Set();
-      famIdxs.forEach(i => set.add(nodes[i].id));
-      return set;
-    }
-
-    // ---- actions ----
-    function parseMarkdown() {
-      const input = inputEl();
-      if (!input) return;
-
-      const text = input.value;
-      if (!text.trim()) return;
-
-      clearMoveState();
-
-      const lines = text.split("\n");
-      nodes = [];
-
-      let currentBox = null;
-      for (const line of lines) {
-        const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
-        if (headerMatch) {
-          currentBox = newNode(headerMatch[1].length, headerMatch[2], "", false, false);
-          nodes.push(currentBox);
-        } else if (currentBox) {
-          currentBox.body += line + "\n";
-        }
-      }
-
-      nodes.forEach(n => n.showBody = false);
-
-      if (nodes[0]) revealAfterRender(nodes[0].id);
-      render({ preserveScroll: false });
-      markDirty();
-    }
-
-    function toggleCollapseById(nodeId) {
-      const idx = indexOfId(nodeId);
+    // ---- Actions ----
+    function toggleBranchCollapse(id) {
+      const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
-      render({ preserveScroll: true });
-      markDirty();
+      markChanged();
+      render();
     }
 
-    function toggleBodyById(nodeId) {
-      const idx = indexOfId(nodeId);
+    function toggleBody(id) {
+      const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].showBody = !nodes[idx].showBody;
-      revealAfterRender(nodeId);
-      render({ preserveScroll: false });
-      markDirty();
+      markChanged();
+      render();
     }
 
-    function toMarkdownString() {
-      return nodes
-        .map((n) => {
-          const header = "#".repeat(n.level) + " " + (n.title ?? "");
-          const body = (n.body ?? "");
-          const bodyNormalized = body.replace(/\s+$/, "");
-          return bodyNormalized ? `${header}\n${bodyNormalized}` : `${header}`;
-        })
-        .join("\n\n");
-    }
-
-    function saveToInput() {
-      const input = inputEl();
-      if (!input) return;
-      input.value = toMarkdownString();
-      // This is a change to the input field, but not necessarily “copy to Ulysses”.
-      // So it should still flip to Not copied.
-      markDirty();
-    }
-
-    async function exportMarkdown() {
-      saveToInput();
-
-      const input = inputEl();
-      if (!input) return;
-
-      const text = input.value;
-
-      try {
-        await navigator.clipboard.writeText(text);
-
-        copiedSinceChange = true;
-        lastCopyAt = new Date().toISOString();
-        setCopyBadge();
-        scheduleSave(); // persist copied flag
-
-        alert("Copied!");
-      } catch {
-        // Fallback: select the text and ask user to copy
-        input.focus();
-        input.select();
-
-        // Not counting this as copied because clipboard call failed
-        alert("Copy failed (permission/browser). Text selected — use Copy.");
-      }
-    }
-
-    function changeLevelById(nodeId, delta) {
-      const idx = indexOfId(nodeId);
+    function changeLevel(id, delta) {
+      const idx = indexById(id);
       if (idx < 0) return;
-
-      clearMoveState();
-
-      const fam = getFamilyByIndex(idx);
-      fam.forEach(i => { nodes[i].level = clamp(nodes[i].level + delta, 1, 6); });
-
-      revealAfterRender(nodeId);
-      render({ preserveScroll: false });
-      markDirty();
-    }
-
-    function addNewNodeAfterById(nodeId) {
-      clearMoveState();
-
-      const idx = indexOfId(nodeId);
-      if (idx < 0) return;
-
-      const fam = getFamilyByIndex(idx);
-      const insertAt = fam.slice(-1)[0] + 1;
-
-      const level = nodes[idx].level;
-      const nn = newNode(level, "", "", false, false);
-      nodes.splice(insertAt, 0, nn);
-
-      revealAfterRender(nn.id);
-      render({ preserveScroll: false });
-      markDirty();
-    }
-
-    function duplicateBlockById(nodeId) {
-      const idx = indexOfId(nodeId);
-      if (idx < 0) return;
-
-      clearMoveState();
-
-      const fam = getFamilyByIndex(idx);
-      const insertAt = fam.slice(-1)[0] + 1;
-
-      const clones = fam.map(i => {
-        const n = nodes[i];
-        return newNode(n.level, n.title ?? "", n.body ?? "", !!n.isCollapsed, false);
+      const fam = familyIndices(idx);
+      fam.forEach((i) => {
+        nodes[i].level = clamp(nodes[i].level + delta, 1, 6);
       });
-
-      nodes.splice(insertAt, 0, ...clones);
-
-      if (clones[0]) revealAfterRender(clones[0].id);
-      render({ preserveScroll: false });
-      markDirty();
+      markChanged();
+      render();
     }
 
-    function deleteBlockById(nodeId) {
-      const idx = indexOfId(nodeId);
+    function addNewAfter(idOrNull) {
+      if (!nodes.length || !idOrNull) {
+        const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false };
+        nodes.push(newNode);
+        lastCreatedId = newNode.id;
+        markChanged();
+        render();
+        return;
+      }
+      const idx = indexById(idOrNull);
       if (idx < 0) return;
-      if (!confirm("Delete?")) return;
+      const fam = familyIndices(idx);
+      const insertAt = fam[fam.length - 1] + 1;
+      const newNode = {
+        id: uid(),
+        level: nodes[idx].level,
+        title: "",
+        body: "",
+        isCollapsed: false,
+        showBody: false,
+      };
+      nodes.splice(insertAt, 0, newNode);
+      lastCreatedId = newNode.id;
+      markChanged();
+      render();
+    }
 
-      clearMoveState();
+    function duplicateBranch(id) {
+      const idx = indexById(id);
+      if (idx < 0) return;
+      const fam = familyIndices(idx);
+      const block = fam.map((i) => nodes[i]);
 
-      const fam = getFamilyByIndex(idx);
+      const clones = block.map((n) => ({
+        id: uid(),
+        level: n.level,
+        title: n.title,
+        body: n.body,
+        isCollapsed: n.isCollapsed,
+        showBody: n.showBody,
+      }));
+
+      const insertAt = fam[fam.length - 1] + 1;
+      nodes.splice(insertAt, 0, ...clones);
+      lastCreatedId = clones[0].id;
+      markChanged();
+      render();
+    }
+
+    function deleteBranch(id) {
+      const idx = indexById(id);
+      if (idx < 0) return;
+      if (!confirm("Delete this heading and its children?")) return;
+      const fam = familyIndices(idx);
       nodes.splice(idx, fam.length);
-
-      const next = nodes[Math.min(idx, nodes.length - 1)];
-      if (next) revealAfterRender(next.id);
-
-      render({ preserveScroll: false });
-      markDirty();
+      if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
+      markChanged();
+      render();
     }
 
-    function resetApp() {
-      if (!confirm("Reset?")) return;
+    // Stable move (fixes “disappears when moving to last sibling”)
+    function toggleMove(id) {
+      if (!sourceId) {
+        sourceId = id;
+        render();
+        return;
+      }
 
-      nodes = [];
-      idCounter = 1;
-      clearMoveState();
-      revealId = null;
+      if (sourceId === id) {
+        sourceId = null;
+        render();
+        return;
+      }
 
-      copiedSinceChange = false;
-      lastCopyAt = null;
+      const movingIds = new Set(familyIds(sourceId));
+      if (movingIds.has(id)) {
+        // can't move into itself/children
+        sourceId = null;
+        render();
+        return;
+      }
 
-      const input = inputEl();
-      if (input) input.value = "";
+      // Capture moving nodes (in order)
+      const movingNodes = nodes.filter((n) => movingIds.has(n.id));
 
-      try { localStorage.removeItem(storageKey); } catch {}
+      // Remove them
+      nodes = nodes.filter((n) => !movingIds.has(n.id));
 
-      render({ preserveScroll: true });
-      setSaveBadge("", "dim");
-      setCopyBadge();
-    }
+      // Find target in remaining list
+      const targetIdx = indexById(id);
+      if (targetIdx < 0) {
+        // if target vanished (shouldn't), append
+        nodes.push(...movingNodes);
+        sourceId = null;
+        markChanged();
+        render();
+        return;
+      }
 
-    function togglePinById(nodeId) {
-      if (sourceId === null) sourceId = nodeId;
-      else if (sourceId === nodeId) sourceId = null;
-      else sourceId = nodeId;
-      render({ preserveScroll: true });
-      markDirty(); // pin state is part of interaction history; treat as change
-    }
+      // Insert AFTER the target's current family in the remaining list
+      const targetFam = familyIndices(targetIdx);
+      const insertAt = targetFam[targetFam.length - 1] + 1;
 
-    function placePinnedAfterTargetId(targetId) {
-      if (sourceId === null) return;
-
-      const sIdx = indexOfId(sourceId);
-      const tIdx = indexOfId(targetId);
-      if (sIdx < 0 || tIdx < 0) { sourceId = null; render({ preserveScroll: true }); return; }
-
-      const sourceFamIdxs = getFamilyByIndex(sIdx);
-      if (sourceFamIdxs.includes(tIdx)) return;
-
-      const moving = nodes.splice(sIdx, sourceFamIdxs.length);
-      const movedRootId = moving[0]?.id ?? null;
-
-      const newTIdx = indexOfId(targetId);
-      const targetFamIdxs = getFamilyByIndex(newTIdx);
-      const insertAt = targetFamIdxs.slice(-1)[0] + 1;
-
-      nodes.splice(insertAt, 0, ...moving);
+      nodes.splice(insertAt, 0, ...movingNodes);
 
       sourceId = null;
-
-      if (movedRootId !== null) revealAfterRender(movedRootId);
-      render({ preserveScroll: false });
-      markDirty();
+      markChanged();
+      render();
     }
 
-    // ---- render ----
-    function render({ preserveScroll }) {
-      const canvas = canvasEl();
-      if (!canvas) return;
+    // Global depth filter
+    function setMaxLevel(level) {
+      maxVisibleLevel = clamp(level, 1, 6);
+      selMax.value = String(maxVisibleLevel);
+      markChanged();
+      render();
+    }
 
+    // ---- Render ----
+    function render() {
       const scrollPos = window.scrollY;
+
+      // Sync select
+      selMax.value = String(maxVisibleLevel);
+
       canvas.innerHTML = "";
 
-      const hidden = new Set();
+      // Determine hidden by collapsed branches
+      const hiddenByCollapse = new Set();
       nodes.forEach((n, idx) => {
-        if (n.isCollapsed) getFamilyByIndex(idx).slice(1).forEach(c => hidden.add(c));
+        if (n.isCollapsed) {
+          familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
+        }
       });
 
-      const movingFamilyIds = computeMovingFamilyIdSet();
+      const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
 
-      nodes.forEach((node, index) => {
-        if (hidden.has(index)) return;
+      nodes.forEach((n, idx) => {
+        // Global depth filter (collapse levels)
+        if (n.level > maxVisibleLevel) return;
 
-        const fam = getFamilyByIndex(index);
-        const hasChildren = fam.length > 1;
+        // Branch collapse hiding
+        if (hiddenByCollapse.has(idx)) return;
 
-        const isSource = (node.id === sourceId);
-        const isMovingChild = (sourceId !== null) && movingFamilyIds.has(node.id) && !isSource;
-        const isValidTarget = (sourceId !== null) && !movingFamilyIds.has(node.id);
+        const isSource = sourceId === n.id;
+        const isValidTarget = !!sourceId && !movingSet.has(n.id);
 
-        const div = document.createElement("div");
-        div.className = "node-item";
-        div.dataset.nodeId = String(node.id);
+        const node = document.createElement("div");
+        node.className =
+          `node level-${n.level}` +
+          (isSource ? " movingSource" : "") +
+          (isValidTarget ? " moveTarget" : "") +
+          (n.isCollapsed ? " collapsed" : "");
 
-        if (isSource) div.classList.add("moving-source");
-        if (isMovingChild) div.classList.add("moving-child-visual");
-        if (node.isCollapsed) div.classList.add("is-collapsed-node");
-        if (isValidTarget) div.classList.add("move-target-hint");
+        if (isValidTarget) node.addEventListener("click", () => toggleMove(n.id));
 
-        div.style.marginLeft = `${(node.level - 1) * 18}px`;
+        const hdr = document.createElement("div");
+        hdr.className = "hdr";
 
-        const headerRow = document.createElement("div");
-        headerRow.className = "node-header-row";
-
-        const drag = document.createElement("div");
-        drag.className = "drag-handle";
-        drag.textContent = isSource ? "📍 PIN" : "⠿";
-        drag.addEventListener("click", (e) => {
+        // Move handle / pin
+        const pin = document.createElement("div");
+        pin.className = "pill gray";
+        pin.textContent = isSource ? "📍 PIN" : "⠿";
+        pin.title = "Pin branch to move";
+        pin.addEventListener("click", (e) => {
           e.stopPropagation();
-          togglePinById(node.id);
+          toggleMove(n.id);
         });
 
-        let collapse;
-        if (hasChildren) {
-          collapse = document.createElement("div");
-          collapse.className = "collapse-toggle";
-          collapse.textContent = node.isCollapsed ? "▶" : "▼";
-          collapse.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleCollapseById(node.id);
-          });
-        } else {
-          collapse = document.createElement("div");
-          collapse.style.width = "34px";
-          collapse.style.flexShrink = "0";
-        }
+        // Collapse toggle
+        const col = document.createElement("div");
+        col.className = "pill gray";
+        col.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "•";
+        col.title = hasChildren(idx) ? "Fold/unfold branch" : "No children";
+        col.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (hasChildren(idx)) toggleBranchCollapse(n.id);
+        });
 
-        const hasBody = (node.body || "").trim().length > 0;
+        // Level pill
+        const lvl = document.createElement("div");
+        lvl.className = "pill";
+        lvl.textContent = `H${n.level}`;
 
-        const lvl = document.createElement("span");
-        lvl.className = "level-label";
-        lvl.textContent = `H${node.level}`;
-        if (hasBody) {
-          const note = document.createElement("span");
-          note.className = "has-body-icon";
-          note.textContent = "📝";
-          note.title = "This section has body text";
-          lvl.appendChild(note);
-        }
-
+        // Title
         const title = document.createElement("textarea");
-        title.className = "title-area";
+        title.className = "title";
         title.rows = 1;
-        title.value = node.title ?? "";
+        title.value = n.title || "";
         title.addEventListener("click", (e) => e.stopPropagation());
         title.addEventListener("input", () => {
-          const idx = indexOfId(node.id);
-          if (idx >= 0) nodes[idx].title = title.value;
-          autoResize(title);
-          markDirty();
+          n.title = title.value;
+          autoResizeTA(title);
+          markChanged();
         });
 
+        // Tools
         const tools = document.createElement("div");
-        tools.className = "btn-tools";
+        tools.className = "tools";
         tools.addEventListener("click", (e) => e.stopPropagation());
 
-        const mkBtn = (text, cssText, onClick, aria, extraClass) => {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.className = "tool-btn" + (extraClass ? (" " + extraClass) : "");
-          b.textContent = text;
-          b.style.cssText = cssText;
-          if (aria) b.setAttribute("aria-label", aria);
-          b.addEventListener("click", onClick);
-          return b;
-        };
+        // Body indicator + toggle
+        const hasBody = !!(n.body && n.body.trim());
+        const bodyBtn = document.createElement("button");
+        bodyBtn.type = "button";
+        bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
+        bodyBtn.className = hasBody ? "primary" : "";
+        bodyBtn.addEventListener("click", () => toggleBody(n.id));
 
-        if (isValidTarget) {
-          tools.append(
-            mkBtn("DROP", "", () => placePinnedAfterTargetId(node.id), "Drop pinned section here", "drop")
-          );
-        }
+        // Duplicate
+        const dup = document.createElement("button");
+        dup.type = "button";
+        dup.textContent = "⧉ Duplicate";
+        dup.addEventListener("click", () => duplicateBranch(n.id));
 
-        tools.append(
-          mkBtn(node.showBody ? "🙈" : "👁", "background:#fff;color:#111;", () => toggleBodyById(node.id),
-            node.showBody ? "Hide body text" : "Show body text")
-        );
+        // Add
+        const add = document.createElement("button");
+        add.type = "button";
+        add.textContent = "+ Add";
+        add.addEventListener("click", () => addNewAfter(n.id));
 
-        tools.append(
-          mkBtn("+",  "background:#0b7a2b;color:#fff;border-color:#0b7a2b;", () => addNewNodeAfterById(node.id), "Add section after"),
-          mkBtn("⧉", "background:#fff;color:#111;", () => duplicateBlockById(node.id), "Duplicate section (with children)"),
-          mkBtn("←", "background:#fff;color:#111;", () => changeLevelById(node.id, -1), "Decrease heading level"),
-          mkBtn("→", "background:#fff;color:#111;", () => changeLevelById(node.id,  1), "Increase heading level"),
-          mkBtn("✕", "background:#fff;color:#7a0000;border-color:#7a0000;", () => deleteBlockById(node.id), "Delete section (with children)")
-        );
+        // Level left/right
+        const left = document.createElement("button");
+        left.type = "button";
+        left.textContent = "←";
+        left.title = "Promote (H-1) for this branch";
+        left.addEventListener("click", () => changeLevel(n.id, -1));
 
-        headerRow.append(drag, collapse, lvl, title, tools);
-        div.appendChild(headerRow);
+        const right = document.createElement("button");
+        right.type = "button";
+        right.textContent = "→";
+        right.title = "Demote (H+1) for this branch";
+        right.addEventListener("click", () => changeLevel(n.id, +1));
 
-        if (node.isCollapsed) {
-          const folded = document.createElement("div");
-          folded.className = "folded-note";
-          folded.textContent = `Branch Folded (${fam.length - 1} sub-sections)`;
-          div.appendChild(folded);
-        } else if (node.showBody) {
-          const body = document.createElement("textarea");
-          body.className = "body-preview";
-          body.value = node.body ?? "";
-          body.addEventListener("input", () => {
-            const idx = indexOfId(node.id);
-            if (idx >= 0) nodes[idx].body = body.value;
-            markDirty();
-          });
-          div.appendChild(body);
-        }
+        // Delete
+        const del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "✕";
+        del.className = "warn";
+        del.title = "Delete branch";
+        del.addEventListener("click", () => deleteBranch(n.id));
 
-        canvas.appendChild(div);
-        autoResize(title);
+        tools.append(bodyBtn, dup, add, left, right, del);
+
+        hdr.append(pin, col, lvl, title, tools);
+        node.appendChild(hdr);
+
+        // Body area (hidden by default)
+        const bodyWrap = document.createElement("div");
+        bodyWrap.className = "body" + (n.showBody ? " show" : "");
+
+        const bodyTA = document.createElement("textarea");
+        bodyTA.rows = 6;
+        bodyTA.value = (n.body || "").trimEnd();
+        bodyTA.addEventListener("input", () => {
+          n.body = bodyTA.value;
+          markChanged();
+        });
+        bodyWrap.appendChild(bodyTA);
+        node.appendChild(bodyWrap);
+
+        canvas.appendChild(node);
+
+        autoResizeTA(title);
       });
 
-      requestAnimationFrame(() => {
-        if (revealId !== null) {
-          const el = canvas.querySelector(`.node-item[data-node-id="${CSS.escape(String(revealId))}"]`);
-          revealId = null;
+      // restore scroll position
+      window.scrollTo(0, scrollPos);
 
-          if (el) {
-            el.scrollIntoView({ block: "center", behavior: "smooth" });
-            el.style.outline = "4px solid #0b5fff";
-            el.style.outlineOffset = "4px";
-            setTimeout(() => {
-              el.style.outline = "";
-              el.style.outlineOffset = "";
-            }, 900);
-
-            const title = el.querySelector(".title-area");
-            if (title) {
-              try { title.focus({ preventScroll: true }); } catch { title.focus(); }
-            }
-            return;
-          }
-        }
-
-        if (preserveScroll) window.scrollTo(0, scrollPos);
-      });
-    }
-
-    // ---- restore ----
-    function restoreIfAvailable() {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return false;
-
-      const data = safeJsonParse(raw);
-      if (!data || typeof data !== "object") return false;
-
-      if (Array.isArray(data.nodes)) nodes = data.nodes;
-      normalizeNodesInPlace();
-
-      const maxId = nodes.reduce((m, n) => Math.max(m, Number(n.id) || 0), 0);
-      idCounter = Math.max(maxId + 1, Number(data.idCounter) || 1);
-
-      copiedSinceChange = !!data.copiedSinceChange;
-      lastCopyAt = (typeof data.lastCopyAt === "string") ? data.lastCopyAt : null;
-
-      const input = inputEl();
-      if (input && typeof data.md === "string") input.value = data.md;
-
-      setCopyBadge();
-
-      if (nodes[0]) revealAfterRender(nodes[0].id);
-      render({ preserveScroll: false });
-      markSaved();
-      return true;
-    }
-
-    // ---- bind top buttons ----
-    const loadBtn = container.querySelector(".load-btn");
-    const saveBtn = container.querySelector(".save-back-btn");
-    const exportBtn = container.querySelector(".export-btn");
-    const resetBtn = container.querySelector(".reset-btn");
-    const input = inputEl();
-
-    if (loadBtn) loadBtn.addEventListener("click", parseMarkdown);
-    if (saveBtn) saveBtn.addEventListener("click", saveToInput);
-    if (exportBtn) exportBtn.addEventListener("click", exportMarkdown);
-    if (resetBtn) resetBtn.addEventListener("click", resetApp);
-
-    if (input) input.addEventListener("input", () => markDirty());
-
-    // ---- initial ----
-    setSaveBadge("", "dim");
-    setCopyBadge();
-    render({ preserveScroll: true });
-
-    const restored = (() => { try { return restoreIfAvailable(); } catch { return false; } })();
-    if (!restored) {
-      // default state: nothing copied yet
-      copiedSinceChange = false;
-      lastCopyAt = null;
-      setCopyBadge();
-    }
-
-    // ---- cleanup if Squarespace swaps DOM ----
-    const cleanupObserver = new MutationObserver(() => {
-      if (!document.documentElement.contains(container)) {
-        clearInterval(pulse);
-        if (saveTimer) clearTimeout(saveTimer);
-        cleanupObserver.disconnect();
+      // autofocus newly created
+      if (lastCreatedId) {
+        const el = [...canvas.querySelectorAll(".node")].find((div) => {
+          // try find title textarea inside a node whose title matches empty new nodes…
+          // instead: focus first title in view if any and it’s empty
+          const t = div.querySelector(".title");
+          return t && t.value === "";
+        });
+        if (el) el.querySelector(".title").focus();
+        lastCreatedId = null;
       }
+    }
+
+    // ---- Buttons / events ----
+    btnLoad.addEventListener("click", () => {
+      const text = taInput.value || "";
+      if (!text.trim()) return;
+      nodes = parseMarkdown(text);
+      sourceId = null;
+      markChanged();
+      render();
     });
-    cleanupObserver.observe(document.documentElement, { childList: true, subtree: true });
-  }
 
-  // ----------------------------
-  // Boot (Squarespace/AJAX friendly)
-  // ----------------------------
-  function initAll() {
-    ensureStyleInjected();
-    const containers = document.querySelectorAll(`.${APP_CLASS}`);
-    containers.forEach((c, idx) => initInstance(c, idx));
-  }
+    btnUpdate.addEventListener("click", () => {
+      taInput.value = toMarkdown();
+      markChanged();
+    });
 
-  function boot() {
-    initAll();
+    btnCopy.addEventListener("click", async () => {
+      const md = toMarkdown();
+      taInput.value = md; // keep in sync
+      const ok = await copyText(md);
+      if (ok) setCopiedFlag(true);
+      else alert("Copy failed.");
+      saveDebounced();
+    });
 
-    const t = setInterval(initAll, 300);
-    setTimeout(() => clearInterval(t), 9000);
+    btnReset.addEventListener("click", () => {
+      if (!confirm("Reset everything (including saved state for this app instance)?")) return;
+      nodes = [];
+      sourceId = null;
+      taInput.value = "";
+      maxVisibleLevel = 6;
+      setCopiedFlag(false);
+      try { localStorage.removeItem(KEY); } catch {}
+      saveDebounced();
+      render();
+    });
 
-    const obs = new MutationObserver(() => initAll());
-    obs.observe(document.documentElement, { childList: true, subtree: true });
+    btnAddTop.addEventListener("click", () => addNewAfter(null));
 
-    window.addEventListener("popstate", () => setTimeout(initAll, 0));
-    window.addEventListener("hashchange", () => setTimeout(initAll, 0));
-  }
+    selMax.addEventListener("change", () => setMaxLevel(parseInt(selMax.value, 10)));
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
-  }
+    btnLvl1.addEventListener("click", () => setMaxLevel(1));
+    btnLvl2.addEventListener("click", () => setMaxLevel(2));
+    btnLvl3.addEventListener("click", () => setMaxLevel(3));
+    btnLvlAll.addEventListener("click", () => setMaxLevel(6));
+
+    // Input changes should mark "not copied"
+    taInput.addEventListener("input", () => markChanged());
+
+    // ---- Init ----
+    loadPref();               // ✅ yes: state load belongs here (init)
+    setCopiedFlag(copiedSinceChange);
+    badgeSave.className = "badge good badgeSave";
+    badgeSave.textContent = "Saved ✓";
+    render();
+    saveDebounced();
+  });
 })();
-
