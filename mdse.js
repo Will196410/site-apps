@@ -393,6 +393,27 @@
   font-weight: 700;
   text-align:right;
 }
+
+/* --- FIX: iPad/Safari flex squeeze -> use grid for header layout --- */
+[data-app="mdse"] .hdr{
+  display: grid !important;
+  grid-template-columns: auto auto auto minmax(240px, 1fr) auto;
+  column-gap: 10px;
+  align-items: start;
+}
+
+/* title fills the 1fr column */
+[data-app="mdse"] .title{
+  width: 100% !important;
+  min-width: 240px !important;
+}
+
+/* tools stay in last column */
+[data-app="mdse"] .tools{
+  margin-left: 0 !important;  /* grid doesn’t need this */
+  justify-content: flex-end;
+}
+
 `;
   }
 
