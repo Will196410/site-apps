@@ -466,8 +466,9 @@
 
   // ---- Tag parsing helpers ----
   // Accept both: "%% ..." and "\%% ..."
-  const TAG_LINE_RE = /^\s*\\?%%\s*(.*)\s*$/;
-
+  // Only treat lines starting with "%% tag" (or "\%% tag") as tags
+  const TAG_LINE_RE = /^\s*\\?%%\s*tag\s+(.*)\s*$/i;
+  
   function normaliseTag(t) {
     return (t || "")
       .trim()
