@@ -192,7 +192,7 @@
   display:flex;
   gap: 10px;
   align-items:flex-start;
-  flex-wrap: nowrap; /* stops Safari doing “helpful” wrapping */
+  flex-wrap: wrap; /* stops Safari doing “helpful” wrapping */
 }
 
 [data-app="mdse"] .pill{
@@ -210,6 +210,7 @@
   flex: 1 1 320px;   /* give Safari a sensible starting width */
   min-width: 0;      /* IMPORTANT for flex children in Safari */
   width: 100%;       /* belt-and-braces */
+  display: block;
   border:2px solid rgba(0,0,0,.15);
   border-radius: 12px;
   padding: 10px 12px;
@@ -227,6 +228,7 @@
   justify-content:flex-end;
   align-items:flex-start;
   flex: 0 0 auto;
+  margin-left: auto; /* keeps tools to the right on wide rows */
 }
 [data-app="mdse"] .tools button{
   padding: 8px 10px;
