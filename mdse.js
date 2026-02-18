@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-mdse-style-v2"; // bump style id so CSS updates cleanly
+  const STYLE_ID = "siteapps-mdse-style-v3";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -58,6 +58,27 @@
 }
 [data-app="mdse"] .topbar .left{ flex: 1 1 520px; }
 [data-app="mdse"] .topbar .right{ flex: 1 1 220px; display:flex; justify-content:flex-end; }
+
+[data-app="mdse"] .tabs{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+  margin: 6px 0 10px;
+}
+[data-app="mdse"] .tabbtn{
+  border:2px solid #111;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 1000;
+  background:#fff;
+  cursor:pointer;
+}
+[data-app="mdse"] .tabbtn.active{
+  background:#111;
+  color:#fff;
+}
+[data-app="mdse"] .tabPanel{ display:none; }
+[data-app="mdse"] .tabPanel.active{ display:block; }
 
 [data-app="mdse"] .btnrow{
   display:flex;
@@ -116,7 +137,7 @@
   background:#fff;
 }
 
-/* Search UI */
+/* Search UI (Structure tab) */
 [data-app="mdse"] .searchRow{
   display:flex;
   gap:8px;
@@ -236,7 +257,7 @@
   background:#fffbe6 !important;
 }
 
-/* Search highlighting */
+/* Search highlighting (Structure tab) */
 [data-app="mdse"] .match{
   outline: 4px solid rgba(255, 170, 0, .65);
   outline-offset: 2px;
@@ -244,6 +265,86 @@
 [data-app="mdse"] .activeMatch{
   outline: 5px solid rgba(255, 120, 0, .85);
   outline-offset: 3px;
+}
+
+/* Tags tab */
+[data-app="mdse"] .tagbar{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin: 10px 0 12px;
+}
+[data-app="mdse"] .tagchip{
+  border:2px solid #111;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 1000;
+  background:#fff;
+  cursor:pointer;
+}
+[data-app="mdse"] .tagchip.active{
+  background:#111;
+  color:#fff;
+}
+[data-app="mdse"] .tagmeta{
+  font-weight: 900;
+  color:#444;
+  font-size: 13px;
+}
+[data-app="mdse"] .taglist{
+  display:grid;
+  gap: 10px;
+}
+[data-app="mdse"] .tagcard{
+  border:2px solid rgba(0,0,0,.15);
+  border-radius: 14px;
+  padding: 12px;
+  background:#fff;
+  cursor:pointer;
+}
+[data-app="mdse"] .tagcard:hover{
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+[data-app="mdse"] .tagcard .toph{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  flex-wrap:wrap;
+  font-weight: 1000;
+}
+[data-app="mdse"] .tagcard .toph .lvl{
+  border:2px solid #111;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 1000;
+}
+[data-app="mdse"] .tagcard .titleline{
+  font-size: 15px;
+  font-weight: 1000;
+}
+[data-app="mdse"] .tagcard .preview{
+  margin-top: 6px;
+  color:#333;
+  font-weight: 750;
+  font-size: 14px;
+  line-height: 1.35;
+}
+[data-app="mdse"] .tagcard .subtags{
+  margin-top: 8px;
+  display:flex;
+  gap: 8px;
+  flex-wrap:wrap;
+}
+[data-app="mdse"] .tagpill{
+  border: 2px solid rgba(0,0,0,.15);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 1000;
+  color:#444;
+  background:#fff;
 }
 
 [data-app="mdse"] .footer{
@@ -299,6 +400,85 @@
     }
   }
 
+  // ---- Tag parsing helpers ----
+  // Accept both: "%% ..." and "\%% ..."
+  const TAG_LINE_RE = /^\s*\\?%%\s*(.*)\s*$/;
+
+  function normaliseTag(t) {
+    return (t || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  }
+
+  function extractTagsFromBody(bodyText) {
+    const tags = [];
+    const lines = (bodyText || "").split("\n");
+    for (const line of lines) {
+      const m = line.match(TAG_LINE_RE);
+      if (!m) continue;
+      const payload = (m[1] || "").trim();
+      if (!payload) continue;
+
+      // Support either:
+      // 1) "arc:escape" (one per line)
+      // 2) "tags: arc:escape, pov:ember"
+      const lower = payload.toLowerCase();
+      let chunk = payload;
+
+      if (lower.startsWith("tags:")) {
+        chunk = payload.slice(payload.indexOf(":") + 1);
+      }
+
+      // Split on commas first; then trim
+      const parts = chunk
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      // If someone writes "arc:escape pov:ember" on one line, split spaces too
+      for (const p of parts) {
+        const sub = p.split(/\s+/).map((x) => x.trim()).filter(Boolean);
+        for (const item of sub) {
+          const nt = normaliseTag(item);
+          if (!nt) continue;
+          tags.push(nt);
+        }
+      }
+    }
+
+    // de-dupe, keep stable order
+    const seen = new Set();
+    const out = [];
+    for (const t of tags) {
+      if (seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+    }
+    return out;
+  }
+
+  function bodyWithoutTagLines(bodyText) {
+    const lines = (bodyText || "").split("\n");
+    const kept = [];
+    for (const line of lines) {
+      if (TAG_LINE_RE.test(line)) continue;
+      kept.push(line);
+    }
+    return kept.join("\n").trim();
+  }
+
+  function firstSentence(text) {
+    const s = (text || "").trim();
+    if (!s) return "";
+    // Find first ., !, ? followed by whitespace/end
+    const m = s.match(/^[\s\S]*?[.!?](?=\s|$)/);
+    if (m && m[0]) return m[0].trim();
+    // fallback: first line
+    const line = s.split("\n").find((x) => x.trim());
+    return (line || "").trim();
+  }
+
   // ---- Core app ----
   window.SiteApps.register("mdse", (container) => {
     ensureStyle();
@@ -306,19 +486,23 @@
     const KEY = storageKey(container);
 
     // State
-    let nodes = []; // {id, level, title, body, isCollapsed, showBody}
+    let nodes = []; // {id, level, title, body, isCollapsed, showBody, tags[]}
     let sourceId = null;
     let lastCreatedId = null;
     let maxVisibleLevel = 6;
     let copiedSinceChange = false;
     let lastCopyAt = null;
 
-    // Search state
+    // Search state (Structure tab)
     let searchQuery = "";
     let searchInBody = false;
     let revealMatches = true;
     let matchIds = [];
     let matchPos = -1;
+
+    // Tabs / Tags view state
+    let activeTab = "structure"; // "structure" | "tags"
+    let activeTag = ""; // normalised tag or ""
 
     let saveTimer = null;
 
@@ -331,43 +515,63 @@
   <div class="left">
     <h3>Markdown Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
-    <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
 
-    <div class="btnrow">
-      <button class="primary btnLoad" type="button">Load Markdown</button>
-      <button class="btnUpdate" type="button">Update Input Area</button>
-      <button class="primary btnCopy" type="button">Copy Result</button>
-      <button class="warn btnReset" type="button">Reset Everything</button>
-      <button class="btnAddTop" type="button">+ Add H1</button>
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button type="button" class="tabbtn tabStructure" role="tab" aria-selected="true">Structure</button>
+      <button type="button" class="tabbtn tabTags" role="tab" aria-selected="false">Tags</button>
     </div>
 
-    <div class="levelFilter">
-      <label for="mdseMaxLevel">Show up to:</label>
-      <select id="mdseMaxLevel">
-        <option value="1">H1</option>
-        <option value="2">H2</option>
-        <option value="3">H3</option>
-        <option value="4">H4</option>
-        <option value="5">H5</option>
-        <option value="6">H6 (All)</option>
-      </select>
+    <div class="tabPanel panelStructure active" role="tabpanel">
+      <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
 
-      <button type="button" class="btnLvl1">H1</button>
-      <button type="button" class="btnLvl2">H1–H2</button>
-      <button type="button" class="btnLvl3">H1–H3</button>
-      <button type="button" class="btnLvlAll">All</button>
+      <div class="btnrow">
+        <button class="primary btnLoad" type="button">Load Markdown</button>
+        <button class="btnUpdate" type="button">Update Input Area</button>
+        <button class="primary btnCopy" type="button">Copy Result</button>
+        <button class="warn btnReset" type="button">Reset Everything</button>
+        <button class="btnAddTop" type="button">+ Add H1</button>
+      </div>
+
+      <div class="levelFilter">
+        <label for="mdseMaxLevel">Show up to:</label>
+        <select id="mdseMaxLevel">
+          <option value="1">H1</option>
+          <option value="2">H2</option>
+          <option value="3">H3</option>
+          <option value="4">H4</option>
+          <option value="5">H5</option>
+          <option value="6">H6 (All)</option>
+        </select>
+
+        <button type="button" class="btnLvl1">H1</button>
+        <button type="button" class="btnLvl2">H1–H2</button>
+        <button type="button" class="btnLvl3">H1–H3</button>
+        <button type="button" class="btnLvlAll">All</button>
+      </div>
+
+      <div class="searchRow" role="search" aria-label="Outline search">
+        <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
+        <button type="button" class="btnPrev">Prev</button>
+        <button type="button" class="btnNext">Next</button>
+        <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
+        <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
+        <span class="searchCount" id="mdseCount"></span>
+      </div>
+
+      <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
+
+      <div class="canvas"></div>
     </div>
 
-    <div class="searchRow" role="search" aria-label="Outline search">
-      <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
-      <button type="button" class="btnPrev">Prev</button>
-      <button type="button" class="btnNext">Next</button>
-      <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
-      <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
-      <span class="searchCount" id="mdseCount"></span>
+    <div class="tabPanel panelTags" role="tabpanel">
+      <div class="muted">Tags are read from lines starting with <b>%%</b> or <b>\\%%</b> inside each section’s body.</div>
+      <div class="tagbar">
+        <button type="button" class="tagchip tagAll active">All tags</button>
+        <span class="tagmeta tagMeta"></span>
+      </div>
+      <div class="tagbar tagCloud" aria-label="Tag list"></div>
+      <div class="taglist tagResults" aria-live="polite"></div>
     </div>
-
-    <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
   </div>
 
   <div class="right">
@@ -378,12 +582,18 @@
   </div>
 </div>
 
-<div class="canvas"></div>
-<div class="footer">v5.1 — Search + Reveal + Next/Prev</div>
+<div class="footer">v5.2 — Tabs + Tag View + Ulysses \\%% Support</div>
 `;
 
     const $ = (sel) => container.querySelector(sel);
 
+    // Tabs
+    const btnTabStructure = $(".tabStructure");
+    const btnTabTags = $(".tabTags");
+    const panelStructure = $(".panelStructure");
+    const panelTags = $(".panelTags");
+
+    // Structure UI
     const taInput = $(".mdInput");
     const canvas = $(".canvas");
 
@@ -409,6 +619,12 @@
     const cbReveal = $("#mdseReveal");
     const countEl = $("#mdseCount");
 
+    // Tags UI
+    const tagMeta = $(".tagMeta");
+    const tagAllBtn = $(".tagAll");
+    const tagCloud = $(".tagCloud");
+    const tagResults = $(".tagResults");
+
     // ---- Persistence ----
     function setCopiedFlag(flag) {
       copiedSinceChange = !!flag;
@@ -418,26 +634,21 @@
       badgeCopy.title = copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
     }
 
-    function markChanged() {
-      setCopiedFlag(false);
-      rebuildMatches(); // keep search in sync
-      saveDebounced();
-    }
-
     function saveNow() {
       try {
         const state = {
-          v: 2,
+          v: 3,
           nodes,
           input: taInput.value,
           sourceId,
           maxVisibleLevel,
           copiedSinceChange,
           lastCopyAt,
-          // search prefs
           searchQuery,
           searchInBody,
-          revealMatches
+          revealMatches,
+          activeTab,
+          activeTag,
         };
         localStorage.setItem(KEY, JSON.stringify(state));
         badgeSave.className = "badge good badgeSave";
@@ -458,6 +669,13 @@
       }, 500);
     }
 
+    function markChanged() {
+      setCopiedFlag(false);
+      rebuildMatches();
+      rebuildTagUI();
+      saveDebounced();
+    }
+
     function loadPref() {
       const raw = localStorage.getItem(KEY);
       if (!raw) return;
@@ -471,22 +689,28 @@
       copiedSinceChange = !!s.copiedSinceChange;
       lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
 
-      // Search prefs (query optional)
       if (typeof s.searchQuery === "string") searchQuery = s.searchQuery;
       if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
       if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
 
-      // sanitise nodes
+      if (typeof s.activeTab === "string") activeTab = s.activeTab === "tags" ? "tags" : "structure";
+      if (typeof s.activeTag === "string") activeTag = normaliseTag(s.activeTag);
+
+      // sanitise nodes & ensure tags exist
       nodes = nodes
         .filter((n) => n && typeof n === "object")
-        .map((n) => ({
-          id: typeof n.id === "string" ? n.id : uid(),
-          level: clamp(parseInt(n.level, 10) || 1, 1, 6),
-          title: typeof n.title === "string" ? n.title : "",
-          body: typeof n.body === "string" ? n.body : "",
-          isCollapsed: !!n.isCollapsed,
-          showBody: !!n.showBody,
-        }));
+        .map((n) => {
+          const body = typeof n.body === "string" ? n.body : "";
+          return {
+            id: typeof n.id === "string" ? n.id : uid(),
+            level: clamp(parseInt(n.level, 10) || 1, 1, 6),
+            title: typeof n.title === "string" ? n.title : "",
+            body,
+            isCollapsed: !!n.isCollapsed,
+            showBody: !!n.showBody,
+            tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
+          };
+        });
     }
 
     // ---- Markdown parse / export ----
@@ -505,12 +729,19 @@
             body: "",
             isCollapsed: false,
             showBody: false,
+            tags: [],
           };
           out.push(current);
         } else if (current) {
           current.body += line + "\n";
         }
       }
+
+      // extract tags post-pass (body already built)
+      out.forEach((n) => {
+        n.tags = extractTagsFromBody(n.body);
+      });
+
       return out;
     }
 
@@ -547,11 +778,10 @@
     }
 
     function hasChildren(idx) {
-      const fam = familyIndices(idx);
-      return fam.length > 1;
+      return familyIndices(idx).length > 1;
     }
 
-    // ---- Search helpers ----
+    // ---- Search helpers (Structure tab) ----
     const norm = (s) => (s || "").toLowerCase();
 
     function nodeMatches(n, q) {
@@ -581,7 +811,7 @@
       }
 
       updateCount();
-      render();
+      renderStructure();
     }
 
     function updateCount() {
@@ -601,14 +831,10 @@
       const reveal = new Set();
       if (!revealMatches || !searchQuery.trim() || !matchIds.length) return reveal;
 
-      // reveal ancestors of matching nodes
       for (let i = 0; i < nodes.length; i++) {
         if (!nodeMatches(nodes[i], searchQuery)) continue;
-
-        // include the node
         reveal.add(nodes[i].id);
 
-        // walk back to parents based on decreasing level
         let childLevel = nodes[i].level;
         for (let j = i - 1; j >= 0; j--) {
           if (nodes[j].level < childLevel) {
@@ -621,14 +847,13 @@
       return reveal;
     }
 
-    function jump(delta) {
+    function jumpMatch(delta) {
       if (!matchIds.length) return;
       matchPos = (matchPos + delta + matchIds.length) % matchIds.length;
       updateCount();
-      render();
+      renderStructure();
 
       const id = matchIds[matchPos];
-      // find the element after render
       const el = canvas.querySelector(`[data-node-id="${id}"]`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -664,7 +889,7 @@
 
     function addNewAfter(idOrNull) {
       if (!nodes.length || !idOrNull) {
-        const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false };
+        const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
         nodes.push(newNode);
         lastCreatedId = newNode.id;
         markChanged();
@@ -681,6 +906,7 @@
         body: "",
         isCollapsed: false,
         showBody: false,
+        tags: [],
       };
       nodes.splice(insertAt, 0, newNode);
       lastCreatedId = newNode.id;
@@ -700,6 +926,7 @@
         body: n.body,
         isCollapsed: n.isCollapsed,
         showBody: n.showBody,
+        tags: Array.isArray(n.tags) ? [...n.tags] : extractTagsFromBody(n.body),
       }));
 
       const insertAt = fam[fam.length - 1] + 1;
@@ -722,20 +949,20 @@
     function toggleMove(id) {
       if (!sourceId) {
         sourceId = id;
-        render();
+        renderStructure();
         return;
       }
 
       if (sourceId === id) {
         sourceId = null;
-        render();
+        renderStructure();
         return;
       }
 
       const movingIds = new Set(familyIds(sourceId));
       if (movingIds.has(id)) {
         sourceId = null;
-        render();
+        renderStructure();
         return;
       }
 
@@ -765,20 +992,146 @@
       markChanged();
     }
 
-    // ---- Render ----
-    function render() {
+    // ---- Tabs ----
+    function setTab(tab) {
+      activeTab = tab === "tags" ? "tags" : "structure";
+      btnTabStructure.classList.toggle("active", activeTab === "structure");
+      btnTabTags.classList.toggle("active", activeTab === "tags");
+
+      btnTabStructure.setAttribute("aria-selected", activeTab === "structure" ? "true" : "false");
+      btnTabTags.setAttribute("aria-selected", activeTab === "tags" ? "true" : "false");
+
+      panelStructure.classList.toggle("active", activeTab === "structure");
+      panelTags.classList.toggle("active", activeTab === "tags");
+
+      if (activeTab === "tags") {
+        rebuildTagUI();
+      }
+      saveDebounced();
+    }
+
+    // ---- Tags view ----
+    function allTags() {
+      const set = new Set();
+      nodes.forEach((n) => (n.tags || []).forEach((t) => set.add(t)));
+      return [...set].sort((a, b) => a.localeCompare(b));
+    }
+
+    function tagsCountMap() {
+      const m = new Map();
+      nodes.forEach((n) => {
+        (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1));
+      });
+      return m;
+    }
+
+    function renderTagCloud(tags, counts) {
+      tagCloud.innerHTML = "";
+      if (!tags.length) {
+        tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% arc:escape</b> inside a section’s body.</span>`;
+        return;
+      }
+
+      tags.forEach((t) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tagchip" + (activeTag === t ? " active" : "");
+        btn.textContent = `${t} (${counts.get(t) || 0})`;
+        btn.addEventListener("click", () => {
+          activeTag = activeTag === t ? "" : t;
+          rebuildTagUI();
+          saveDebounced();
+        });
+        tagCloud.appendChild(btn);
+      });
+    }
+
+    function renderTagResults() {
+      tagResults.innerHTML = "";
+
+      if (!activeTag) {
+        tagMeta.textContent = `Choose a tag to see matching sections (in manuscript order).`;
+        return;
+      }
+
+      const matches = nodes.filter((n) => (n.tags || []).includes(activeTag));
+      tagMeta.textContent = `${activeTag}: ${matches.length} section${matches.length === 1 ? "" : "s"}`;
+
+      if (!matches.length) return;
+
+      matches.forEach((n) => {
+        const card = document.createElement("div");
+        card.className = "tagcard";
+        card.title = "Tap to jump to this section in Structure view";
+        card.addEventListener("click", () => {
+          setTab("structure");
+          // ensure it’s visible
+          // (if level filter hides it, temporarily bump)
+          if (n.level > maxVisibleLevel) {
+            maxVisibleLevel = 6;
+            selMax.value = "6";
+          }
+          // reveal via scroll/focus
+          renderStructure();
+          const el = canvas.querySelector(`[data-node-id="${n.id}"]`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            const t = el.querySelector(".title");
+            if (t) t.focus();
+          }
+        });
+
+        const top = document.createElement("div");
+        top.className = "toph";
+        const lvl = document.createElement("span");
+        lvl.className = "lvl";
+        lvl.textContent = `H${n.level}`;
+        const title = document.createElement("span");
+        title.className = "titleline";
+        title.textContent = n.title || "(untitled)";
+        top.append(lvl, title);
+
+        const cleaned = bodyWithoutTagLines(n.body);
+        const preview = firstSentence(cleaned);
+        const p = document.createElement("div");
+        p.className = "preview";
+        p.textContent = preview ? preview : "(No body text yet.)";
+
+        const subtags = document.createElement("div");
+        subtags.className = "subtags";
+        (n.tags || []).slice(0, 12).forEach((t) => {
+          const pill = document.createElement("span");
+          pill.className = "tagpill";
+          pill.textContent = t;
+          subtags.appendChild(pill);
+        });
+
+        card.append(top, p, subtags);
+        tagResults.appendChild(card);
+      });
+    }
+
+    function rebuildTagUI() {
+      // Sync "All tags" chip
+      tagAllBtn.classList.toggle("active", !activeTag);
+
+      const tags = allTags();
+      const counts = tagsCountMap();
+      renderTagCloud(tags, counts);
+      renderTagResults();
+    }
+
+    // ---- Render (Structure tab) ----
+    function renderStructure() {
       const scrollPos = window.scrollY;
 
       selMax.value = String(maxVisibleLevel);
-
-      // Sync search UI
       inSearch.value = searchQuery;
       cbBody.checked = searchInBody;
       cbReveal.checked = revealMatches;
 
       canvas.innerHTML = "";
 
-      // Collapsed hiding (but allow reveal to override)
       const hiddenByCollapse = new Set();
       nodes.forEach((n, idx) => {
         if (n.isCollapsed) {
@@ -787,22 +1140,15 @@
       });
 
       const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
-
-      // Reveal matching branches
       const revealSet = computeRevealSet();
-
-      // For quick match checks in render
       const matchSet = new Set(matchIds);
 
       nodes.forEach((n, idx) => {
         if (n.level > maxVisibleLevel) return;
-
-        // Hidden by collapse unless reveal says otherwise (or it's an ancestor in revealSet)
         if (hiddenByCollapse.has(idx) && !revealSet.has(n.id)) return;
 
         const isSource = sourceId === n.id;
         const isValidTarget = !!sourceId && !movingSet.has(n.id);
-
         const isMatch = searchQuery.trim() && matchSet.has(n.id);
         const isActive = isMatch && matchPos >= 0 && matchIds[matchPos] === n.id;
 
@@ -899,7 +1245,7 @@
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
 
-        // Body area (hidden by default) — BUT reveal body if match is body-only while searching & revealMatches on
+        // Body area: show if user toggled, or if reveal+body-match-only while searching
         const bodyShouldShow =
           n.showBody ||
           (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
@@ -912,13 +1258,14 @@
         bodyTA.value = (n.body || "").trimEnd();
         bodyTA.addEventListener("input", () => {
           n.body = bodyTA.value;
+          // tags update live from body edits (supports %% and \%%)
+          n.tags = extractTagsFromBody(n.body);
           markChanged();
         });
         bodyWrap.appendChild(bodyTA);
         node.appendChild(bodyWrap);
 
         canvas.appendChild(node);
-
         autoResizeTA(title);
       });
 
@@ -935,6 +1282,15 @@
     }
 
     // ---- Buttons / events ----
+    btnTabStructure.addEventListener("click", () => setTab("structure"));
+    btnTabTags.addEventListener("click", () => setTab("tags"));
+
+    tagAllBtn.addEventListener("click", () => {
+      activeTag = "";
+      rebuildTagUI();
+      saveDebounced();
+    });
+
     btnLoad.addEventListener("click", () => {
       const text = taInput.value || "";
       if (!text.trim()) return;
@@ -963,25 +1319,28 @@
       sourceId = null;
       taInput.value = "";
       maxVisibleLevel = 6;
+
       searchQuery = "";
       matchIds = [];
       matchPos = -1;
+
+      activeTag = "";
+
       setCopiedFlag(false);
       try { localStorage.removeItem(KEY); } catch {}
       saveDebounced();
-      render();
+      renderStructure();
+      rebuildTagUI();
     });
 
     btnAddTop.addEventListener("click", () => addNewAfter(null));
 
     selMax.addEventListener("change", () => setMaxLevel(parseInt(selMax.value, 10)));
-
     btnLvl1.addEventListener("click", () => setMaxLevel(1));
     btnLvl2.addEventListener("click", () => setMaxLevel(2));
     btnLvl3.addEventListener("click", () => setMaxLevel(3));
     btnLvlAll.addEventListener("click", () => setMaxLevel(6));
 
-    // Search events
     inSearch.addEventListener("input", () => {
       searchQuery = inSearch.value || "";
       rebuildMatches();
@@ -996,19 +1355,18 @@
 
     cbReveal.addEventListener("change", () => {
       revealMatches = !!cbReveal.checked;
-      render();
+      renderStructure();
       saveDebounced();
     });
 
-    btnPrev.addEventListener("click", () => jump(-1));
-    btnNext.addEventListener("click", () => jump(+1));
+    btnPrev.addEventListener("click", () => jumpMatch(-1));
+    btnNext.addEventListener("click", () => jumpMatch(+1));
 
-    // Enter = Next, Shift+Enter = Prev (nice on desktop; harmless on iPad)
     inSearch.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (e.shiftKey) jump(-1);
-        else jump(+1);
+        if (e.shiftKey) jumpMatch(-1);
+        else jumpMatch(+1);
       }
       if (e.key === "Escape") {
         e.preventDefault();
@@ -1017,28 +1375,33 @@
         matchPos = -1;
         inSearch.value = "";
         updateCount();
-        render();
+        renderStructure();
         saveDebounced();
       }
     });
 
-    // Input changes should mark "not copied"
     taInput.addEventListener("input", () => markChanged());
 
     // ---- Init ----
     loadPref();
     setCopiedFlag(copiedSinceChange);
 
-    // Sync UI with loaded prefs
     selMax.value = String(maxVisibleLevel);
     inSearch.value = searchQuery;
     cbBody.checked = searchInBody;
     cbReveal.checked = revealMatches;
 
+    // Default badge
     badgeSave.className = "badge good badgeSave";
     badgeSave.textContent = "Saved ✓";
 
-    rebuildMatches(); // renders as well
+    // initial renders
+    rebuildMatches();  // calls renderStructure
+    rebuildTagUI();
+
+    // set tab last (so UI is correct)
+    setTab(activeTab);
+
     saveDebounced();
   });
 })();
