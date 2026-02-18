@@ -192,7 +192,9 @@
   display:flex;
   gap: 10px;
   align-items:flex-start;
+  flex-wrap: nowrap; /* stops Safari doing “helpful” wrapping */
 }
+
 [data-app="mdse"] .pill{
   border:2px solid #111;
   border-radius: 12px;
@@ -205,7 +207,9 @@
 }
 [data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
 [data-app="mdse"] .title{
-  flex: 1 1 auto;
+  flex: 1 1 320px;   /* give Safari a sensible starting width */
+  min-width: 0;      /* IMPORTANT for flex children in Safari */
+  width: 100%;       /* belt-and-braces */
   border:2px solid rgba(0,0,0,.15);
   border-radius: 12px;
   padding: 10px 12px;
