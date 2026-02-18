@@ -10,12 +10,18 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-mdse-style-v3";
+  // Keep the ID stable now — ensureStyle() updates in place.
+  const STYLE_ID = "siteapps-mdse-style";
 
   function ensureStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
+    let style = document.getElementById(STYLE_ID);
+    if (!style) {
+      style = document.createElement("style");
+      style.id = STYLE_ID;
+      document.head.appendChild(style);
+    }
+
+    // Always replace CSS so changes apply even if style tag already exists.
     style.textContent = `
 [data-app="mdse"]{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -31,8 +37,14 @@
 [data-app="mdse"] h3{ margin:0 0 10px; font-size: 18px; }
 [data-app="mdse"] .muted{ color:#444; font-size: 13px; font-weight: 700; }
 
-[data-app="mdse"] textarea{
+/* IMPORTANT: do NOT force width:100% onto the flex title textarea */
+[data-app="mdse"] textarea:not(.title){
   width:100%;
+}
+
+[data-app="mdse"] textarea,
+[data-app="mdse"] input,
+[data-app="mdse"] select{
   border:2px solid #111;
   border-radius: 12px;
   padding: 12px;
@@ -56,8 +68,8 @@
   flex-wrap:wrap;
   margin-bottom: 10px;
 }
-[data-app="mdse"] .topbar .left{ flex: 1 1 520px; }
-[data-app="mdse"] .topbar .right{ flex: 1 1 220px; display:flex; justify-content:flex-end; }
+[data-app="mdse"] .topbar .left{ flex: 1 1 520px; min-width: 0; }
+[data-app="mdse"] .topbar .right{ flex: 1 1 220px; display:flex; justify-content:flex-end; min-width: 0; }
 
 [data-app="mdse"] .tabs{
   display:flex;
@@ -130,8 +142,6 @@
   font-size: 13px;
 }
 [data-app="mdse"] select{
-  border:2px solid #111;
-  border-radius: 12px;
   padding: 8px 10px;
   font-weight: 900;
   background:#fff;
@@ -192,8 +202,12 @@
   display:flex;
   gap: 10px;
   align-items:flex-start;
-  flex-wrap: wrap; /* stops Safari doing “helpful” wrapping */
+  flex-wrap: nowrap; /* stable on desktop */
+  min-width: 0;
 }
+
+/* Safari insurance: make flex children behave */
+[data-app="mdse"] .hdr > *{ min-width: 0; }
 
 [data-app="mdse"] .pill{
   border:2px solid #111;
@@ -206,11 +220,12 @@
   user-select: none;
 }
 [data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
+
 [data-app="mdse"] .title{
-  flex: 1 1 320px;   /* give Safari a sensible starting width */
-  min-width: 0;      /* IMPORTANT for flex children in Safari */
-  width: 100%;       /* belt-and-braces */
-  display: block;
+  /* CRITICAL: width:auto lets flex determine width properly */
+  width: auto;
+  flex: 1 1 320px;   /* sensible starting width */
+  min-width: 0;      /* allow shrink without collapsing */
   border:2px solid rgba(0,0,0,.15);
   border-radius: 12px;
   padding: 10px 12px;
@@ -220,7 +235,9 @@
   overflow:hidden;
   min-height: 44px;
   background: #fbfbfb;
+  display:block;
 }
+
 [data-app="mdse"] .tools{
   display:flex;
   gap: 6px;
@@ -228,13 +245,14 @@
   justify-content:flex-end;
   align-items:flex-start;
   flex: 0 0 auto;
-  margin-left: auto; /* keeps tools to the right on wide rows */
+  margin-left: auto;
 }
 [data-app="mdse"] .tools button{
   padding: 8px 10px;
   border-radius: 12px;
   font-size: 13px;
 }
+
 [data-app="mdse"] .body{
   margin-top: 10px;
   display:none;
@@ -252,14 +270,13 @@
   [data-app="mdse"] .hdr{
     flex-wrap: wrap;          /* allow wrapping on iPad widths */
   }
-
   [data-app="mdse"] .title{
-    flex: 1 1 100%;           /* title takes a full row */
+    flex: 1 1 100%;
     width: 100%;
   }
-
   [data-app="mdse"] .tools{
-    flex: 1 1 100%;           /* tools drop below title */
+    flex: 1 1 100%;
+    margin-left: 0;
     justify-content: flex-start;
   }
 }
@@ -377,12 +394,12 @@
   text-align:right;
 }
 `;
-    document.head.appendChild(style);
   }
 
   // ---- Utilities ----
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-  const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+  const uid = () =>
+    `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
   function autoResizeTA(ta) {
     ta.style.height = "auto";
@@ -390,7 +407,11 @@
   }
 
   function safeJsonParse(s) {
-    try { return JSON.parse(s); } catch { return null; }
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
   }
 
   function storageKey(container) {
@@ -442,9 +463,9 @@
       const payload = (m[1] || "").trim();
       if (!payload) continue;
 
-      // Support either:
-      // 1) "arc:escape" (one per line)
-      // 2) "tags: arc:escape, pov:ember"
+      // Support:
+      // - "arc:escape" (one per line)
+      // - "tags: arc:escape, pov:ember"
       const lower = payload.toLowerCase();
       let chunk = payload;
 
@@ -452,15 +473,16 @@
         chunk = payload.slice(payload.indexOf(":") + 1);
       }
 
-      // Split on commas first; then trim
       const parts = chunk
         .split(",")
         .map((p) => p.trim())
         .filter(Boolean);
 
-      // If someone writes "arc:escape pov:ember" on one line, split spaces too
       for (const p of parts) {
-        const sub = p.split(/\s+/).map((x) => x.trim()).filter(Boolean);
+        const sub = p
+          .split(/\s+/)
+          .map((x) => x.trim())
+          .filter(Boolean);
         for (const item of sub) {
           const nt = normaliseTag(item);
           if (!nt) continue;
@@ -469,7 +491,6 @@
       }
     }
 
-    // de-dupe, keep stable order
     const seen = new Set();
     const out = [];
     for (const t of tags) {
@@ -493,10 +514,8 @@
   function firstSentence(text) {
     const s = (text || "").trim();
     if (!s) return "";
-    // Find first ., !, ? followed by whitespace/end
     const m = s.match(/^[\s\S]*?[.!?](?=\s|$)/);
     if (m && m[0]) return m[0].trim();
-    // fallback: first line
     const line = s.split("\n").find((x) => x.trim());
     return (line || "").trim();
   }
@@ -604,7 +623,7 @@
   </div>
 </div>
 
-<div class="footer">v5.2 — Tabs + Tag View + Ulysses \\%% Support</div>
+<div class="footer">v5.3 — Tabs + Tags + Search + Fix Safari title width</div>
 `;
 
     const $ = (sel) => container.querySelector(sel);
@@ -653,13 +672,14 @@
       if (copiedSinceChange) lastCopyAt = new Date().toISOString();
       badgeCopy.className = "badge " + (copiedSinceChange ? "good" : "warn");
       badgeCopy.textContent = copiedSinceChange ? "Copied ✓" : "Not copied";
-      badgeCopy.title = copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
+      badgeCopy.title =
+        copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
     }
 
     function saveNow() {
       try {
         const state = {
-          v: 3,
+          v: 4,
           nodes,
           input: taInput.value,
           sourceId,
@@ -706,8 +726,10 @@
 
       if (Array.isArray(s.nodes)) nodes = s.nodes;
       if (typeof s.input === "string") taInput.value = s.input;
-      if (typeof s.sourceId === "string" || s.sourceId === null) sourceId = s.sourceId;
-      if (typeof s.maxVisibleLevel === "number") maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
+      if (typeof s.sourceId === "string" || s.sourceId === null)
+        sourceId = s.sourceId;
+      if (typeof s.maxVisibleLevel === "number")
+        maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
       copiedSinceChange = !!s.copiedSinceChange;
       lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
 
@@ -715,7 +737,8 @@
       if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
       if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
 
-      if (typeof s.activeTab === "string") activeTab = s.activeTab === "tags" ? "tags" : "structure";
+      if (typeof s.activeTab === "string")
+        activeTab = s.activeTab === "tags" ? "tags" : "structure";
       if (typeof s.activeTag === "string") activeTag = normaliseTag(s.activeTag);
 
       // sanitise nodes & ensure tags exist
@@ -730,7 +753,9 @@
             body,
             isCollapsed: !!n.isCollapsed,
             showBody: !!n.showBody,
-            tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
+            tags: Array.isArray(n.tags)
+              ? n.tags.map(normaliseTag).filter(Boolean)
+              : extractTagsFromBody(body),
           };
         });
     }
@@ -759,7 +784,6 @@
         }
       }
 
-      // extract tags post-pass (body already built)
       out.forEach((n) => {
         n.tags = extractTagsFromBody(n.body);
       });
@@ -803,7 +827,7 @@
       return familyIndices(idx).length > 1;
     }
 
-    // ---- Search helpers (Structure tab) ----
+    // ---- Search helpers ----
     const norm = (s) => (s || "").toLowerCase();
 
     function nodeMatches(n, q) {
@@ -845,7 +869,7 @@
         countEl.textContent = "0 matches";
         return;
       }
-      const cur = matchPos >= 0 ? (matchPos + 1) : 0;
+      const cur = matchPos >= 0 ? matchPos + 1 : 0;
       countEl.textContent = cur ? `${cur}/${matchIds.length}` : `${matchIds.length} matches`;
     }
 
@@ -911,16 +935,27 @@
 
     function addNewAfter(idOrNull) {
       if (!nodes.length || !idOrNull) {
-        const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
+        const newNode = {
+          id: uid(),
+          level: 1,
+          title: "",
+          body: "",
+          isCollapsed: false,
+          showBody: false,
+          tags: [],
+        };
         nodes.push(newNode);
         lastCreatedId = newNode.id;
         markChanged();
         return;
       }
+
       const idx = indexById(idOrNull);
       if (idx < 0) return;
+
       const fam = familyIndices(idx);
       const insertAt = fam[fam.length - 1] + 1;
+
       const newNode = {
         id: uid(),
         level: nodes[idx].level,
@@ -930,6 +965,7 @@
         showBody: false,
         tags: [],
       };
+
       nodes.splice(insertAt, 0, newNode);
       lastCreatedId = newNode.id;
       markChanged();
@@ -1001,7 +1037,6 @@
 
       const targetFam = familyIndices(targetIdx);
       const insertAt = targetFam[targetFam.length - 1] + 1;
-
       nodes.splice(insertAt, 0, ...movingNodes);
 
       sourceId = null;
@@ -1017,6 +1052,7 @@
     // ---- Tabs ----
     function setTab(tab) {
       activeTab = tab === "tags" ? "tags" : "structure";
+
       btnTabStructure.classList.toggle("active", activeTab === "structure");
       btnTabTags.classList.toggle("active", activeTab === "tags");
 
@@ -1026,9 +1062,7 @@
       panelStructure.classList.toggle("active", activeTab === "structure");
       panelTags.classList.toggle("active", activeTab === "tags");
 
-      if (activeTab === "tags") {
-        rebuildTagUI();
-      }
+      if (activeTab === "tags") rebuildTagUI();
       saveDebounced();
     }
 
@@ -1050,7 +1084,8 @@
     function renderTagCloud(tags, counts) {
       tagCloud.innerHTML = "";
       if (!tags.length) {
-        tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% arc:escape</b> inside a section’s body.</span>`;
+        tagCloud.innerHTML =
+          `<span class="tagmeta">No tags found yet. Add lines like <b>%% arc:escape</b> inside a section’s body.</span>`;
         return;
       }
 
@@ -1087,13 +1122,10 @@
         card.title = "Tap to jump to this section in Structure view";
         card.addEventListener("click", () => {
           setTab("structure");
-          // ensure it’s visible
-          // (if level filter hides it, temporarily bump)
           if (n.level > maxVisibleLevel) {
             maxVisibleLevel = 6;
             selMax.value = "6";
           }
-          // reveal via scroll/focus
           renderStructure();
           const el = canvas.querySelector(`[data-node-id="${n.id}"]`);
           if (el) {
@@ -1105,12 +1137,15 @@
 
         const top = document.createElement("div");
         top.className = "toph";
+
         const lvl = document.createElement("span");
         lvl.className = "lvl";
         lvl.textContent = `H${n.level}`;
+
         const title = document.createElement("span");
         title.className = "titleline";
         title.textContent = n.title || "(untitled)";
+
         top.append(lvl, title);
 
         const cleaned = bodyWithoutTagLines(n.body);
@@ -1134,9 +1169,7 @@
     }
 
     function rebuildTagUI() {
-      // Sync "All tags" chip
       tagAllBtn.classList.toggle("active", !activeTag);
-
       const tags = allTags();
       const counts = tagsCountMap();
       renderTagCloud(tags, counts);
@@ -1267,7 +1300,6 @@
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
 
-        // Body area: show if user toggled, or if reveal+body-match-only while searching
         const bodyShouldShow =
           n.showBody ||
           (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
@@ -1280,10 +1312,10 @@
         bodyTA.value = (n.body || "").trimEnd();
         bodyTA.addEventListener("input", () => {
           n.body = bodyTA.value;
-          // tags update live from body edits (supports %% and \%%)
           n.tags = extractTagsFromBody(n.body);
           markChanged();
         });
+
         bodyWrap.appendChild(bodyTA);
         node.appendChild(bodyWrap);
 
@@ -1303,7 +1335,7 @@
       }
     }
 
-    // ---- Buttons / events ----
+    // ---- Events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
     btnTabTags.addEventListener("click", () => setTab("tags"));
 
@@ -1413,15 +1445,11 @@
     cbBody.checked = searchInBody;
     cbReveal.checked = revealMatches;
 
-    // Default badge
     badgeSave.className = "badge good badgeSave";
     badgeSave.textContent = "Saved ✓";
 
-    // initial renders
-    rebuildMatches();  // calls renderStructure
+    rebuildMatches();   // also renders structure
     rebuildTagUI();
-
-    // set tab last (so UI is correct)
     setTab(activeTab);
 
     saveDebounced();
