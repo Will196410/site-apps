@@ -21,7 +21,6 @@
       document.head.appendChild(style);
     }
 
-    // Always replace CSS so changes apply even if style tag already exists.
     style.textContent = `
 [data-app="mdse"]{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -198,15 +197,14 @@
 [data-app="mdse"] .node.level-5{ border-left: 10px solid #bbb; margin-left:72px; }
 [data-app="mdse"] .node.level-6{ border-left: 10px solid #ddd; margin-left:90px; }
 
+/* --- FIX: iPad/Safari flex squeeze -> use grid for header layout --- */
 [data-app="mdse"] .hdr{
-  display:flex;
-  gap: 10px;
-  align-items:flex-start;
-  flex-wrap: nowrap; /* stable on desktop */
+  display: grid !important;
+  grid-template-columns: auto auto auto minmax(240px, 1fr) auto;
+  column-gap: 10px;
+  align-items: start;
   min-width: 0;
 }
-
-/* Safari insurance: make flex children behave */
 [data-app="mdse"] .hdr > *{ min-width: 0; }
 
 [data-app="mdse"] .pill{
@@ -216,16 +214,13 @@
   font-weight: 900;
   font-size: 13px;
   background:#fff;
-  flex: 0 0 auto;
   user-select: none;
 }
 [data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
 
 [data-app="mdse"] .title{
-  /* CRITICAL: width:auto lets flex determine width properly */
-  width: auto;
-  flex: 1 1 320px;   /* sensible starting width */
-  min-width: 0;      /* allow shrink without collapsing */
+  width: 100% !important;
+  min-width: 240px !important;
   border:2px solid rgba(0,0,0,.15);
   border-radius: 12px;
   padding: 10px 12px;
@@ -244,8 +239,7 @@
   flex-wrap:wrap;
   justify-content:flex-end;
   align-items:flex-start;
-  flex: 0 0 auto;
-  margin-left: auto;
+  margin-left: 0 !important;
 }
 [data-app="mdse"] .tools button{
   padding: 8px 10px;
@@ -271,16 +265,17 @@
 
 @media (max-width: 900px){
   [data-app="mdse"] .hdr{
-    flex-wrap: wrap;          /* allow wrapping on iPad widths */
-  }
-  [data-app="mdse"] .title{
-    flex: 1 1 100%;
-    width: 100%;
+    grid-template-columns: auto auto auto 1fr;
+    grid-auto-rows: auto;
+    row-gap: 10px;
   }
   [data-app="mdse"] .tools{
-    flex: 1 1 100%;
-    margin-left: 0;
+    grid-column: 1 / -1;
     justify-content: flex-start;
+  }
+  [data-app="mdse"] .title{
+    grid-column: 1 / -1;
+    min-width: 0 !important;
   }
 }
 
@@ -396,27 +391,6 @@
   font-weight: 700;
   text-align:right;
 }
-
-/* --- FIX: iPad/Safari flex squeeze -> use grid for header layout --- */
-[data-app="mdse"] .hdr{
-  display: grid !important;
-  grid-template-columns: auto auto auto minmax(240px, 1fr) auto;
-  column-gap: 10px;
-  align-items: start;
-}
-
-/* title fills the 1fr column */
-[data-app="mdse"] .title{
-  width: 100% !important;
-  min-width: 240px !important;
-}
-
-/* tools stay in last column */
-[data-app="mdse"] .tools{
-  margin-left: 0 !important;  /* grid doesn’t need this */
-  justify-content: flex-end;
-}
-
 `;
   }
 
@@ -431,11 +405,7 @@
   }
 
   function safeJsonParse(s) {
-    try {
-      return JSON.parse(s);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(s); } catch { return null; }
   }
 
   function storageKey(container) {
@@ -468,10 +438,9 @@
   }
 
   // ---- Tag parsing helpers ----
-  // Accept both: "%% ..." and "\%% ..."
   // Only treat lines starting with "%% tag" (or "\%% tag") as tags
   const TAG_LINE_RE = /^\s*\\?%%\s*tag\s+(.*)\s*$/i;
-  
+
   function normaliseTag(t) {
     return (t || "")
       .trim()
@@ -503,15 +472,14 @@
         .map((p) => p.trim())
         .filter(Boolean);
 
-
       for (const p of parts) {
-  const nt = normaliseTag(p);
-  if (!nt) continue;
-  tags.push(nt);
-}
-      
+        const nt = normaliseTag(p);
+        if (!nt) continue;
+        tags.push(nt);
+      }
     }
 
+    // de-dupe, stable order
     const seen = new Set();
     const out = [];
     for (const t of tags) {
@@ -567,6 +535,8 @@
     let activeTag = ""; // normalised tag or ""
 
     let saveTimer = null;
+    let matchTimer = null;
+    let tagTimer = null;
 
     // Build UI
     container.innerHTML = "";
@@ -626,7 +596,7 @@
     </div>
 
     <div class="tabPanel panelTags" role="tabpanel">
-      <div class="muted">Tags are read from lines starting with <b>%%</b> or <b>\\%%</b> inside each section’s body.</div>
+      <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
       <div class="tagbar">
         <button type="button" class="tagchip tagAll active">All tags</button>
         <span class="tagmeta tagMeta"></span>
@@ -644,7 +614,7 @@
   </div>
 </div>
 
-<div class="footer">v5.3 — Tabs + Tags + Search + Fix Safari title width</div>
+<div class="footer">v5.4 — Stable focus (no re-render while typing) + Titles single-line + Body returns fixed</div>
 `;
 
     const $ = (sel) => container.querySelector(sel);
@@ -700,7 +670,7 @@
     function saveNow() {
       try {
         const state = {
-          v: 4,
+          v: 5,
           nodes,
           input: taInput.value,
           sourceId,
@@ -732,10 +702,50 @@
       }, 500);
     }
 
-    function markChanged() {
+    function rebuildMatchesNoRender() {
+      matchIds = [];
+      matchPos = -1;
+
+      if (searchQuery.trim()) {
+        for (const n of nodes) {
+          if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
+        }
+      }
+      updateCount();
+      // NOTE: no renderStructure() here
+    }
+
+    function rebuildMatchesDebounced() {
+      if (matchTimer) clearTimeout(matchTimer);
+      matchTimer = setTimeout(() => {
+        matchTimer = null;
+        rebuildMatchesNoRender();
+      }, 150);
+    }
+
+    function rebuildTagUIDebounced() {
+      if (tagTimer) clearTimeout(tagTimer);
+      tagTimer = setTimeout(() => {
+        tagTimer = null;
+        if (activeTab === "tags") rebuildTagUI();
+      }, 150);
+    }
+
+    // Full change: safe to re-render (structural actions)
+    function markChangedFull() {
       setCopiedFlag(false);
-      rebuildMatches();
+      rebuildMatches();   // renders
       rebuildTagUI();
+      saveDebounced();
+    }
+
+    // Typing change: NEVER re-render structure (keeps focus)
+    function markChangedTyping() {
+      setCopiedFlag(false);
+      // keep search counts roughly accurate without nuking DOM
+      if (searchQuery.trim()) rebuildMatchesDebounced();
+      // tags update while typing (only re-render tags view)
+      rebuildTagUIDebounced();
       saveDebounced();
     }
 
@@ -747,10 +757,8 @@
 
       if (Array.isArray(s.nodes)) nodes = s.nodes;
       if (typeof s.input === "string") taInput.value = s.input;
-      if (typeof s.sourceId === "string" || s.sourceId === null)
-        sourceId = s.sourceId;
-      if (typeof s.maxVisibleLevel === "number")
-        maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
+      if (typeof s.sourceId === "string" || s.sourceId === null) sourceId = s.sourceId;
+      if (typeof s.maxVisibleLevel === "number") maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
       copiedSinceChange = !!s.copiedSinceChange;
       lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
 
@@ -758,11 +766,9 @@
       if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
       if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
 
-      if (typeof s.activeTab === "string")
-        activeTab = s.activeTab === "tags" ? "tags" : "structure";
+      if (typeof s.activeTab === "string") activeTab = s.activeTab === "tags" ? "tags" : "structure";
       if (typeof s.activeTag === "string") activeTag = normaliseTag(s.activeTag);
 
-      // sanitise nodes & ensure tags exist
       nodes = nodes
         .filter((n) => n && typeof n === "object")
         .map((n) => {
@@ -774,9 +780,7 @@
             body,
             isCollapsed: !!n.isCollapsed,
             showBody: !!n.showBody,
-            tags: Array.isArray(n.tags)
-              ? n.tags.map(normaliseTag).filter(Boolean)
-              : extractTagsFromBody(body),
+            tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
           };
         });
     }
@@ -805,10 +809,7 @@
         }
       }
 
-      out.forEach((n) => {
-        n.tags = extractTagsFromBody(n.body);
-      });
-
+      out.forEach((n) => (n.tags = extractTagsFromBody(n.body)));
       return out;
     }
 
@@ -867,20 +868,6 @@
       return !inTitle && inBody;
     }
 
-    function rebuildMatches() {
-      matchIds = [];
-      matchPos = -1;
-
-      if (searchQuery.trim()) {
-        for (const n of nodes) {
-          if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
-        }
-      }
-
-      updateCount();
-      renderStructure();
-    }
-
     function updateCount() {
       if (!searchQuery.trim()) {
         countEl.textContent = "";
@@ -914,6 +901,11 @@
       return reveal;
     }
 
+    function rebuildMatches() {
+      rebuildMatchesNoRender();
+      renderStructure();
+    }
+
     function jumpMatch(delta) {
       if (!matchIds.length) return;
       matchPos = (matchPos + delta + matchIds.length) % matchIds.length;
@@ -934,62 +926,40 @@
       const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
-      markChanged();
+      markChangedFull();
     }
 
     function toggleBody(id) {
       const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].showBody = !nodes[idx].showBody;
-      markChanged();
+      markChangedFull(); // intentional: UI changes
     }
 
     function changeLevel(id, delta) {
       const idx = indexById(id);
       if (idx < 0) return;
       const fam = familyIndices(idx);
-      fam.forEach((i) => {
-        nodes[i].level = clamp(nodes[i].level + delta, 1, 6);
-      });
-      markChanged();
+      fam.forEach((i) => (nodes[i].level = clamp(nodes[i].level + delta, 1, 6)));
+      markChangedFull();
     }
 
     function addNewAfter(idOrNull) {
       if (!nodes.length || !idOrNull) {
-        const newNode = {
-          id: uid(),
-          level: 1,
-          title: "",
-          body: "",
-          isCollapsed: false,
-          showBody: false,
-          tags: [],
-        };
+        const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
         nodes.push(newNode);
         lastCreatedId = newNode.id;
-        markChanged();
+        markChangedFull();
         return;
       }
-
       const idx = indexById(idOrNull);
       if (idx < 0) return;
-
       const fam = familyIndices(idx);
       const insertAt = fam[fam.length - 1] + 1;
-
-      const newNode = {
-        id: uid(),
-        level: nodes[idx].level,
-        title: "",
-        body: "",
-        isCollapsed: false,
-        showBody: false,
-        tags: [],
-      };
-
+      const newNode = { id: uid(), level: nodes[idx].level, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
       nodes.splice(insertAt, 0, newNode);
       lastCreatedId = newNode.id;
-      markChanged();
+      markChangedFull();
     }
 
     function duplicateBranch(id) {
@@ -1011,7 +981,7 @@
       const insertAt = fam[fam.length - 1] + 1;
       nodes.splice(insertAt, 0, ...clones);
       lastCreatedId = clones[0].id;
-      markChanged();
+      markChangedFull();
     }
 
     function deleteBranch(id) {
@@ -1021,10 +991,9 @@
       const fam = familyIndices(idx);
       nodes.splice(idx, fam.length);
       if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
-      markChanged();
+      markChangedFull();
     }
 
-    // Stable move
     function toggleMove(id) {
       if (!sourceId) {
         sourceId = id;
@@ -1052,7 +1021,7 @@
       if (targetIdx < 0) {
         nodes.push(...movingNodes);
         sourceId = null;
-        markChanged();
+        markChangedFull();
         return;
       }
 
@@ -1061,13 +1030,13 @@
       nodes.splice(insertAt, 0, ...movingNodes);
 
       sourceId = null;
-      markChanged();
+      markChangedFull();
     }
 
     function setMaxLevel(level) {
       maxVisibleLevel = clamp(level, 1, 6);
       selMax.value = String(maxVisibleLevel);
-      markChanged();
+      markChangedFull();
     }
 
     // ---- Tabs ----
@@ -1096,17 +1065,14 @@
 
     function tagsCountMap() {
       const m = new Map();
-      nodes.forEach((n) => {
-        (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1));
-      });
+      nodes.forEach((n) => (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1)));
       return m;
     }
 
     function renderTagCloud(tags, counts) {
       tagCloud.innerHTML = "";
       if (!tags.length) {
-        tagCloud.innerHTML =
-          `<span class="tagmeta">No tags found yet. Add lines like <b>%% arc:escape</b> inside a section’s body.</span>`;
+        tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% tag arc:escape</b> inside a section’s body.</span>`;
         return;
       }
 
@@ -1171,6 +1137,7 @@
 
         const cleaned = bodyWithoutTagLines(n.body);
         const preview = firstSentence(cleaned);
+
         const p = document.createElement("div");
         p.className = "preview";
         p.textContent = preview ? preview : "(No body text yet.)";
@@ -1210,9 +1177,7 @@
 
       const hiddenByCollapse = new Set();
       nodes.forEach((n, idx) => {
-        if (n.isCollapsed) {
-          familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
-        }
+        if (n.isCollapsed) familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
       });
 
       const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
@@ -1265,15 +1230,27 @@
         lvl.className = "pill";
         lvl.textContent = `H${n.level}`;
 
+        // --- TITLE: single-line, no Enter ---
         const title = document.createElement("textarea");
         title.className = "title";
         title.rows = 1;
-        title.value = n.title || "";
+        title.value = (n.title || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
         title.addEventListener("click", (e) => e.stopPropagation());
+
+        // Stop app-level key handlers; block Enter so it doesn't make new lines / weird focus shifts
+        title.addEventListener("keydown", (e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") {
+            e.preventDefault(); // keep focus, do nothing
+          }
+        });
+
         title.addEventListener("input", () => {
-          n.title = title.value;
+          // enforce single-line title
+          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
+          if (title.value !== n.title) title.value = n.title;
           autoResizeTA(title);
-          markChanged();
+          markChangedTyping();
         });
 
         const tools = document.createElement("div");
@@ -1321,6 +1298,7 @@
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
 
+        // Body area: show if user toggled, or if reveal+body-match-only while searching
         const bodyShouldShow =
           n.showBody ||
           (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
@@ -1328,22 +1306,24 @@
         const bodyWrap = document.createElement("div");
         bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
 
-const bodyTA = document.createElement("textarea");
-bodyTA.rows = 6;
-bodyTA.wrap = "soft";
-bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+        // --- BODY: allow Enter, keep focus by preventing re-render on input ---
+        const bodyTA = document.createElement("textarea");
+        bodyTA.rows = 6;
+        bodyTA.wrap = "soft";
+        bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
 
-// IMPORTANT: allow Enter to create new lines, but prevent bubbling to app-level handlers
-bodyTA.addEventListener("keydown", (e) => {
-  e.stopPropagation(); // do NOT preventDefault
-});
+        // Stop bubbling to app-level handlers (but do NOT preventDefault)
+        const stop = (e) => e.stopPropagation();
+        bodyTA.addEventListener("keydown", stop);
+        bodyTA.addEventListener("keypress", stop);
+        bodyTA.addEventListener("keyup", stop);
 
-bodyTA.addEventListener("input", () => {
-  n.body = bodyTA.value;
-  n.tags = extractTagsFromBody(n.body);
-  markChanged();
-});
-        
+        bodyTA.addEventListener("input", () => {
+          n.body = bodyTA.value;
+          n.tags = extractTagsFromBody(n.body);
+          markChangedTyping();
+        });
+
         bodyWrap.appendChild(bodyTA);
         node.appendChild(bodyWrap);
 
@@ -1363,7 +1343,7 @@ bodyTA.addEventListener("input", () => {
       }
     }
 
-    // ---- Events ----
+    // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
     btnTabTags.addEventListener("click", () => setTab("tags"));
 
@@ -1378,12 +1358,12 @@ bodyTA.addEventListener("input", () => {
       if (!text.trim()) return;
       nodes = parseMarkdown(text);
       sourceId = null;
-      markChanged();
+      markChangedFull();
     });
 
     btnUpdate.addEventListener("click", () => {
       taInput.value = toMarkdown();
-      markChanged();
+      markChangedFull();
     });
 
     btnCopy.addEventListener("click", async () => {
@@ -1413,6 +1393,7 @@ bodyTA.addEventListener("input", () => {
       saveDebounced();
       renderStructure();
       rebuildTagUI();
+      rebuildMatchesNoRender();
     });
 
     btnAddTop.addEventListener("click", () => addNewAfter(null));
@@ -1425,7 +1406,7 @@ bodyTA.addEventListener("input", () => {
 
     inSearch.addEventListener("input", () => {
       searchQuery = inSearch.value || "";
-      rebuildMatches();
+      rebuildMatches(); // intentional: you’re not typing in nodes here
       saveDebounced();
     });
 
@@ -1462,7 +1443,7 @@ bodyTA.addEventListener("input", () => {
       }
     });
 
-    taInput.addEventListener("input", () => markChanged());
+    taInput.addEventListener("input", () => markChangedFull());
 
     // ---- Init ----
     loadPref();
