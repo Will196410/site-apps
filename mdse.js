@@ -253,6 +253,9 @@
   font-size: 13px;
 }
 
+[data-app="mdse"] .body textarea{
+  white-space: pre-wrap;
+}
 [data-app="mdse"] .body{
   margin-top: 10px;
   display:none;
@@ -1325,15 +1328,22 @@
         const bodyWrap = document.createElement("div");
         bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
 
-        const bodyTA = document.createElement("textarea");
-        bodyTA.rows = 6;
-        bodyTA.value = (n.body || "").trimEnd();
-        bodyTA.addEventListener("input", () => {
-          n.body = bodyTA.value;
-          n.tags = extractTagsFromBody(n.body);
-          markChanged();
-        });
+const bodyTA = document.createElement("textarea");
+bodyTA.rows = 6;
+bodyTA.wrap = "soft";
+bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
 
+// IMPORTANT: allow Enter to create new lines, but prevent bubbling to app-level handlers
+bodyTA.addEventListener("keydown", (e) => {
+  e.stopPropagation(); // do NOT preventDefault
+});
+
+bodyTA.addEventListener("input", () => {
+  n.body = bodyTA.value;
+  n.tags = extractTagsFromBody(n.body);
+  markChanged();
+});
+        
         bodyWrap.appendChild(bodyTA);
         node.appendChild(bodyWrap);
 
