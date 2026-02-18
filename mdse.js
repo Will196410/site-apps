@@ -246,6 +246,22 @@
   color:#444;
 }
 
+@media (max-width: 900px){
+  [data-app="mdse"] .hdr{
+    flex-wrap: wrap;          /* allow wrapping on iPad widths */
+  }
+
+  [data-app="mdse"] .title{
+    flex: 1 1 100%;           /* title takes a full row */
+    width: 100%;
+  }
+
+  [data-app="mdse"] .tools{
+    flex: 1 1 100%;           /* tools drop below title */
+    justify-content: flex-start;
+  }
+}
+
 [data-app="mdse"] .movingSource{
   border-color: #0b5fff !important;
   box-shadow: 0 8px 28px rgba(11,95,255,.18);
