@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-mdse-style-v1";
+  const STYLE_ID = "siteapps-mdse-style-v2"; // bump style id so CSS updates cleanly
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -43,7 +43,8 @@
 }
 [data-app="mdse"] textarea:focus,
 [data-app="mdse"] button:focus,
-[data-app="mdse"] select:focus{
+[data-app="mdse"] select:focus,
+[data-app="mdse"] input:focus{
   outline: 3px solid rgba(11,95,255,.35);
   outline-offset: 2px;
 }
@@ -115,6 +116,41 @@
   background:#fff;
 }
 
+/* Search UI */
+[data-app="mdse"] .searchRow{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top: 10px;
+}
+[data-app="mdse"] .searchRow input[type="search"]{
+  flex: 1 1 260px;
+  border:2px solid #111;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 900;
+  font-size: 15px;
+  background:#fff;
+}
+[data-app="mdse"] .searchOpt{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  font-weight: 900;
+  font-size: 13px;
+  color:#222;
+}
+[data-app="mdse"] .searchCount{
+  font-weight: 900;
+  font-size: 13px;
+  color:#444;
+  padding: 6px 10px;
+  border: 2px solid rgba(0,0,0,.15);
+  border-radius: 999px;
+  background:#fff;
+}
+
 [data-app="mdse"] .canvas{ margin-top: 14px; }
 
 [data-app="mdse"] .node{
@@ -147,8 +183,6 @@
   user-select: none;
 }
 [data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
-[data-app="mdse"] .pill.green{ border-color:#0b3d0b; color:#0b3d0b; }
-[data-app="mdse"] .pill.warn{ border-color:#7a0000; color:#7a0000; }
 [data-app="mdse"] .title{
   flex: 1 1 auto;
   border:2px solid rgba(0,0,0,.15);
@@ -201,6 +235,17 @@
   border-color:#9a7b00 !important;
   background:#fffbe6 !important;
 }
+
+/* Search highlighting */
+[data-app="mdse"] .match{
+  outline: 4px solid rgba(255, 170, 0, .65);
+  outline-offset: 2px;
+}
+[data-app="mdse"] .activeMatch{
+  outline: 5px solid rgba(255, 120, 0, .85);
+  outline-offset: 3px;
+}
+
 [data-app="mdse"] .footer{
   margin-top: 14px;
   font-size: 12px;
@@ -228,7 +273,6 @@
   function storageKey(container) {
     const k = container.getAttribute("data-storage-key");
     if (k && k.trim()) return `siteapps:mdse:${k.trim()}`;
-    // fallback: page-based (safe enough)
     return `siteapps:mdse:${location.pathname || "/"}`;
   }
 
@@ -263,11 +307,18 @@
 
     // State
     let nodes = []; // {id, level, title, body, isCollapsed, showBody}
-    let sourceId = null;          // pinned node id
-    let lastCreatedId = null;     // autofocus
-    let maxVisibleLevel = 6;      // global depth filter
+    let sourceId = null;
+    let lastCreatedId = null;
+    let maxVisibleLevel = 6;
     let copiedSinceChange = false;
     let lastCopyAt = null;
+
+    // Search state
+    let searchQuery = "";
+    let searchInBody = false;
+    let revealMatches = true;
+    let matchIds = [];
+    let matchPos = -1;
 
     let saveTimer = null;
 
@@ -307,6 +358,15 @@
       <button type="button" class="btnLvlAll">All</button>
     </div>
 
+    <div class="searchRow" role="search" aria-label="Outline search">
+      <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
+      <button type="button" class="btnPrev">Prev</button>
+      <button type="button" class="btnNext">Next</button>
+      <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
+      <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
+      <span class="searchCount" id="mdseCount"></span>
+    </div>
+
     <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
   </div>
 
@@ -319,7 +379,7 @@
 </div>
 
 <div class="canvas"></div>
-<div class="footer">v5.0 — Level Filter + Duplicate + Stable Moves + Persistent State</div>
+<div class="footer">v5.1 — Search + Reveal + Next/Prev</div>
 `;
 
     const $ = (sel) => container.querySelector(sel);
@@ -342,6 +402,13 @@
     const btnLvl3 = $(".btnLvl3");
     const btnLvlAll = $(".btnLvlAll");
 
+    const inSearch = $("#mdseSearch");
+    const btnPrev = $(".btnPrev");
+    const btnNext = $(".btnNext");
+    const cbBody = $("#mdseSearchBody");
+    const cbReveal = $("#mdseReveal");
+    const countEl = $("#mdseCount");
+
     // ---- Persistence ----
     function setCopiedFlag(flag) {
       copiedSinceChange = !!flag;
@@ -353,19 +420,24 @@
 
     function markChanged() {
       setCopiedFlag(false);
+      rebuildMatches(); // keep search in sync
       saveDebounced();
     }
 
     function saveNow() {
       try {
         const state = {
-          v: 1,
+          v: 2,
           nodes,
           input: taInput.value,
           sourceId,
           maxVisibleLevel,
           copiedSinceChange,
           lastCopyAt,
+          // search prefs
+          searchQuery,
+          searchInBody,
+          revealMatches
         };
         localStorage.setItem(KEY, JSON.stringify(state));
         badgeSave.className = "badge good badgeSave";
@@ -399,7 +471,12 @@
       copiedSinceChange = !!s.copiedSinceChange;
       lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
 
-      // sanitise nodes a bit
+      // Search prefs (query optional)
+      if (typeof s.searchQuery === "string") searchQuery = s.searchQuery;
+      if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
+      if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
+
+      // sanitise nodes
       nodes = nodes
         .filter((n) => n && typeof n === "object")
         .map((n) => ({
@@ -427,7 +504,7 @@
             title: m[2] || "",
             body: "",
             isCollapsed: false,
-            showBody: false, // body hidden by default
+            showBody: false,
           };
           out.push(current);
         } else if (current) {
@@ -447,7 +524,7 @@
         .join("\n\n");
     }
 
-    // ---- Outline structure helpers (based on levels) ----
+    // ---- Outline helpers ----
     function indexById(id) {
       return nodes.findIndex((n) => n.id === id);
     }
@@ -474,13 +551,98 @@
       return fam.length > 1;
     }
 
+    // ---- Search helpers ----
+    const norm = (s) => (s || "").toLowerCase();
+
+    function nodeMatches(n, q) {
+      if (!q) return false;
+      const qq = norm(q);
+      if (norm(n.title).includes(qq)) return true;
+      if (searchInBody && norm(n.body).includes(qq)) return true;
+      return false;
+    }
+
+    function nodeMatchesBodyOnly(n, q) {
+      if (!q || !searchInBody) return false;
+      const qq = norm(q);
+      const inTitle = norm(n.title).includes(qq);
+      const inBody = norm(n.body).includes(qq);
+      return !inTitle && inBody;
+    }
+
+    function rebuildMatches() {
+      matchIds = [];
+      matchPos = -1;
+
+      if (searchQuery.trim()) {
+        for (const n of nodes) {
+          if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
+        }
+      }
+
+      updateCount();
+      render();
+    }
+
+    function updateCount() {
+      if (!searchQuery.trim()) {
+        countEl.textContent = "";
+        return;
+      }
+      if (!matchIds.length) {
+        countEl.textContent = "0 matches";
+        return;
+      }
+      const cur = matchPos >= 0 ? (matchPos + 1) : 0;
+      countEl.textContent = cur ? `${cur}/${matchIds.length}` : `${matchIds.length} matches`;
+    }
+
+    function computeRevealSet() {
+      const reveal = new Set();
+      if (!revealMatches || !searchQuery.trim() || !matchIds.length) return reveal;
+
+      // reveal ancestors of matching nodes
+      for (let i = 0; i < nodes.length; i++) {
+        if (!nodeMatches(nodes[i], searchQuery)) continue;
+
+        // include the node
+        reveal.add(nodes[i].id);
+
+        // walk back to parents based on decreasing level
+        let childLevel = nodes[i].level;
+        for (let j = i - 1; j >= 0; j--) {
+          if (nodes[j].level < childLevel) {
+            reveal.add(nodes[j].id);
+            childLevel = nodes[j].level;
+          }
+          if (childLevel === 1) break;
+        }
+      }
+      return reveal;
+    }
+
+    function jump(delta) {
+      if (!matchIds.length) return;
+      matchPos = (matchPos + delta + matchIds.length) % matchIds.length;
+      updateCount();
+      render();
+
+      const id = matchIds[matchPos];
+      // find the element after render
+      const el = canvas.querySelector(`[data-node-id="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const t = el.querySelector(".title");
+        if (t) t.focus();
+      }
+    }
+
     // ---- Actions ----
     function toggleBranchCollapse(id) {
       const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
       markChanged();
-      render();
     }
 
     function toggleBody(id) {
@@ -488,7 +650,6 @@
       if (idx < 0) return;
       nodes[idx].showBody = !nodes[idx].showBody;
       markChanged();
-      render();
     }
 
     function changeLevel(id, delta) {
@@ -499,7 +660,6 @@
         nodes[i].level = clamp(nodes[i].level + delta, 1, 6);
       });
       markChanged();
-      render();
     }
 
     function addNewAfter(idOrNull) {
@@ -508,7 +668,6 @@
         nodes.push(newNode);
         lastCreatedId = newNode.id;
         markChanged();
-        render();
         return;
       }
       const idx = indexById(idOrNull);
@@ -526,7 +685,6 @@
       nodes.splice(insertAt, 0, newNode);
       lastCreatedId = newNode.id;
       markChanged();
-      render();
     }
 
     function duplicateBranch(id) {
@@ -548,7 +706,6 @@
       nodes.splice(insertAt, 0, ...clones);
       lastCreatedId = clones[0].id;
       markChanged();
-      render();
     }
 
     function deleteBranch(id) {
@@ -559,10 +716,9 @@
       nodes.splice(idx, fam.length);
       if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
       markChanged();
-      render();
     }
 
-    // Stable move (fixes “disappears when moving to last sibling”)
+    // Stable move
     function toggleMove(id) {
       if (!sourceId) {
         sourceId = id;
@@ -578,30 +734,22 @@
 
       const movingIds = new Set(familyIds(sourceId));
       if (movingIds.has(id)) {
-        // can't move into itself/children
         sourceId = null;
         render();
         return;
       }
 
-      // Capture moving nodes (in order)
       const movingNodes = nodes.filter((n) => movingIds.has(n.id));
-
-      // Remove them
       nodes = nodes.filter((n) => !movingIds.has(n.id));
 
-      // Find target in remaining list
       const targetIdx = indexById(id);
       if (targetIdx < 0) {
-        // if target vanished (shouldn't), append
         nodes.push(...movingNodes);
         sourceId = null;
         markChanged();
-        render();
         return;
       }
 
-      // Insert AFTER the target's current family in the remaining list
       const targetFam = familyIndices(targetIdx);
       const insertAt = targetFam[targetFam.length - 1] + 1;
 
@@ -609,27 +757,28 @@
 
       sourceId = null;
       markChanged();
-      render();
     }
 
-    // Global depth filter
     function setMaxLevel(level) {
       maxVisibleLevel = clamp(level, 1, 6);
       selMax.value = String(maxVisibleLevel);
       markChanged();
-      render();
     }
 
     // ---- Render ----
     function render() {
       const scrollPos = window.scrollY;
 
-      // Sync select
       selMax.value = String(maxVisibleLevel);
+
+      // Sync search UI
+      inSearch.value = searchQuery;
+      cbBody.checked = searchInBody;
+      cbReveal.checked = revealMatches;
 
       canvas.innerHTML = "";
 
-      // Determine hidden by collapsed branches
+      // Collapsed hiding (but allow reveal to override)
       const hiddenByCollapse = new Set();
       nodes.forEach((n, idx) => {
         if (n.isCollapsed) {
@@ -639,29 +788,39 @@
 
       const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
 
+      // Reveal matching branches
+      const revealSet = computeRevealSet();
+
+      // For quick match checks in render
+      const matchSet = new Set(matchIds);
+
       nodes.forEach((n, idx) => {
-        // Global depth filter (collapse levels)
         if (n.level > maxVisibleLevel) return;
 
-        // Branch collapse hiding
-        if (hiddenByCollapse.has(idx)) return;
+        // Hidden by collapse unless reveal says otherwise (or it's an ancestor in revealSet)
+        if (hiddenByCollapse.has(idx) && !revealSet.has(n.id)) return;
 
         const isSource = sourceId === n.id;
         const isValidTarget = !!sourceId && !movingSet.has(n.id);
 
+        const isMatch = searchQuery.trim() && matchSet.has(n.id);
+        const isActive = isMatch && matchPos >= 0 && matchIds[matchPos] === n.id;
+
         const node = document.createElement("div");
+        node.setAttribute("data-node-id", n.id);
         node.className =
           `node level-${n.level}` +
           (isSource ? " movingSource" : "") +
           (isValidTarget ? " moveTarget" : "") +
-          (n.isCollapsed ? " collapsed" : "");
+          (n.isCollapsed ? " collapsed" : "") +
+          (isMatch ? " match" : "") +
+          (isActive ? " activeMatch" : "");
 
         if (isValidTarget) node.addEventListener("click", () => toggleMove(n.id));
 
         const hdr = document.createElement("div");
         hdr.className = "hdr";
 
-        // Move handle / pin
         const pin = document.createElement("div");
         pin.className = "pill gray";
         pin.textContent = isSource ? "📍 PIN" : "⠿";
@@ -671,7 +830,6 @@
           toggleMove(n.id);
         });
 
-        // Collapse toggle
         const col = document.createElement("div");
         col.className = "pill gray";
         col.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "•";
@@ -681,12 +839,10 @@
           if (hasChildren(idx)) toggleBranchCollapse(n.id);
         });
 
-        // Level pill
         const lvl = document.createElement("div");
         lvl.className = "pill";
         lvl.textContent = `H${n.level}`;
 
-        // Title
         const title = document.createElement("textarea");
         title.className = "title";
         title.rows = 1;
@@ -698,12 +854,10 @@
           markChanged();
         });
 
-        // Tools
         const tools = document.createElement("div");
         tools.className = "tools";
         tools.addEventListener("click", (e) => e.stopPropagation());
 
-        // Body indicator + toggle
         const hasBody = !!(n.body && n.body.trim());
         const bodyBtn = document.createElement("button");
         bodyBtn.type = "button";
@@ -711,19 +865,16 @@
         bodyBtn.className = hasBody ? "primary" : "";
         bodyBtn.addEventListener("click", () => toggleBody(n.id));
 
-        // Duplicate
         const dup = document.createElement("button");
         dup.type = "button";
         dup.textContent = "⧉ Duplicate";
         dup.addEventListener("click", () => duplicateBranch(n.id));
 
-        // Add
         const add = document.createElement("button");
         add.type = "button";
         add.textContent = "+ Add";
         add.addEventListener("click", () => addNewAfter(n.id));
 
-        // Level left/right
         const left = document.createElement("button");
         left.type = "button";
         left.textContent = "←";
@@ -736,7 +887,6 @@
         right.title = "Demote (H+1) for this branch";
         right.addEventListener("click", () => changeLevel(n.id, +1));
 
-        // Delete
         const del = document.createElement("button");
         del.type = "button";
         del.textContent = "✕";
@@ -749,9 +899,13 @@
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
 
-        // Body area (hidden by default)
+        // Body area (hidden by default) — BUT reveal body if match is body-only while searching & revealMatches on
+        const bodyShouldShow =
+          n.showBody ||
+          (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
+
         const bodyWrap = document.createElement("div");
-        bodyWrap.className = "body" + (n.showBody ? " show" : "");
+        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
 
         const bodyTA = document.createElement("textarea");
         bodyTA.rows = 6;
@@ -768,14 +922,10 @@
         autoResizeTA(title);
       });
 
-      // restore scroll position
       window.scrollTo(0, scrollPos);
 
-      // autofocus newly created
       if (lastCreatedId) {
         const el = [...canvas.querySelectorAll(".node")].find((div) => {
-          // try find title textarea inside a node whose title matches empty new nodes…
-          // instead: focus first title in view if any and it’s empty
           const t = div.querySelector(".title");
           return t && t.value === "";
         });
@@ -791,7 +941,6 @@
       nodes = parseMarkdown(text);
       sourceId = null;
       markChanged();
-      render();
     });
 
     btnUpdate.addEventListener("click", () => {
@@ -801,7 +950,7 @@
 
     btnCopy.addEventListener("click", async () => {
       const md = toMarkdown();
-      taInput.value = md; // keep in sync
+      taInput.value = md;
       const ok = await copyText(md);
       if (ok) setCopiedFlag(true);
       else alert("Copy failed.");
@@ -814,6 +963,9 @@
       sourceId = null;
       taInput.value = "";
       maxVisibleLevel = 6;
+      searchQuery = "";
+      matchIds = [];
+      matchPos = -1;
       setCopiedFlag(false);
       try { localStorage.removeItem(KEY); } catch {}
       saveDebounced();
@@ -829,15 +981,64 @@
     btnLvl3.addEventListener("click", () => setMaxLevel(3));
     btnLvlAll.addEventListener("click", () => setMaxLevel(6));
 
+    // Search events
+    inSearch.addEventListener("input", () => {
+      searchQuery = inSearch.value || "";
+      rebuildMatches();
+      saveDebounced();
+    });
+
+    cbBody.addEventListener("change", () => {
+      searchInBody = !!cbBody.checked;
+      rebuildMatches();
+      saveDebounced();
+    });
+
+    cbReveal.addEventListener("change", () => {
+      revealMatches = !!cbReveal.checked;
+      render();
+      saveDebounced();
+    });
+
+    btnPrev.addEventListener("click", () => jump(-1));
+    btnNext.addEventListener("click", () => jump(+1));
+
+    // Enter = Next, Shift+Enter = Prev (nice on desktop; harmless on iPad)
+    inSearch.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (e.shiftKey) jump(-1);
+        else jump(+1);
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        searchQuery = "";
+        matchIds = [];
+        matchPos = -1;
+        inSearch.value = "";
+        updateCount();
+        render();
+        saveDebounced();
+      }
+    });
+
     // Input changes should mark "not copied"
     taInput.addEventListener("input", () => markChanged());
 
     // ---- Init ----
-    loadPref();               // ✅ yes: state load belongs here (init)
+    loadPref();
     setCopiedFlag(copiedSinceChange);
+
+    // Sync UI with loaded prefs
+    selMax.value = String(maxVisibleLevel);
+    inSearch.value = searchQuery;
+    cbBody.checked = searchInBody;
+    cbReveal.checked = revealMatches;
+
     badgeSave.className = "badge good badgeSave";
     badgeSave.textContent = "Saved ✓";
-    render();
+
+    rebuildMatches(); // renders as well
     saveDebounced();
   });
 })();
