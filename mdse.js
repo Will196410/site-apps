@@ -500,17 +500,13 @@
         .map((p) => p.trim())
         .filter(Boolean);
 
+
       for (const p of parts) {
-        const sub = p
-          .split(/\s+/)
-          .map((x) => x.trim())
-          .filter(Boolean);
-        for (const item of sub) {
-          const nt = normaliseTag(item);
-          if (!nt) continue;
-          tags.push(nt);
-        }
-      }
+  const nt = normaliseTag(p);
+  if (!nt) continue;
+  tags.push(nt);
+}
+      
     }
 
     const seen = new Set();
