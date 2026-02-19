@@ -509,6 +509,87 @@
     return (line || "").trim();
   }
 
+// INSERT
+
+  // ---- Bulk tag helpers (direct children only) ----
+function directChildIndices(parentIdx) {
+  const out = [];
+  if (parentIdx < 0 || parentIdx >= nodes.length) return out;
+  const pLevel = nodes[parentIdx].level;
+
+  for (let i = parentIdx + 1; i < nodes.length; i++) {
+    const lvl = nodes[i].level;
+    if (lvl <= pLevel) break;             // end of subtree
+    if (lvl === pLevel + 1) out.push(i);  // direct child only
+  }
+  return out;
+}
+
+function normaliseNewlines(s) {
+  return (s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+// exact line match for: "%% tag <payload>" (allow leading spaces, allow "\%%" too)
+function hasExactTagLine(body, payload) {
+  const lines = normaliseNewlines(body).split("\n");
+  const want = (payload || "").trim();
+  if (!want) return false;
+
+  return lines.some((ln) => {
+    const m = ln.match(/^\s*\\?%%\s*tag\s+(.*)\s*$/i);
+    if (!m) return false;
+    return (m[1] || "").trim().toLowerCase() === want.toLowerCase();
+  });
+}
+
+function addTagLineToBody(body, payload) {
+  const want = (payload || "").trim();
+  if (!want) return body || "";
+
+  const b = normaliseNewlines(body || "").trimEnd();
+  if (hasExactTagLine(b, want)) return b;
+
+  // ensure a newline before we append, then append as the last line
+  const prefix = b ? b + "\n" : "";
+  return prefix + `%% tag ${want}`;
+}
+
+function removeTagLineFromBody(body, payload) {
+  const want = (payload || "").trim();
+  if (!want) return body || "";
+
+  const lines = normaliseNewlines(body || "").split("\n");
+  const kept = lines.filter((ln) => {
+    const m = ln.match(/^\s*\\?%%\s*tag\s+(.*)\s*$/i);
+    if (!m) return true;
+    return (m[1] || "").trim().toLowerCase() !== want.toLowerCase();
+  });
+
+  return kept.join("\n").trimEnd();
+}
+
+function bulkTagDirectChildren(parentId, payload, mode /* "add" | "remove" */) {
+  const parentIdx = indexById(parentId);
+  if (parentIdx < 0) return;
+
+  const childIdxs = directChildIndices(parentIdx);
+  if (!childIdxs.length) {
+    alert("No direct children under this heading.");
+    return;
+  }
+
+  childIdxs.forEach((i) => {
+    const n = nodes[i];
+    if (mode === "remove") n.body = removeTagLineFromBody(n.body, payload);
+    else n.body = addTagLineToBody(n.body, payload);
+
+    n.tags = extractTagsFromBody(n.body);
+  });
+
+  markChangedFull(); // structural change -> safe to re-render
+}
+// END INSERT
+  
   // ---- Core app ----
   window.SiteApps.register("mdse", (container) => {
     ensureStyle();
@@ -1384,7 +1465,31 @@ panelTags.classList.toggle("active", activeTab === "tags");
         del.title = "Delete branch";
         del.addEventListener("click", () => deleteBranch(n.id));
 
-        tools.append(bodyBtn, dup, add, left, right, del);
+        // tools.append(bodyBtn, dup, add, left, right, del);
+        const tagKids = document.createElement("button");
+tagKids.type = "button";
+tagKids.textContent = `🏷 Tag H${n.level + 1}`;
+tagKids.title = `Add a %% tag line to every H${n.level + 1} under this heading`;
+tagKids.addEventListener("click", () => {
+  const payload = prompt(`Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
+  if (!payload) return;
+  bulkTagDirectChildren(n.id, payload, "add");
+});
+
+const untagKids = document.createElement("button");
+untagKids.type = "button";
+untagKids.textContent = `🧽 Untag H${n.level + 1}`;
+untagKids.title = `Remove a %% tag line from every H${n.level + 1} under this heading`;
+untagKids.addEventListener("click", () => {
+  const payload = prompt(`Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
+  if (!payload) return;
+  bulkTagDirectChildren(n.id, payload, "remove");
+});
+
+// Optional: only show these if it *can* have children (H6 can't have H7)
+if (n.level < 6) tools.append(bodyBtn, dup, add, left, right, tagKids, untagKids, del);
+else tools.append(bodyBtn, dup, add, left, right, del);
+        
 
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
