@@ -10,7 +10,6 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  // Keep the ID stable now — ensureStyle() updates in place.
   const STYLE_ID = "siteapps-mdse-style";
 
   function ensureStyle() {
@@ -36,10 +35,7 @@
 [data-app="mdse"] h3{ margin:0 0 10px; font-size: 18px; }
 [data-app="mdse"] .muted{ color:#444; font-size: 13px; font-weight: 700; }
 
-/* IMPORTANT: do NOT force width:100% onto the flex title textarea */
-[data-app="mdse"] textarea:not(.title){
-  width:100%;
-}
+[data-app="mdse"] textarea:not(.title){ width:100%; }
 
 [data-app="mdse"] textarea,
 [data-app="mdse"] input,
@@ -146,7 +142,7 @@
   background:#fff;
 }
 
-/* Search UI (Structure tab) */
+/* Search UI */
 [data-app="mdse"] .searchRow{
   display:flex;
   gap:8px;
@@ -197,7 +193,7 @@
 [data-app="mdse"] .node.level-5{ border-left: 10px solid #bbb; margin-left:72px; }
 [data-app="mdse"] .node.level-6{ border-left: 10px solid #ddd; margin-left:90px; }
 
-/* --- FIX: iPad/Safari flex squeeze -> use grid for header layout --- */
+/* iPad/Safari flex squeeze fix: grid header */
 [data-app="mdse"] .hdr{
   display: grid !important;
   grid-template-columns: auto auto auto minmax(240px, 1fr) auto;
@@ -247,13 +243,8 @@
   font-size: 13px;
 }
 
-[data-app="mdse"] .body textarea{
-  white-space: pre-wrap;
-}
-[data-app="mdse"] .body{
-  margin-top: 10px;
-  display:none;
-}
+[data-app="mdse"] .body textarea{ white-space: pre-wrap; }
+[data-app="mdse"] .body{ margin-top: 10px; display:none; }
 [data-app="mdse"] .body.show{ display:block; }
 
 [data-app="mdse"] .hint{
@@ -304,7 +295,7 @@
   outline-offset: 3px;
 }
 
-/* Tags tab */
+/* Tags + Search cards */
 [data-app="mdse"] .tagbar{
   display:flex;
   gap: 10px;
@@ -332,6 +323,7 @@
 [data-app="mdse"] .taglist{
   display:grid;
   gap: 10px;
+  margin-top: 10px;
 }
 [data-app="mdse"] .tagcard{
   border:2px solid rgba(0,0,0,.15);
@@ -479,7 +471,6 @@
       }
     }
 
-    // de-dupe, stable order
     const seen = new Set();
     const out = [];
     for (const t of tags) {
@@ -508,11 +499,11 @@
     const line = s.split("\n").find((x) => x.trim());
     return (line || "").trim();
   }
-  
+
   // ---- Core app ----
   window.SiteApps.register("mdse", (container) => {
     ensureStyle();
-    
+
     const KEY = storageKey(container);
 
     // State
@@ -520,36 +511,11 @@
     let sourceId = null;
     let lastCreatedId = null;
     let maxVisibleLevel = 6;
+
     let copiedSinceChange = false;
     let lastCopyAt = null;
 
-// INSERT helper
-    const tagKids = document.createElement("button");
-tagKids.type = "button";
-tagKids.textContent = `🏷 Tag H${n.level + 1}`;
-tagKids.title = `Add a %% tag line to every H${n.level + 1} under this heading`;
-tagKids.addEventListener("click", () => {
-  const payload = prompt(`Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
-  if (!payload) return;
-  bulkTagDirectChildren(n.id, payload, "add");
-});
-
-const untagKids = document.createElement("button");
-untagKids.type = "button";
-untagKids.textContent = `🧽 Untag H${n.level + 1}`;
-untagKids.title = `Remove a %% tag line from every H${n.level + 1} under this heading`;
-untagKids.addEventListener("click", () => {
-  const payload = prompt(`Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
-  if (!payload) return;
-  bulkTagDirectChildren(n.id, payload, "remove");
-});
-
-// Optional: only show these if it *can* have children (H6 can't have H7)
-if (n.level < 6) tools.append(bodyBtn, dup, add, left, right, tagKids, untagKids, del);
-else tools.append(bodyBtn, dup, add, left, right, del);
-// INSERT END
-    
-    // Search state (Structure tab)
+    // Search state
     let searchQuery = "";
     let searchInBody = false;
     let revealMatches = true;
@@ -557,14 +523,137 @@ else tools.append(bodyBtn, dup, add, left, right, del);
     let matchPos = -1;
 
     // Tabs / Tags view state
-    let activeTab = "structure"; // "structure" | "tags"
+    let activeTab = "structure"; // "structure" | "search" | "tags"
     let activeTag = ""; // normalised tag or ""
 
     let saveTimer = null;
     let matchTimer = null;
     let tagTimer = null;
 
-    // Build UI
+    // ---- Outline helpers ----
+    function indexById(id) {
+      return nodes.findIndex((n) => n.id === id);
+    }
+
+    function familyIndices(startIdx) {
+      const fam = [startIdx];
+      if (startIdx < 0 || startIdx >= nodes.length) return fam;
+      const pLevel = nodes[startIdx].level;
+      for (let i = startIdx + 1; i < nodes.length; i++) {
+        if (nodes[i].level > pLevel) fam.push(i);
+        else break;
+      }
+      return fam;
+    }
+
+    function familyIds(startId) {
+      const idx = indexById(startId);
+      if (idx < 0) return [];
+      return familyIndices(idx).map((i) => nodes[i].id);
+    }
+
+    function hasChildren(idx) {
+      return familyIndices(idx).length > 1;
+    }
+
+    // ---- Bulk tag helpers (DIRECT CHILDREN ONLY) ----
+    function normaliseNewlines(s) {
+      return (s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    }
+
+    function directChildIndices(parentIdx) {
+      const out = [];
+      if (parentIdx < 0 || parentIdx >= nodes.length) return out;
+      const pLevel = nodes[parentIdx].level;
+
+      for (let i = parentIdx + 1; i < nodes.length; i++) {
+        const lvl = nodes[i].level;
+        if (lvl <= pLevel) break;            // end of subtree
+        if (lvl === pLevel + 1) out.push(i); // direct children only
+      }
+      return out;
+    }
+
+    function hasExactTagLine(body, payload) {
+      const want = (payload || "").trim();
+      if (!want) return false;
+      const lines = normaliseNewlines(body).split("\n");
+      return lines.some((ln) => {
+        const m = ln.match(/^\s*\\?%%\s*tag\s+(.*)\s*$/i);
+        if (!m) return false;
+        return (m[1] || "").trim().toLowerCase() === want.toLowerCase();
+      });
+    }
+
+    function addTagLineToBody(body, payload) {
+      const want = (payload || "").trim();
+      if (!want) return body || "";
+
+      const b = normaliseNewlines(body || "").trimEnd();
+      if (hasExactTagLine(b, want)) return b;
+
+      const prefix = b ? b + "\n" : "";
+      return prefix + `%% tag ${want}`;
+    }
+
+    function removeTagLineFromBody(body, payload) {
+      const want = (payload || "").trim();
+      if (!want) return body || "";
+
+      const lines = normaliseNewlines(body || "").split("\n");
+      const kept = lines.filter((ln) => {
+        const m = ln.match(/^\s*\\?%%\s*tag\s+(.*)\s*$/i);
+        if (!m) return true;
+        return (m[1] || "").trim().toLowerCase() !== want.toLowerCase();
+      });
+
+      return kept.join("\n").trimEnd();
+    }
+
+    function bulkTagDirectChildren(parentId, payload, mode /* "add" | "remove" */) {
+      const parentIdx = indexById(parentId);
+      if (parentIdx < 0) return;
+
+      const childIdxs = directChildIndices(parentIdx);
+      if (!childIdxs.length) {
+        alert("No direct children under this heading.");
+        return;
+      }
+
+      childIdxs.forEach((i) => {
+        const n = nodes[i];
+        n.body =
+          mode === "remove"
+            ? removeTagLineFromBody(n.body || "", payload)
+            : addTagLineToBody(n.body || "", payload);
+
+        n.tags = extractTagsFromBody(n.body);
+        n.showBody = true; // show immediately so you can confirm it worked
+      });
+
+      markChangedFull();
+    }
+
+    // ---- Search helpers ----
+    const norm = (s) => (s || "").toLowerCase();
+
+    function nodeMatches(n, q) {
+      if (!q) return false;
+      const qq = norm(q);
+      if (norm(n.title).includes(qq)) return true;
+      if (searchInBody && norm(n.body).includes(qq)) return true;
+      return false;
+    }
+
+    function nodeMatchesBodyOnly(n, q) {
+      if (!q || !searchInBody) return false;
+      const qq = norm(q);
+      const inTitle = norm(n.title).includes(qq);
+      const inBody = norm(n.body).includes(qq);
+      return !inTitle && inBody;
+    }
+
+    // ---- Build UI ----
     container.innerHTML = "";
     container.setAttribute("data-app", "mdse");
 
@@ -574,13 +663,13 @@ else tools.append(bodyBtn, dup, add, left, right, del);
     <h3>Markdown Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
 
-<div class="tabs" role="tablist" aria-label="Views">
-  <button type="button" class="tabbtn tabStructure" role="tab" aria-selected="true">Structure</button>
-  <button type="button" class="tabbtn tabSearch" role="tab" aria-selected="false">Search</button>
-  <button type="button" class="tabbtn tabTags" role="tab" aria-selected="false">Tags</button>
-</div>
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button type="button" class="tabbtn tabStructure" role="tab">Structure</button>
+      <button type="button" class="tabbtn tabSearch" role="tab">Search</button>
+      <button type="button" class="tabbtn tabTags" role="tab">Tags</button>
+    </div>
 
-    <div class="tabPanel panelStructure active" role="tabpanel">
+    <div class="tabPanel panelStructure" role="tabpanel">
       <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
 
       <div class="btnrow">
@@ -614,21 +703,18 @@ else tools.append(bodyBtn, dup, add, left, right, del);
     </div>
 
     <div class="tabPanel panelSearch" role="tabpanel">
-    
-  <div class="searchRow" role="search">
-    <input id="mdseSearch" type="search" placeholder="Search…" />
-    <button type="button" class="btnPrev">Prev</button>
-    <button type="button" class="btnNext">Next</button>
-    <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
-    <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
-    <span class="searchCount" id="mdseCount"></span>
+      <div class="searchRow" role="search" aria-label="Outline search">
+        <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
+        <button type="button" class="btnPrev">Prev</button>
+        <button type="button" class="btnNext">Next</button>
+        <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
+        <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
+        <span class="searchCount" id="mdseCount"></span>
+      </div>
 
-<div class="taglist searchResults" aria-live="polite"></div>
-    
-  </div>
-
-  <div class="hint">Search results highlight in Structure view.</div>
-</div>
+      <div class="taglist searchResults" aria-live="polite"></div>
+      <div class="hint">Search results highlight in Structure view.</div>
+    </div>
 
     <div class="tabPanel panelTags" role="tabpanel">
       <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
@@ -649,22 +735,20 @@ else tools.append(bodyBtn, dup, add, left, right, del);
   </div>
 </div>
 
-<div class="footer">v5.4 — Stable focus (no re-render while typing) + Titles single-line + Body returns fixed</div>
+<div class="footer">v5.6 — Search tab + Tags tab + Bulk tag direct children</div>
 `;
 
     const $ = (sel) => container.querySelector(sel);
 
     // Tabs
-const btnTabStructure = $(".tabStructure");
-const btnTabSearch = $(".tabSearch");
-const btnTabTags = $(".tabTags");
+    const btnTabStructure = $(".tabStructure");
+    const btnTabSearch = $(".tabSearch");
+    const btnTabTags = $(".tabTags");
 
-const panelStructure = $(".panelStructure");
-const panelSearch = $(".panelSearch");
-const panelTags = $(".panelTags");
+    const panelStructure = $(".panelStructure");
+    const panelSearch = $(".panelSearch");
+    const panelTags = $(".panelTags");
 
-const searchResults = $(".searchResults");
-    
     // Structure UI
     const taInput = $(".mdInput");
     const canvas = $(".canvas");
@@ -684,12 +768,14 @@ const searchResults = $(".searchResults");
     const btnLvl3 = $(".btnLvl3");
     const btnLvlAll = $(".btnLvlAll");
 
+    // Search UI
     const inSearch = $("#mdseSearch");
     const btnPrev = $(".btnPrev");
     const btnNext = $(".btnNext");
     const cbBody = $("#mdseSearchBody");
     const cbReveal = $("#mdseReveal");
     const countEl = $("#mdseCount");
+    const searchResults = $(".searchResults");
 
     // Tags UI
     const tagMeta = $(".tagMeta");
@@ -710,7 +796,7 @@ const searchResults = $(".searchResults");
     function saveNow() {
       try {
         const state = {
-          v: 5,
+          v: 6,
           nodes,
           input: taInput.value,
           sourceId,
@@ -742,53 +828,6 @@ const searchResults = $(".searchResults");
       }, 500);
     }
 
-    function rebuildMatchesNoRender() {
-      matchIds = [];
-      matchPos = -1;
-
-      if (searchQuery.trim()) {
-        for (const n of nodes) {
-          if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
-        }
-      }
-      updateCount();
-      // NOTE: no renderStructure() here
-    }
-
-    function rebuildMatchesDebounced() {
-      if (matchTimer) clearTimeout(matchTimer);
-      matchTimer = setTimeout(() => {
-        matchTimer = null;
-        rebuildMatchesNoRender();
-      }, 150);
-    }
-
-    function rebuildTagUIDebounced() {
-      if (tagTimer) clearTimeout(tagTimer);
-      tagTimer = setTimeout(() => {
-        tagTimer = null;
-        if (activeTab === "tags") rebuildTagUI();
-      }, 150);
-    }
-
-    // Full change: safe to re-render (structural actions)
-    function markChangedFull() {
-      setCopiedFlag(false);
-      rebuildMatches();   // renders
-      rebuildTagUI();
-      saveDebounced();
-    }
-
-    // Typing change: NEVER re-render structure (keeps focus)
-    function markChangedTyping() {
-      setCopiedFlag(false);
-      // keep search counts roughly accurate without nuking DOM
-      if (searchQuery.trim()) rebuildMatchesDebounced();
-      // tags update while typing (only re-render tags view)
-      rebuildTagUIDebounced();
-      saveDebounced();
-    }
-
     function loadPref() {
       const raw = localStorage.getItem(KEY);
       if (!raw) return;
@@ -799,6 +838,7 @@ const searchResults = $(".searchResults");
       if (typeof s.input === "string") taInput.value = s.input;
       if (typeof s.sourceId === "string" || s.sourceId === null) sourceId = s.sourceId;
       if (typeof s.maxVisibleLevel === "number") maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
+
       copiedSinceChange = !!s.copiedSinceChange;
       lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
 
@@ -806,7 +846,7 @@ const searchResults = $(".searchResults");
       if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
       if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
 
-      if (typeof s.activeTab === "string") activeTab = s.activeTab === "tags" ? "tags" : "structure";
+      if (typeof s.activeTab === "string") activeTab = ["structure","search","tags"].includes(s.activeTab) ? s.activeTab : "structure";
       if (typeof s.activeTag === "string") activeTag = normaliseTag(s.activeTag);
 
       nodes = nodes
@@ -863,51 +903,7 @@ const searchResults = $(".searchResults");
         .join("\n\n");
     }
 
-    // ---- Outline helpers ----
-    function indexById(id) {
-      return nodes.findIndex((n) => n.id === id);
-    }
-
-    function familyIndices(startIdx) {
-      const fam = [startIdx];
-      if (startIdx < 0 || startIdx >= nodes.length) return fam;
-      const pLevel = nodes[startIdx].level;
-      for (let i = startIdx + 1; i < nodes.length; i++) {
-        if (nodes[i].level > pLevel) fam.push(i);
-        else break;
-      }
-      return fam;
-    }
-
-    function familyIds(startId) {
-      const idx = indexById(startId);
-      if (idx < 0) return [];
-      return familyIndices(idx).map((i) => nodes[i].id);
-    }
-
-    function hasChildren(idx) {
-      return familyIndices(idx).length > 1;
-    }
-
-    // ---- Search helpers ----
-    const norm = (s) => (s || "").toLowerCase();
-
-    function nodeMatches(n, q) {
-      if (!q) return false;
-      const qq = norm(q);
-      if (norm(n.title).includes(qq)) return true;
-      if (searchInBody && norm(n.body).includes(qq)) return true;
-      return false;
-    }
-
-    function nodeMatchesBodyOnly(n, q) {
-      if (!q || !searchInBody) return false;
-      const qq = norm(q);
-      const inTitle = norm(n.title).includes(qq);
-      const inBody = norm(n.body).includes(qq);
-      return !inTitle && inBody;
-    }
-
+    // ---- Matches ----
     function updateCount() {
       if (!searchQuery.trim()) {
         countEl.textContent = "";
@@ -941,6 +937,26 @@ const searchResults = $(".searchResults");
       return reveal;
     }
 
+    function rebuildMatchesNoRender() {
+      matchIds = [];
+      matchPos = -1;
+
+      if (searchQuery.trim()) {
+        for (const n of nodes) {
+          if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
+        }
+      }
+      updateCount();
+    }
+
+    function rebuildMatchesDebounced() {
+      if (matchTimer) clearTimeout(matchTimer);
+      matchTimer = setTimeout(() => {
+        matchTimer = null;
+        rebuildMatchesNoRender();
+      }, 150);
+    }
+
     function rebuildMatches() {
       rebuildMatchesNoRender();
       renderStructure();
@@ -962,7 +978,191 @@ const searchResults = $(".searchResults");
       }
     }
 
+    // ---- Tags view ----
+    function allTags() {
+      const set = new Set();
+      nodes.forEach((n) => (n.tags || []).forEach((t) => set.add(t)));
+      return [...set].sort((a, b) => a.localeCompare(b));
+    }
+
+    function tagsCountMap() {
+      const m = new Map();
+      nodes.forEach((n) => (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1)));
+      return m;
+    }
+
+    function renderTagCloud(tags, counts) {
+      tagCloud.innerHTML = "";
+      if (!tags.length) {
+        tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% tag arc:escape</b> inside a section’s body.</span>`;
+        return;
+      }
+
+      tags.forEach((t) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tagchip" + (activeTag === t ? " active" : "");
+        btn.textContent = `${t} (${counts.get(t) || 0})`;
+        btn.addEventListener("click", () => {
+          activeTag = activeTag === t ? "" : t;
+          rebuildTagUI();
+          saveDebounced();
+        });
+        tagCloud.appendChild(btn);
+      });
+    }
+
+    function renderTagResults() {
+      tagResults.innerHTML = "";
+
+      if (!activeTag) {
+        tagMeta.textContent = `Choose a tag to see matching sections (in manuscript order).`;
+        return;
+      }
+
+      const matches = nodes.filter((n) => (n.tags || []).includes(activeTag));
+      tagMeta.textContent = `${activeTag}: ${matches.length} section${matches.length === 1 ? "" : "s"}`;
+
+      if (!matches.length) return;
+
+      matches.forEach((n) => {
+        const card = document.createElement("div");
+        card.className = "tagcard";
+        card.title = "Tap to jump to this section in Structure view";
+        card.addEventListener("click", () => jumpToNode(n.id));
+
+        const top = document.createElement("div");
+        top.className = "toph";
+
+        const lvl = document.createElement("span");
+        lvl.className = "lvl";
+        lvl.textContent = `H${n.level}`;
+
+        const title = document.createElement("span");
+        title.className = "titleline";
+        title.textContent = n.title || "(untitled)";
+
+        top.append(lvl, title);
+
+        const cleaned = bodyWithoutTagLines(n.body);
+        const preview = firstSentence(cleaned);
+
+        const p = document.createElement("div");
+        p.className = "preview";
+        p.textContent = preview ? preview : "(No body text yet.)";
+
+        const subtags = document.createElement("div");
+        subtags.className = "subtags";
+        (n.tags || []).slice(0, 12).forEach((t) => {
+          const pill = document.createElement("span");
+          pill.className = "tagpill";
+          pill.textContent = t;
+          subtags.appendChild(pill);
+        });
+
+        card.append(top, p, subtags);
+        tagResults.appendChild(card);
+      });
+    }
+
+    function rebuildTagUI() {
+      tagAllBtn.classList.toggle("active", !activeTag);
+      const tags = allTags();
+      const counts = tagsCountMap();
+      renderTagCloud(tags, counts);
+      renderTagResults();
+    }
+
+    function rebuildTagUIDebounced() {
+      if (tagTimer) clearTimeout(tagTimer);
+      tagTimer = setTimeout(() => {
+        tagTimer = null;
+        if (activeTab === "tags") rebuildTagUI();
+      }, 150);
+    }
+
+    // ---- Search results tab ----
+    function renderSearchResults() {
+      searchResults.innerHTML = "";
+
+      if (!searchQuery.trim()) {
+        searchResults.innerHTML = `<div class="tagmeta">Type to search your outline.</div>`;
+        return;
+      }
+
+      if (!matchIds.length) {
+        searchResults.innerHTML = `<div class="tagmeta">No matches found.</div>`;
+        return;
+      }
+
+      const matchSet = new Set(matchIds);
+      const matches = nodes.filter((n) => matchSet.has(n.id));
+
+      matches.forEach((n) => {
+        const card = document.createElement("div");
+        card.className = "tagcard";
+        card.title = "Jump to this section in Structure view";
+        card.addEventListener("click", () => jumpToNode(n.id));
+
+        const top = document.createElement("div");
+        top.className = "toph";
+
+        const lvl = document.createElement("span");
+        lvl.className = "lvl";
+        lvl.textContent = `H${n.level}`;
+
+        const title = document.createElement("span");
+        title.className = "titleline";
+        title.textContent = n.title || "(untitled)";
+
+        top.append(lvl, title);
+
+        const cleaned = bodyWithoutTagLines(n.body);
+        const preview = firstSentence(cleaned);
+
+        const p = document.createElement("div");
+        p.className = "preview";
+        p.textContent = preview || "(No body text.)";
+
+        card.append(top, p);
+        searchResults.appendChild(card);
+      });
+    }
+
+    function jumpToNode(id) {
+      setTab("structure");
+
+      const idx = indexById(id);
+      if (idx >= 0 && nodes[idx].level > maxVisibleLevel) {
+        maxVisibleLevel = 6;
+        selMax.value = "6";
+      }
+
+      renderStructure();
+
+      const el = canvas.querySelector(`[data-node-id="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const t = el.querySelector(".title");
+        if (t) t.focus();
+      }
+    }
+
     // ---- Actions ----
+    function markChangedFull() {
+      setCopiedFlag(false);
+      rebuildMatches();   // renders structure + counts
+      rebuildTagUI();
+      saveDebounced();
+    }
+
+    function markChangedTyping() {
+      setCopiedFlag(false);
+      if (searchQuery.trim()) rebuildMatchesDebounced();
+      rebuildTagUIDebounced();
+      saveDebounced();
+    }
+
     function toggleBranchCollapse(id) {
       const idx = indexById(id);
       if (idx < 0) return;
@@ -974,7 +1174,7 @@ const searchResults = $(".searchResults");
       const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].showBody = !nodes[idx].showBody;
-      markChangedFull(); // intentional: UI changes
+      markChangedFull();
     }
 
     function changeLevel(id, delta) {
@@ -1081,204 +1281,25 @@ const searchResults = $(".searchResults");
     }
 
     // ---- Tabs ----
-    // function setTab(tab) {
-    //  activeTab = tab === "tags" ? "tags" : "structure";
     function setTab(tab) {
-  if (tab === "search") activeTab = "search";
-  else if (tab === "tags") activeTab = "tags";
-  else activeTab = "structure";
+      activeTab = ["structure","search","tags"].includes(tab) ? tab : "structure";
 
-      // INSERT
       btnTabStructure.classList.toggle("active", activeTab === "structure");
-btnTabSearch.classList.toggle("active", activeTab === "search");
-btnTabTags.classList.toggle("active", activeTab === "tags");
+      btnTabSearch.classList.toggle("active", activeTab === "search");
+      btnTabTags.classList.toggle("active", activeTab === "tags");
 
-btnTabStructure.setAttribute("aria-selected", activeTab === "structure" ? "true" : "false");
-btnTabSearch.setAttribute("aria-selected", activeTab === "search" ? "true" : "false");
-btnTabTags.setAttribute("aria-selected", activeTab === "tags" ? "true" : "false");
+      btnTabStructure.setAttribute("aria-selected", activeTab === "structure" ? "true" : "false");
+      btnTabSearch.setAttribute("aria-selected", activeTab === "search" ? "true" : "false");
+      btnTabTags.setAttribute("aria-selected", activeTab === "tags" ? "true" : "false");
 
-panelStructure.classList.toggle("active", activeTab === "structure");
-panelSearch.classList.toggle("active", activeTab === "search");
-panelTags.classList.toggle("active", activeTab === "tags");
-      // INSERT 
-      
+      panelStructure.classList.toggle("active", activeTab === "structure");
+      panelSearch.classList.toggle("active", activeTab === "search");
+      panelTags.classList.toggle("active", activeTab === "tags");
+
       if (activeTab === "tags") rebuildTagUI();
       if (activeTab === "search") renderSearchResults();
+
       saveDebounced();
-    }
-
-    // ---- Tags view ----
-    function allTags() {
-      const set = new Set();
-      nodes.forEach((n) => (n.tags || []).forEach((t) => set.add(t)));
-      return [...set].sort((a, b) => a.localeCompare(b));
-    }
-
-    function tagsCountMap() {
-      const m = new Map();
-      nodes.forEach((n) => (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1)));
-      return m;
-    }
-
-
-    function renderSearchResults() {
-  searchResults.innerHTML = "";
-
-  if (!searchQuery.trim()) {
-    searchResults.innerHTML =
-      `<div class="tagmeta">Type to search your outline.</div>`;
-    return;
-  }
-
-  if (!matchIds.length) {
-    searchResults.innerHTML =
-      `<div class="tagmeta">No matches found.</div>`;
-    return;
-  }
-
-  const matches = nodes.filter(n => matchIds.includes(n.id));
-
-  matches.forEach(n => {
-    const card = document.createElement("div");
-    card.className = "tagcard";
-    card.title = "Jump to this section";
-
-    card.addEventListener("click", () => {
-      setTab("structure");
-
-      if (n.level > maxVisibleLevel) {
-        maxVisibleLevel = 6;
-        selMax.value = "6";
-      }
-
-      renderStructure();
-
-      const el = canvas.querySelector(`[data-node-id="${n.id}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const t = el.querySelector(".title");
-        if (t) t.focus();
-      }
-    });
-
-    const top = document.createElement("div");
-    top.className = "toph";
-
-    const lvl = document.createElement("span");
-    lvl.className = "lvl";
-    lvl.textContent = `H${n.level}`;
-
-    const title = document.createElement("span");
-    title.className = "titleline";
-    title.textContent = n.title || "(untitled)";
-
-    top.append(lvl, title);
-
-    const cleaned = bodyWithoutTagLines(n.body);
-    const preview = firstSentence(cleaned);
-
-    const p = document.createElement("div");
-    p.className = "preview";
-    p.textContent = preview || "(No body text.)";
-
-    card.append(top, p);
-    searchResults.appendChild(card);
-  });
-}
-    
-    function renderTagCloud(tags, counts) {
-      tagCloud.innerHTML = "";
-      if (!tags.length) {
-        tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% tag arc:escape</b> inside a section’s body.</span>`;
-        return;
-      }
-
-      tags.forEach((t) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "tagchip" + (activeTag === t ? " active" : "");
-        btn.textContent = `${t} (${counts.get(t) || 0})`;
-        btn.addEventListener("click", () => {
-          activeTag = activeTag === t ? "" : t;
-          rebuildTagUI();
-          saveDebounced();
-        });
-        tagCloud.appendChild(btn);
-      });
-    }
-
-    function renderTagResults() {
-      tagResults.innerHTML = "";
-
-      if (!activeTag) {
-        tagMeta.textContent = `Choose a tag to see matching sections (in manuscript order).`;
-        return;
-      }
-
-      const matches = nodes.filter((n) => (n.tags || []).includes(activeTag));
-      tagMeta.textContent = `${activeTag}: ${matches.length} section${matches.length === 1 ? "" : "s"}`;
-
-      if (!matches.length) return;
-
-      matches.forEach((n) => {
-        const card = document.createElement("div");
-        card.className = "tagcard";
-        card.title = "Tap to jump to this section in Structure view";
-        card.addEventListener("click", () => {
-          setTab("structure");
-          if (n.level > maxVisibleLevel) {
-            maxVisibleLevel = 6;
-            selMax.value = "6";
-          }
-          renderStructure();
-          const el = canvas.querySelector(`[data-node-id="${n.id}"]`);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            const t = el.querySelector(".title");
-            if (t) t.focus();
-          }
-        });
-
-        const top = document.createElement("div");
-        top.className = "toph";
-
-        const lvl = document.createElement("span");
-        lvl.className = "lvl";
-        lvl.textContent = `H${n.level}`;
-
-        const title = document.createElement("span");
-        title.className = "titleline";
-        title.textContent = n.title || "(untitled)";
-
-        top.append(lvl, title);
-
-        const cleaned = bodyWithoutTagLines(n.body);
-        const preview = firstSentence(cleaned);
-
-        const p = document.createElement("div");
-        p.className = "preview";
-        p.textContent = preview ? preview : "(No body text yet.)";
-
-        const subtags = document.createElement("div");
-        subtags.className = "subtags";
-        (n.tags || []).slice(0, 12).forEach((t) => {
-          const pill = document.createElement("span");
-          pill.className = "tagpill";
-          pill.textContent = t;
-          subtags.appendChild(pill);
-        });
-
-        card.append(top, p, subtags);
-        tagResults.appendChild(card);
-      });
-    }
-
-    function rebuildTagUI() {
-      tagAllBtn.classList.toggle("active", !activeTag);
-      const tags = allTags();
-      const counts = tagsCountMap();
-      renderTagCloud(tags, counts);
-      renderTagResults();
     }
 
     // ---- Render (Structure tab) ----
@@ -1286,9 +1307,6 @@ panelTags.classList.toggle("active", activeTab === "tags");
       const scrollPos = window.scrollY;
 
       selMax.value = String(maxVisibleLevel);
-      inSearch.value = searchQuery;
-      cbBody.checked = searchInBody;
-      cbReveal.checked = revealMatches;
 
       canvas.innerHTML = "";
 
@@ -1347,23 +1365,17 @@ panelTags.classList.toggle("active", activeTab === "tags");
         lvl.className = "pill";
         lvl.textContent = `H${n.level}`;
 
-        // --- TITLE: single-line, no Enter ---
+        // --- TITLE: single-line ---
         const title = document.createElement("textarea");
         title.className = "title";
         title.rows = 1;
         title.value = (n.title || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
         title.addEventListener("click", (e) => e.stopPropagation());
-
-        // Stop app-level key handlers; block Enter so it doesn't make new lines / weird focus shifts
         title.addEventListener("keydown", (e) => {
           e.stopPropagation();
-          if (e.key === "Enter") {
-            e.preventDefault(); // keep focus, do nothing
-          }
+          if (e.key === "Enter") e.preventDefault();
         });
-
         title.addEventListener("input", () => {
-          // enforce single-line title
           n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
           if (title.value !== n.title) title.value = n.title;
           autoResizeTA(title);
@@ -1403,6 +1415,32 @@ panelTags.classList.toggle("active", activeTab === "tags");
         right.title = "Demote (H+1) for this branch";
         right.addEventListener("click", () => changeLevel(n.id, +1));
 
+        const tagKids = document.createElement("button");
+        tagKids.type = "button";
+        tagKids.textContent = `🏷 Tag H${n.level + 1}`;
+        tagKids.title = `Add a %% tag line to every direct H${n.level + 1} under this heading`;
+        tagKids.addEventListener("click", () => {
+          const payload = prompt(
+            `Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`,
+            "arc holiday"
+          );
+          if (!payload) return;
+          bulkTagDirectChildren(n.id, payload, "add");
+        });
+
+        const untagKids = document.createElement("button");
+        untagKids.type = "button";
+        untagKids.textContent = `🧽 Untag H${n.level + 1}`;
+        untagKids.title = `Remove that exact %% tag line from every direct H${n.level + 1} under this heading`;
+        untagKids.addEventListener("click", () => {
+          const payload = prompt(
+            `Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`,
+            "arc holiday"
+          );
+          if (!payload) return;
+          bulkTagDirectChildren(n.id, payload, "remove");
+        });
+
         const del = document.createElement("button");
         del.type = "button";
         del.textContent = "✕";
@@ -1410,36 +1448,13 @@ panelTags.classList.toggle("active", activeTab === "tags");
         del.title = "Delete branch";
         del.addEventListener("click", () => deleteBranch(n.id));
 
-        // tools.append(bodyBtn, dup, add, left, right, del);
-        const tagKids = document.createElement("button");
-tagKids.type = "button";
-tagKids.textContent = `🏷 Tag H${n.level + 1}`;
-tagKids.title = `Add a %% tag line to every H${n.level + 1} under this heading`;
-tagKids.addEventListener("click", () => {
-  const payload = prompt(`Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
-  if (!payload) return;
-  bulkTagDirectChildren(n.id, payload, "add");
-});
-
-const untagKids = document.createElement("button");
-untagKids.type = "button";
-untagKids.textContent = `🧽 Untag H${n.level + 1}`;
-untagKids.title = `Remove a %% tag line from every H${n.level + 1} under this heading`;
-untagKids.addEventListener("click", () => {
-  const payload = prompt(`Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
-  if (!payload) return;
-  bulkTagDirectChildren(n.id, payload, "remove");
-});
-
-// Optional: only show these if it *can* have children (H6 can't have H7)
-if (n.level < 6) tools.append(bodyBtn, dup, add, left, right, tagKids, untagKids, del);
-else tools.append(bodyBtn, dup, add, left, right, del);
-        
+        if (n.level < 6) tools.append(bodyBtn, dup, add, left, right, tagKids, untagKids, del);
+        else tools.append(bodyBtn, dup, add, left, right, del);
 
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
 
-        // Body area: show if user toggled, or if reveal+body-match-only while searching
+        // Body area: show if toggled, OR reveal+body-match-only while searching
         const bodyShouldShow =
           n.showBody ||
           (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
@@ -1447,13 +1462,11 @@ else tools.append(bodyBtn, dup, add, left, right, del);
         const bodyWrap = document.createElement("div");
         bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
 
-        // --- BODY: allow Enter, keep focus by preventing re-render on input ---
         const bodyTA = document.createElement("textarea");
         bodyTA.rows = 6;
         bodyTA.wrap = "soft";
         bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
 
-        // Stop bubbling to app-level handlers (but do NOT preventDefault)
         const stop = (e) => e.stopPropagation();
         bodyTA.addEventListener("keydown", stop);
         bodyTA.addEventListener("keypress", stop);
@@ -1475,19 +1488,19 @@ else tools.append(bodyBtn, dup, add, left, right, del);
       window.scrollTo(0, scrollPos);
 
       if (lastCreatedId) {
-        const el = [...canvas.querySelectorAll(".node")].find((div) => {
-          const t = div.querySelector(".title");
-          return t && t.value === "";
-        });
-        if (el) el.querySelector(".title").focus();
+        const el = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
+        if (el) {
+          const t = el.querySelector(".title");
+          if (t) t.focus();
+        }
         lastCreatedId = null;
       }
     }
 
     // ---- Buttons / events ----
-btnTabStructure.addEventListener("click", () => setTab("structure"));
-btnTabSearch.addEventListener("click", () => setTab("search"));
-btnTabTags.addEventListener("click", () => setTab("tags"));
+    btnTabStructure.addEventListener("click", () => setTab("structure"));
+    btnTabSearch.addEventListener("click", () => setTab("search"));
+    btnTabTags.addEventListener("click", () => setTab("tags"));
 
     tagAllBtn.addEventListener("click", () => {
       activeTag = "";
@@ -1536,6 +1549,7 @@ btnTabTags.addEventListener("click", () => setTab("tags"));
       renderStructure();
       rebuildTagUI();
       rebuildMatchesNoRender();
+      renderSearchResults();
     });
 
     btnAddTop.addEventListener("click", () => addNewAfter(null));
@@ -1548,13 +1562,15 @@ btnTabTags.addEventListener("click", () => setTab("tags"));
 
     inSearch.addEventListener("input", () => {
       searchQuery = inSearch.value || "";
-      rebuildMatches(); // intentional: you’re not typing in nodes here
+      rebuildMatches();
+      if (activeTab === "search") renderSearchResults();
       saveDebounced();
     });
 
     cbBody.addEventListener("change", () => {
       searchInBody = !!cbBody.checked;
       rebuildMatches();
+      if (activeTab === "search") renderSearchResults();
       saveDebounced();
     });
 
@@ -1581,11 +1597,16 @@ btnTabTags.addEventListener("click", () => setTab("tags"));
         inSearch.value = "";
         updateCount();
         renderStructure();
+        renderSearchResults();
         saveDebounced();
       }
     });
 
-    taInput.addEventListener("input", () => markChangedFull());
+    taInput.addEventListener("input", () => {
+      // you changed the input text; it doesn't change nodes until Load
+      setCopiedFlag(false);
+      saveDebounced();
+    });
 
     // ---- Init ----
     loadPref();
@@ -1599,10 +1620,10 @@ btnTabTags.addEventListener("click", () => setTab("tags"));
     badgeSave.className = "badge good badgeSave";
     badgeSave.textContent = "Saved ✓";
 
-    rebuildMatches();   // also renders structure
+    // initial renders
+    rebuildMatches();
     rebuildTagUI();
-    setTab(activeTab);
-
+    setTab(activeTab || "structure");
     saveDebounced();
   });
 })();
