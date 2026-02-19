@@ -582,15 +582,6 @@
         <button type="button" class="btnLvlAll">All</button>
       </div>
 
-      <div class="searchRow" role="search" aria-label="Outline search">
-        <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
-        <button type="button" class="btnPrev">Prev</button>
-        <button type="button" class="btnNext">Next</button>
-        <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
-        <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
-        <span class="searchCount" id="mdseCount"></span>
-      </div>
-
       <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
 
       <div class="canvas"></div>
