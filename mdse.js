@@ -508,15 +508,22 @@
     const line = s.split("\n").find((x) => x.trim());
     return (line || "").trim();
   }
-
-// INSERT
-// END INSERT
   
   // ---- Core app ----
   window.SiteApps.register("mdse", (container) => {
     ensureStyle();
+    
+    const KEY = storageKey(container);
 
-// INSERT
+    // State
+    let nodes = []; // {id, level, title, body, isCollapsed, showBody, tags[]}
+    let sourceId = null;
+    let lastCreatedId = null;
+    let maxVisibleLevel = 6;
+    let copiedSinceChange = false;
+    let lastCopyAt = null;
+
+// INSERT helper
     const tagKids = document.createElement("button");
 tagKids.type = "button";
 tagKids.textContent = `🏷 Tag H${n.level + 1}`;
@@ -542,16 +549,6 @@ if (n.level < 6) tools.append(bodyBtn, dup, add, left, right, tagKids, untagKids
 else tools.append(bodyBtn, dup, add, left, right, del);
 // INSERT END
     
-    const KEY = storageKey(container);
-
-    // State
-    let nodes = []; // {id, level, title, body, isCollapsed, showBody, tags[]}
-    let sourceId = null;
-    let lastCreatedId = null;
-    let maxVisibleLevel = 6;
-    let copiedSinceChange = false;
-    let lastCopyAt = null;
-
     // Search state (Structure tab)
     let searchQuery = "";
     let searchInBody = false;
