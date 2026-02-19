@@ -596,8 +596,8 @@
       <div class="canvas"></div>
     </div>
 
-    // insert start
     <div class="tabPanel panelSearch" role="tabpanel">
+    
   <div class="searchRow" role="search">
     <input id="mdseSearch" type="search" placeholder="Search…" />
     <button type="button" class="btnPrev">Prev</button>
@@ -605,11 +605,13 @@
     <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
     <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
     <span class="searchCount" id="mdseCount"></span>
+
+<div class="taglist searchResults" aria-live="polite"></div>
+    
   </div>
 
   <div class="hint">Search results highlight in Structure view.</div>
 </div>
-    // insert finish 
 
     <div class="tabPanel panelTags" role="tabpanel">
       <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
@@ -643,6 +645,8 @@ const btnTabTags = $(".tabTags");
 const panelStructure = $(".panelStructure");
 const panelSearch = $(".panelSearch");
 const panelTags = $(".panelTags");
+
+const searchResults = $(".searchResults");
     
     // Structure UI
     const taInput = $(".mdInput");
@@ -923,6 +927,7 @@ const panelTags = $(".panelTags");
     function rebuildMatches() {
       rebuildMatchesNoRender();
       renderStructure();
+      if (activeTab === "search") renderSearchResults();
     }
 
     function jumpMatch(delta) {
@@ -1081,6 +1086,7 @@ panelTags.classList.toggle("active", activeTab === "tags");
       // INSERT 
       
       if (activeTab === "tags") rebuildTagUI();
+      if (activeTab === "search") renderSearchResults();
       saveDebounced();
     }
 
@@ -1097,6 +1103,72 @@ panelTags.classList.toggle("active", activeTab === "tags");
       return m;
     }
 
+
+    function renderSearchResults() {
+  searchResults.innerHTML = "";
+
+  if (!searchQuery.trim()) {
+    searchResults.innerHTML =
+      `<div class="tagmeta">Type to search your outline.</div>`;
+    return;
+  }
+
+  if (!matchIds.length) {
+    searchResults.innerHTML =
+      `<div class="tagmeta">No matches found.</div>`;
+    return;
+  }
+
+  const matches = nodes.filter(n => matchIds.includes(n.id));
+
+  matches.forEach(n => {
+    const card = document.createElement("div");
+    card.className = "tagcard";
+    card.title = "Jump to this section";
+
+    card.addEventListener("click", () => {
+      setTab("structure");
+
+      if (n.level > maxVisibleLevel) {
+        maxVisibleLevel = 6;
+        selMax.value = "6";
+      }
+
+      renderStructure();
+
+      const el = canvas.querySelector(`[data-node-id="${n.id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const t = el.querySelector(".title");
+        if (t) t.focus();
+      }
+    });
+
+    const top = document.createElement("div");
+    top.className = "toph";
+
+    const lvl = document.createElement("span");
+    lvl.className = "lvl";
+    lvl.textContent = `H${n.level}`;
+
+    const title = document.createElement("span");
+    title.className = "titleline";
+    title.textContent = n.title || "(untitled)";
+
+    top.append(lvl, title);
+
+    const cleaned = bodyWithoutTagLines(n.body);
+    const preview = firstSentence(cleaned);
+
+    const p = document.createElement("div");
+    p.className = "preview";
+    p.textContent = preview || "(No body text.)";
+
+    card.append(top, p);
+    searchResults.appendChild(card);
+  });
+}
+    
     function renderTagCloud(tags, counts) {
       tagCloud.innerHTML = "";
       if (!tags.length) {
