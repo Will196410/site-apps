@@ -548,10 +548,11 @@
     <h3>Markdown Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
 
-    <div class="tabs" role="tablist" aria-label="Views">
-      <button type="button" class="tabbtn tabStructure" role="tab" aria-selected="true">Structure</button>
-      <button type="button" class="tabbtn tabTags" role="tab" aria-selected="false">Tags</button>
-    </div>
+<div class="tabs" role="tablist" aria-label="Views">
+  <button type="button" class="tabbtn tabStructure" role="tab" aria-selected="true">Structure</button>
+  <button type="button" class="tabbtn tabSearch" role="tab" aria-selected="false">Search</button>
+  <button type="button" class="tabbtn tabTags" role="tab" aria-selected="false">Tags</button>
+</div>
 
     <div class="tabPanel panelStructure active" role="tabpanel">
       <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
@@ -595,6 +596,21 @@
       <div class="canvas"></div>
     </div>
 
+    // insert start
+    <div class="tabPanel panelSearch" role="tabpanel">
+  <div class="searchRow" role="search">
+    <input id="mdseSearch" type="search" placeholder="Search…" />
+    <button type="button" class="btnPrev">Prev</button>
+    <button type="button" class="btnNext">Next</button>
+    <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
+    <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
+    <span class="searchCount" id="mdseCount"></span>
+  </div>
+
+  <div class="hint">Search results highlight in Structure view.</div>
+</div>
+    // insert finish 
+
     <div class="tabPanel panelTags" role="tabpanel">
       <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
       <div class="tagbar">
@@ -620,11 +636,14 @@
     const $ = (sel) => container.querySelector(sel);
 
     // Tabs
-    const btnTabStructure = $(".tabStructure");
-    const btnTabTags = $(".tabTags");
-    const panelStructure = $(".panelStructure");
-    const panelTags = $(".panelTags");
+const btnTabStructure = $(".tabStructure");
+const btnTabSearch = $(".tabSearch");
+const btnTabTags = $(".tabTags");
 
+const panelStructure = $(".panelStructure");
+const panelSearch = $(".panelSearch");
+const panelTags = $(".panelTags");
+    
     // Structure UI
     const taInput = $(".mdInput");
     const canvas = $(".canvas");
@@ -1040,18 +1059,27 @@
     }
 
     // ---- Tabs ----
+    // function setTab(tab) {
+    //  activeTab = tab === "tags" ? "tags" : "structure";
     function setTab(tab) {
-      activeTab = tab === "tags" ? "tags" : "structure";
+  if (tab === "search") activeTab = "search";
+  else if (tab === "tags") activeTab = "tags";
+  else activeTab = "structure";
 
+      // INSERT
       btnTabStructure.classList.toggle("active", activeTab === "structure");
-      btnTabTags.classList.toggle("active", activeTab === "tags");
+btnTabSearch.classList.toggle("active", activeTab === "search");
+btnTabTags.classList.toggle("active", activeTab === "tags");
 
-      btnTabStructure.setAttribute("aria-selected", activeTab === "structure" ? "true" : "false");
-      btnTabTags.setAttribute("aria-selected", activeTab === "tags" ? "true" : "false");
+btnTabStructure.setAttribute("aria-selected", activeTab === "structure" ? "true" : "false");
+btnTabSearch.setAttribute("aria-selected", activeTab === "search" ? "true" : "false");
+btnTabTags.setAttribute("aria-selected", activeTab === "tags" ? "true" : "false");
 
-      panelStructure.classList.toggle("active", activeTab === "structure");
-      panelTags.classList.toggle("active", activeTab === "tags");
-
+panelStructure.classList.toggle("active", activeTab === "structure");
+panelSearch.classList.toggle("active", activeTab === "search");
+panelTags.classList.toggle("active", activeTab === "tags");
+      // INSERT 
+      
       if (activeTab === "tags") rebuildTagUI();
       saveDebounced();
     }
@@ -1344,8 +1372,9 @@
     }
 
     // ---- Buttons / events ----
-    btnTabStructure.addEventListener("click", () => setTab("structure"));
-    btnTabTags.addEventListener("click", () => setTab("tags"));
+btnTabStructure.addEventListener("click", () => setTab("structure"));
+btnTabSearch.addEventListener("click", () => setTab("search"));
+btnTabTags.addEventListener("click", () => setTab("tags"));
 
     tagAllBtn.addEventListener("click", () => {
       activeTag = "";
