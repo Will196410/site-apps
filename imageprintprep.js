@@ -738,18 +738,6 @@ if (fmt === "pdf") {
   pdf.save("print-ready.pdf");
   return;
 }
-
-        // Use JPEG inside PDF for size/reliability (PNG PDFs can be huge)
-        const jpgData = canvas.toDataURL("image/jpeg", 1.0);
-        const { jsPDF } = window.jspdf;
-
-        const pdf = new jsPDF({
-          orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
-          unit: "px",
-          format: [canvas.width, canvas.height],
-          compress: true,
-        });
-
         pdf.addImage(jpgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
         pdf.save("print-ready.pdf");
       } else {
