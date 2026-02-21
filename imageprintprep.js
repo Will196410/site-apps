@@ -21,7 +21,7 @@
 
     style.textContent = `
 [data-app="imageprintprep"]{
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: system-ui;
   max-width: 1000px;
   margin: 20px auto;
   border:2px solid #111;
@@ -29,8 +29,6 @@
   padding:20px;
   background:#fff;
 }
-[data-app="imageprintprep"] h3{ margin:0 0 16px; }
-
 [data-app="imageprintprep"] input,
 [data-app="imageprintprep"] select{
   padding:10px;
@@ -38,7 +36,6 @@
   border-radius:10px;
   font-weight:700;
 }
-
 [data-app="imageprintprep"] button{
   padding:10px 14px;
   border:2px solid #111;
@@ -51,20 +48,17 @@
   background:#111;
   color:#fff;
 }
-
 [data-app="imageprintprep"] .grid{
   display:grid;
   gap:12px;
   margin-top:16px;
 }
-
 [data-app="imageprintprep"] canvas{
   max-width:100%;
   margin-top:20px;
   border:2px solid #111;
   border-radius:10px;
 }
-
 [data-app="imageprintprep"] .drop{
   border:3px dashed #111;
   border-radius:14px;
@@ -83,7 +77,7 @@
     container.setAttribute("data-app","imageprintprep");
 
     container.innerHTML = `
-<h3>Print Preparation Tool (iPad Optimised)</h3>
+<h3>Print Preparation Tool</h3>
 
 <div class="drop">Tap to Upload Image</div>
 <input type="file" accept="image/*" style="display:none">
@@ -100,14 +94,14 @@
 
 <label>
 <input type="checkbox" class="contain" checked>
-Maintain aspect ratio (letterbox)
+Maintain aspect ratio
 </label>
 
-<label>Fill Colour
+<label>Fill
 <select class="fill">
   <option value="white">White</option>
   <option value="black">Black</option>
-  <option value="auto">Auto (average image)</option>
+  <option value="auto">Auto</option>
   <option value="custom">Custom</option>
 </select>
 </label>
@@ -116,9 +110,10 @@ Maintain aspect ratio (letterbox)
 
 <label>Export Format
 <select class="format">
-  <option value="image/jpeg">JPG (print safe)</option>
+  <option value="image/jpeg">JPG</option>
   <option value="image/png">PNG</option>
   <option value="image/webp">WebP</option>
+  <option value="pdf">PDF</option>
 </select>
 </label>
 
@@ -171,13 +166,13 @@ Maintain aspect ratio (letterbox)
       customColour.style.display = fillSel.value === "custom" ? "block" : "none";
     });
 
-    function getAverageColour(img) {
-      const temp = document.createElement("canvas");
-      const tctx = temp.getContext("2d");
-      temp.width = 50;
-      temp.height = 50;
-      tctx.drawImage(img,0,0,50,50);
-      const data = tctx.getImageData(0,0,50,50).data;
+    function getAverageColour(img){
+      const temp=document.createElement("canvas");
+      const tctx=temp.getContext("2d");
+      temp.width=40;
+      temp.height=40;
+      tctx.drawImage(img,0,0,40,40);
+      const data=tctx.getImageData(0,0,40,40).data;
       let r=0,g=0,b=0,count=0;
       for(let i=0;i<data.length;i+=4){
         r+=data[i];
@@ -191,52 +186,57 @@ Maintain aspect ratio (letterbox)
     function drawPreview(){
       if(!image) return;
 
-      const w = parseInt(outW.value);
-      const h = parseInt(outH.value);
+      const w=parseInt(outW.value);
+      const h=parseInt(outH.value);
 
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width=w;
+      canvas.height=h;
 
-      let fillColour = "#ffffff";
-      if(fillSel.value==="black") fillColour="#000000";
-      if(fillSel.value==="custom") fillColour=customColour.value;
-      if(fillSel.value==="auto") fillColour=getAverageColour(image);
+      let fill="#ffffff";
+      if(fillSel.value==="black") fill="#000";
+      if(fillSel.value==="custom") fill=customColour.value;
+      if(fillSel.value==="auto") fill=getAverageColour(image);
 
-      ctx.fillStyle = fillColour;
+      ctx.fillStyle=fill;
       ctx.fillRect(0,0,w,h);
 
-      let drawW = w;
-      let drawH = h;
-      let offsetX = 0;
-      let offsetY = 0;
+      const ratio=Math.min(w/image.width,h/image.height);
+      const drawW=image.width*ratio;
+      const drawH=image.height*ratio;
+      const x=(w-drawW)/2;
+      const y=(h-drawH)/2;
 
-      if(contain.checked){
-        const ratio = Math.min(w/image.width, h/image.height);
-        drawW = image.width * ratio;
-        drawH = image.height * ratio;
-        offsetX = (w - drawW)/2;
-        offsetY = (h - drawH)/2;
-      }
-
-      ctx.drawImage(image, offsetX, offsetY, drawW, drawH);
+      ctx.drawImage(image,x,y,drawW,drawH);
     }
 
-    processBtn.addEventListener("click", drawPreview);
+    processBtn.addEventListener("click",drawPreview);
 
-    downloadBtn.addEventListener("click", () => {
+    downloadBtn.addEventListener("click",()=>{
       if(!image) return;
 
-      const format = formatSel.value;
-      const quality = parseFloat(qualityInput.value) || 0.95;
+      const format=formatSel.value;
+      const quality=parseFloat(qualityInput.value)||0.95;
 
-      canvas.toBlob(blob=>{
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "print-ready-image";
-        a.click();
-        URL.revokeObjectURL(url);
-      }, format, quality);
+      if(format==="pdf"){
+        const imgData=canvas.toDataURL("image/jpeg",1.0);
+        const { jsPDF } = window.jspdf;
+        const pdf=new jsPDF({
+          orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+          unit:"px",
+          format:[canvas.width,canvas.height]
+        });
+        pdf.addImage(imgData,"JPEG",0,0,canvas.width,canvas.height);
+        pdf.save("print-ready.pdf");
+      } else {
+        canvas.toBlob(blob=>{
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement("a");
+          a.href=url;
+          a.download="print-ready-image";
+          a.click();
+          URL.revokeObjectURL(url);
+        },format,quality);
+      }
     });
 
   });
