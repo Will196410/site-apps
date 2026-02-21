@@ -141,6 +141,32 @@
   function mmToIn(mm) { return mm / 25.4; }
   function inToMm(_in) { return _in * 25.4; }
 
+  async function ensureJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+
+  await new Promise((resolve, reject) => {
+    const existing = document.querySelector(
+      'script[data-siteapps-jspdf="1"]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true), { once: true });
+      existing.addEventListener("error", () => reject(new Error("jsPDF load error")), { once: true });
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.async = true;
+    s.setAttribute("data-siteapps-jspdf", "1");
+    s.onload = () => resolve(true);
+    s.onerror = () => reject(new Error("jsPDF load error"));
+    document.head.appendChild(s);
+  });
+
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  throw new Error("jsPDF loaded but window.jspdf.jsPDF not found");
+}
+
   // Average colour (simple + iPad-safe)
   function avgColourFromImage(img) {
     const temp = document.createElement("canvas");
@@ -690,11 +716,28 @@ orientationToggle.addEventListener("change", () => {
       const fmt = formatSel.value;
       const q = clamp(toNum(qualityInp.value, 0.95), 0.1, 1);
 
-      if (fmt === "pdf") {
-        if (!window.jspdf || !window.jspdf.jsPDF) {
-          alert("PDF library not loaded. Ensure jsPDF is included before this script.");
-          return;
-        }
+if (fmt === "pdf") {
+  let JsPDF;
+  try {
+    JsPDF = await ensureJsPDF();
+  } catch (e) {
+    alert("Couldn’t load PDF library. Please try again.");
+    return;
+  }
+
+  const jpgData = canvas.toDataURL("image/jpeg", 1.0);
+
+  const pdf = new JsPDF({
+    orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
+    unit: "px",
+    format: [canvas.width, canvas.height],
+    compress: true,
+  });
+
+  pdf.addImage(jpgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
+  pdf.save("print-ready.pdf");
+  return;
+}
 
         // Use JPEG inside PDF for size/reliability (PNG PDFs can be huge)
         const jpgData = canvas.toDataURL("image/jpeg", 1.0);
