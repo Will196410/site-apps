@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  // ---- SiteApps registry ----
+  // ---- SiteApps registry (safe, minimal) ----
   window.SiteApps = window.SiteApps || {};
   window.SiteApps.registry = window.SiteApps.registry || {};
   window.SiteApps.register =
@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-imageprintprep-style-v2";
+  const STYLE_ID = "siteapps-imageprintprep-style-v3";
 
   function ensureStyle() {
     let style = document.getElementById(STYLE_ID);
@@ -32,9 +32,18 @@
   color:#111;
 }
 [data-app="imageprintprep"] *{ box-sizing:border-box; }
-
 [data-app="imageprintprep"] h3{ margin:0 0 8px; font-size: 18px; }
 [data-app="imageprintprep"] .muted{ color:#444; font-size: 13px; font-weight: 800; }
+[data-app="imageprintprep"] .err{
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 2px solid #7a0000;
+  border-radius: 12px;
+  background: #fff5f5;
+  color: #7a0000;
+  font-weight: 900;
+  display:none;
+}
 
 [data-app="imageprintprep"] .drop{
   border: 3px dashed #111;
@@ -141,31 +150,29 @@
   function mmToIn(mm) { return mm / 25.4; }
   function inToMm(_in) { return _in * 25.4; }
 
+  // Lazy-load jsPDF (UMD: window.jspdf.jsPDF)
   async function ensureJsPDF() {
-  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
 
-  await new Promise((resolve, reject) => {
-    const existing = document.querySelector(
-      'script[data-siteapps-jspdf="1"]'
-    );
-    if (existing) {
-      existing.addEventListener("load", () => resolve(true), { once: true });
-      existing.addEventListener("error", () => reject(new Error("jsPDF load error")), { once: true });
-      return;
-    }
+    await new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-siteapps-jspdf="1"]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve(true), { once: true });
+        existing.addEventListener("error", () => reject(new Error("jsPDF load error")), { once: true });
+        return;
+      }
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.async = true;
+      s.setAttribute("data-siteapps-jspdf", "1");
+      s.onload = () => resolve(true);
+      s.onerror = () => reject(new Error("jsPDF load error"));
+      document.head.appendChild(s);
+    });
 
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-    s.async = true;
-    s.setAttribute("data-siteapps-jspdf", "1");
-    s.onload = () => resolve(true);
-    s.onerror = () => reject(new Error("jsPDF load error"));
-    document.head.appendChild(s);
-  });
-
-  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
-  throw new Error("jsPDF loaded but window.jspdf.jsPDF not found");
-}
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    throw new Error("jsPDF loaded but window.jspdf.jsPDF not found");
+  }
 
   // Average colour (simple + iPad-safe)
   function avgColourFromImage(img) {
@@ -183,17 +190,12 @@
     return `rgb(${r},${g},${b})`;
   }
 
-  // Presets (trim size, not including bleed)
   const PRESETS = [
     { id: "custom", name: "Custom" },
-
-    // ISO A sizes (mm)
     { id: "a4", name: "A4 (210×297mm)", wMm: 210, hMm: 297 },
     { id: "a3", name: "A3 (297×420mm)", wMm: 297, hMm: 420 },
     { id: "a2", name: "A2 (420×594mm)", wMm: 420, hMm: 594 },
     { id: "a1", name: "A1 (594×841mm)", wMm: 594, hMm: 841 },
-
-    // Common photo prints (in)
     { id: "4x6", name: "Photo 4×6 in", wIn: 4, hIn: 6 },
     { id: "5x7", name: "Photo 5×7 in", wIn: 5, hIn: 7 },
     { id: "8x10", name: "Photo 8×10 in", wIn: 8, hIn: 10 },
@@ -203,28 +205,38 @@
 
   window.SiteApps.register("imageprintprep", (container) => {
     ensureStyle();
-    container.setAttribute("data-app", "imageprintprep");
 
+    // Visible error banner (helps on iPad)
+    function showErr(msg) {
+      const el = container.querySelector(".err");
+      if (!el) return;
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+    function clearErr() {
+      const el = container.querySelector(".err");
+      if (!el) return;
+      el.textContent = "";
+      el.style.display = "none";
+    }
+
+    container.setAttribute("data-app", "imageprintprep");
     container.innerHTML = `
 <h3>Image Print Prep</h3>
-<div class="muted">Resize for print agencies: set physical size + DPI → export JPG/PNG/WebP or a true PDF. Optional bleed + crop/fit + fill.</div>
+<div class="muted">Set physical size + DPI → export JPG/PNG/WebP or a true PDF. Optional bleed + crop/fit + fill.</div>
+<div class="err"></div>
 
 <div class="drop">Tap to Upload Image</div>
 <input class="file" type="file" accept="image/*" style="display:none">
 
 <div class="row">
-  <label>
-    Preset
-    <select class="preset"></select>
+  <label>Preset <select class="preset"></select></label>
+
+  <label class="check">
+    <input class="orientation" type="checkbox"> Landscape
   </label>
 
-<label class="check">
-  <input class="orientation" type="checkbox">
-  Landscape
-</label>
-
-  <label>
-    Units
+  <label>Units
     <select class="units">
       <option value="mm">mm</option>
       <option value="in">in</option>
@@ -232,38 +244,24 @@
     </select>
   </label>
 
-  <label>
-    Width
-    <input class="w" type="number" step="0.01" value="210">
-  </label>
-
-  <label>
-    Height
-    <input class="h" type="number" step="0.01" value="297">
-  </label>
-
-  <label>
-    DPI
-    <input class="dpi" type="number" step="1" value="300">
-  </label>
+  <label>Width <input class="w" type="number" step="0.01" value="210"></label>
+  <label>Height <input class="h" type="number" step="0.01" value="297"></label>
+  <label>DPI <input class="dpi" type="number" step="1" value="300"></label>
 
   <label class="check">
-    <input class="lock" type="checkbox" checked>
-    Lock aspect ratio
+    <input class="lock" type="checkbox" checked> Lock aspect ratio
   </label>
 </div>
 
 <div class="row">
-  <label>
-    Fit mode
+  <label>Fit mode
     <select class="mode">
       <option value="contain">Fit (contain) — no crop</option>
       <option value="cover">Fill (cover) — crop</option>
     </select>
   </label>
 
-  <label>
-    Fill
+  <label>Fill
     <select class="fill">
       <option value="white">White</option>
       <option value="black">Black</option>
@@ -273,30 +271,25 @@
     </select>
   </label>
 
-  <label class="customWrap" style="display:none">
-    Colour
+  <label class="customWrap" style="display:none">Colour
     <input class="custom" type="color" value="#ffffff">
   </label>
 
-  <label class="blurWrap" style="display:none">
-    Blur strength
+  <label class="blurWrap" style="display:none">Blur strength
     <input class="blur" type="number" step="1" min="0" max="80" value="28">
   </label>
 
   <label class="check">
-    <input class="guides" type="checkbox" checked>
-    Show trim guides
+    <input class="guides" type="checkbox" checked> Show trim guides
   </label>
 </div>
 
 <div class="row">
   <label class="check">
-    <input class="bleedOn" type="checkbox">
-    Include bleed
+    <input class="bleedOn" type="checkbox"> Include bleed
   </label>
 
-  <label>
-    Bleed (mm)
+  <label>Bleed (mm)
     <input class="bleedMm" type="number" step="0.1" value="3" disabled>
   </label>
 
@@ -342,7 +335,6 @@
     const lock = $(".lock");
 
     const modeSel = $(".mode");
-
     const fillSel = $(".fill");
     const customWrap = $(".customWrap");
     const customCol = $(".custom");
@@ -350,7 +342,6 @@
     const blurInp = $(".blur");
 
     const guides = $(".guides");
-
     const bleedOn = $(".bleedOn");
     const bleedMm = $(".bleedMm");
 
@@ -368,8 +359,8 @@
     let img = null;
     let imgAspect = null;
 
-    // Populate presets
-    PRESETS.forEach(p => {
+    // Presets
+    PRESETS.forEach((p) => {
       const opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.name;
@@ -377,9 +368,7 @@
     });
     preset.value = "a4";
 
-    function currentUnits() {
-      return units.value; // mm | in | px
-    }
+    function currentUnits() { return units.value; }
 
     function getTrimSizeInInches() {
       const u = currentUnits();
@@ -387,34 +376,27 @@
       const h = toNum(hInp.value, 0);
 
       if (u === "px") {
-        // px + dpi => inches
         const dpi = Math.max(1, toNum(dpiInp.value, 300));
         return { wIn: w / dpi, hIn: h / dpi };
       }
-      if (u === "mm") {
-        return { wIn: mmToIn(w), hIn: mmToIn(h) };
-      }
+      if (u === "mm") return { wIn: mmToIn(w), hIn: mmToIn(h) };
       return { wIn: w, hIn: h };
     }
 
     function getBleedInInches() {
       if (!bleedOn.checked) return 0;
-      const bMm = Math.max(0, toNum(bleedMm.value, 0));
-      return mmToIn(bMm);
+      return mmToIn(Math.max(0, toNum(bleedMm.value, 0)));
     }
 
     function computeCanvasPixels() {
       const dpi = Math.max(1, toNum(dpiInp.value, 300));
       const { wIn, hIn } = getTrimSizeInInches();
       const bIn = getBleedInInches();
-
       const fullWIn = wIn + 2 * bIn;
       const fullHIn = hIn + 2 * bIn;
-
       const pxW = Math.round(fullWIn * dpi);
       const pxH = Math.round(fullHIn * dpi);
-
-      return { pxW, pxH, dpi, wIn, hIn, bIn, fullWIn, fullHIn };
+      return { pxW, pxH, dpi, wIn, hIn, bIn };
     }
 
     function updatePxInfo() {
@@ -429,14 +411,11 @@
       const bleedText = bIn > 0 ? ` • Bleed: ${inToMm(bIn).toFixed(1)}mm` : "";
       pxInfo.textContent = `${trimText} → Output: ${pxW}×${pxH} px${bleedText}`;
 
-      // Rough memory estimate: 4 bytes per pixel, x2 safety factor
       const mp = (pxW * pxH) / 1_000_000;
-      const bytes = pxW * pxH * 4;
-      const approxMB = bytes / (1024 * 1024);
+      const approxMB = (pxW * pxH * 4) / (1024 * 1024);
 
       let cls = "pill good memInfo";
       let msg = `Canvas: ${mp.toFixed(1)}MP (~${approxMB.toFixed(0)}MB raw)`;
-      // iPad Safari can struggle with huge canvases; warn early
       if (mp > 80 || pxW > 12000 || pxH > 12000) {
         cls = "pill warn memInfo";
         msg = `Warning: ${mp.toFixed(1)}MP — may fail on iPad Safari`;
@@ -449,54 +428,40 @@
     }
 
     function applyPreset(id) {
-      const p = PRESETS.find(x => x.id === id);
+      const p = PRESETS.find((x) => x.id === id);
       if (!p || id === "custom") return;
 
-      // default units mm for ISO, in for photo
       if (p.wMm && p.hMm) {
         units.value = "mm";
-let wVal = p.wMm || p.wIn;
-let hVal = p.hMm || p.hIn;
-
-if (orientationToggle.checked) {
-  const temp = wVal;
-  wVal = hVal;
-  hVal = temp;
-}
-
-wInp.value = String(wVal);
-hInp.value = String(hVal);
-        
+        let wVal = p.wMm, hVal = p.hMm;
+        if (orientationToggle.checked) [wVal, hVal] = [hVal, wVal];
+        wInp.value = String(wVal);
+        hInp.value = String(hVal);
       } else if (p.wIn && p.hIn) {
         units.value = "in";
-        wInp.value = String(p.wIn);
-        hInp.value = String(p.hIn);
+        let wVal = p.wIn, hVal = p.hIn;
+        if (orientationToggle.checked) [wVal, hVal] = [hVal, wVal];
+        wInp.value = String(wVal);
+        hInp.value = String(hVal);
       }
       updatePxInfo();
     }
 
-function swapWidthHeight() {
-  const w = wInp.value;
-  const h = hInp.value;
-  wInp.value = h;
-  hInp.value = w;
-  updatePxInfo();
-  if (img) draw();
-}
+    function swapWidthHeight() {
+      const w = wInp.value;
+      const h = hInp.value;
+      wInp.value = h;
+      hInp.value = w;
+      updatePxInfo();
+      if (img) draw();
+    }
 
-orientationToggle.addEventListener("change", () => {
-  swapWidthHeight();
-});
-    
     function setAspectLockedFromImageIfNeeded() {
       if (!img || !lock.checked) return;
       imgAspect = img.width / img.height;
-      // update height to match width while preserving selected units
       const u = currentUnits();
       const w = toNum(wInp.value, 0);
       if (w <= 0 || !imgAspect) return;
-
-      // For lock: keep user-controlled width, compute height
       const newH = w / imgAspect;
       hInp.value = String(u === "px" ? Math.round(newH) : newH.toFixed(2));
     }
@@ -507,7 +472,6 @@ orientationToggle.addEventListener("change", () => {
       const u = currentUnits();
       const h = toNum(hInp.value, 0);
       if (h <= 0 || !imgAspect) return;
-
       const newW = h * imgAspect;
       wInp.value = String(u === "px" ? Math.round(newW) : newW.toFixed(2));
     }
@@ -528,6 +492,7 @@ orientationToggle.addEventListener("change", () => {
     }
 
     function draw() {
+      clearErr();
       if (!img) return;
 
       const { pxW, pxH, dpi, bIn } = computeCanvasPixels();
@@ -538,7 +503,6 @@ orientationToggle.addEventListener("change", () => {
 
       const fillMode = fillSel.value;
 
-      // Base fill / background
       if (fillMode === "white") {
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, pxW, pxH);
@@ -552,20 +516,16 @@ orientationToggle.addEventListener("change", () => {
         ctx.fillStyle = avgColourFromImage(img);
         ctx.fillRect(0, 0, pxW, pxH);
       } else if (fillMode === "blur") {
-        // Edge-blur: draw a cover background (fills), blur, then draw main image on top
         ctx.save();
         const bgRatio = Math.max(pxW / img.width, pxH / img.height);
         const bgW = img.width * bgRatio;
         const bgH = img.height * bgRatio;
         const bgX = (pxW - bgW) / 2;
         const bgY = (pxH - bgH) / 2;
-
         const blurPx = clamp(toNum(blurInp.value, 28), 0, 80);
         ctx.filter = blurPx ? `blur(${blurPx}px)` : "none";
         ctx.drawImage(img, bgX, bgY, bgW, bgH);
         ctx.restore();
-
-        // Add a subtle neutral wash to avoid noisy borders
         ctx.fillStyle = "rgba(255,255,255,.08)";
         ctx.fillRect(0, 0, pxW, pxH);
       } else {
@@ -573,34 +533,29 @@ orientationToggle.addEventListener("change", () => {
         ctx.fillRect(0, 0, pxW, pxH);
       }
 
-      // Determine draw rect for the "trim area" if bleed is enabled:
-      // We always draw the main image within the full canvas; bleed just expands canvas.
-      const targetW = pxW;
-      const targetH = pxH;
-
-      const mode = modeSel.value; // contain | cover
+      const mode = modeSel.value;
       const ratio =
         mode === "cover"
-          ? Math.max(targetW / img.width, targetH / img.height)
-          : Math.min(targetW / img.width, targetH / img.height);
+          ? Math.max(pxW / img.width, pxH / img.height)
+          : Math.min(pxW / img.width, pxH / img.height);
 
       const drawW = img.width * ratio;
       const drawH = img.height * ratio;
-      const x = (targetW - drawW) / 2;
-      const y = (targetH - drawH) / 2;
+      const x = (pxW - drawW) / 2;
+      const y = (pxH - drawH) / 2;
 
       ctx.drawImage(img, x, y, drawW, drawH);
 
-      // Trim guides (show where the cut line is, inside the bleed)
       if (trimInsetPx > 0) drawGuides(pxW, pxH, trimInsetPx);
 
       updatePxInfo();
     }
 
-    // ---- UI wiring ----
+    // UI wiring
     drop.addEventListener("click", () => file.click());
 
     file.addEventListener("change", () => {
+      clearErr();
       const f = file.files && file.files[0];
       if (!f) return;
 
@@ -610,36 +565,35 @@ orientationToggle.addEventListener("change", () => {
         im.onload = () => {
           img = im;
           imgAspect = img.width / img.height;
-
-          // If lock is on, reshape the output to match image AR
           setAspectLockedFromImageIfNeeded();
           updatePxInfo();
           draw();
         };
+        im.onerror = () => showErr("Couldn’t load that image.");
         im.src = e.target.result;
       };
+      reader.onerror = () => showErr("Couldn’t read that file.");
       reader.readAsDataURL(f);
     });
 
-    preset.addEventListener("change", () => {
-      applyPreset(preset.value);
-    });
+    preset.addEventListener("change", () => applyPreset(preset.value));
+
+    orientationToggle.addEventListener("change", () => swapWidthHeight());
 
     units.addEventListener("change", () => {
-      // If switching to px, convert current physical to px using dpi, preserving size
       const dpi = Math.max(1, toNum(dpiInp.value, 300));
       const u = currentUnits();
 
+      // Convert by interpreting current entries as inches (from helper)
+      const { wIn, hIn } = getTrimSizeInInches();
+
       if (u === "px") {
-        const { wIn, hIn } = getTrimSizeInInches();
         wInp.value = String(Math.round(wIn * dpi));
         hInp.value = String(Math.round(hIn * dpi));
       } else if (u === "mm") {
-        const { wIn, hIn } = getTrimSizeInInches();
         wInp.value = String(inToMm(wIn).toFixed(2));
         hInp.value = String(inToMm(hIn).toFixed(2));
       } else {
-        const { wIn, hIn } = getTrimSizeInInches();
         wInp.value = String(wIn.toFixed(2));
         hInp.value = String(hIn.toFixed(2));
       }
@@ -659,9 +613,7 @@ orientationToggle.addEventListener("change", () => {
       updatePxInfo();
     });
 
-    dpiInp.addEventListener("input", () => {
-      updatePxInfo();
-    });
+    dpiInp.addEventListener("input", updatePxInfo);
 
     lock.addEventListener("change", () => {
       if (img && lock.checked) setAspectLockedFromImageIfNeeded();
@@ -694,70 +646,59 @@ orientationToggle.addEventListener("change", () => {
       if (img) draw();
     });
 
-    modeSel.addEventListener("change", () => {
-      if (img) draw();
-    });
+    modeSel.addEventListener("change", () => { if (img) draw(); });
+    guides.addEventListener("change", () => { if (img) draw(); });
 
-    guides.addEventListener("change", () => {
-      if (img) draw();
-    });
-
-    genBtn.addEventListener("click", () => {
-      if (!img) return;
-      draw();
-    });
+    genBtn.addEventListener("click", () => { if (img) draw(); });
 
     dlBtn.addEventListener("click", async () => {
-      if (!img) return;
+      clearErr();
+      if (!img) { showErr("Upload an image first."); return; }
 
-      // Ensure canvas is up-to-date
       draw();
 
       const fmt = formatSel.value;
       const q = clamp(toNum(qualityInp.value, 0.95), 0.1, 1);
 
-if (fmt === "pdf") {
-  let JsPDF;
-  try {
-    JsPDF = await ensureJsPDF();
-  } catch (e) {
-    alert("Couldn’t load PDF library. Please try again.");
-    return;
-  }
+      if (fmt === "pdf") {
+        let JsPDF;
+        try {
+          JsPDF = await ensureJsPDF();
+        } catch (e) {
+          showErr("Couldn’t load the PDF library. Check your connection and try again.");
+          return;
+        }
 
-  const jpgData = canvas.toDataURL("image/jpeg", 1.0);
-
-  const pdf = new JsPDF({
-    orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
-    unit: "px",
-    format: [canvas.width, canvas.height],
-    compress: true,
-  });
-
-  pdf.addImage(jpgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
-  pdf.save("print-ready.pdf");
-  return;
-}
-      } else {
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) return;
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-
-            const ext =
-              fmt === "image/png" ? "png" :
-              fmt === "image/webp" ? "webp" : "jpg";
-
-            a.download = `print-ready.${ext}`;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 500);
-          },
-          fmt,
-          q
-        );
+        const jpgData = canvas.toDataURL("image/jpeg", 1.0);
+        const pdf = new JsPDF({
+          orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
+          unit: "px",
+          format: [canvas.width, canvas.height],
+          compress: true,
+        });
+        pdf.addImage(jpgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
+        pdf.save("print-ready.pdf");
+        return;
       }
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { showErr("Couldn’t create the image file."); return; }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+
+          const ext =
+            fmt === "image/png" ? "png" :
+            fmt === "image/webp" ? "webp" : "jpg";
+
+          a.download = `print-ready.${ext}`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 800);
+        },
+        fmt,
+        q
+      );
     });
 
     // Init state
