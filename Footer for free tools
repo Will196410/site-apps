@@ -1,8 +1,18 @@
-<script src="https://will196410.github.io/site-apps/loader.js?v=1"></script>
+<script src="https://will196410.github.io/site-apps/loader.js?v=2"></script>
 
-<!-- Optional: only keep deps here if multiple apps need them -->
+
+<!-- If you have an explicit init call, it goes LAST -->
+<script>window.SiteApps && window.SiteApps.initAll && window.SiteApps.initAll();</script>
+
 <script>
-  window.SiteApps && window.SiteApps.initAll && window.SiteApps.initAll();
+  window.SiteApps && window.SiteApps.map && window.SiteApps.map({
+    mdse: "https://will196410.github.io/site-apps/mdse.js?v=118",
+    sorter: "https://will196410.github.io/site-apps/sorter.js?v=1",
+    numberer: "https://will196410.github.io/site-apps/numberer.js?v=2",
+    invisible: "https://will196410.github.io/site-apps/invisible.js?v=1",
+    palette: "https://will196410.github.io/site-apps/palette.js?v=2",
+    imageprintprep: "https://will196410.github.io/site-apps/imageprintprep.js?v=107"
+  });
 </script>
 
 <script>
@@ -10,7 +20,7 @@
   "use strict";
 
   function setStatus(wrap, msg) {
-    const status = wrap && wrap.querySelector(".copy-link-status");
+    const status = wrap.querySelector(".copy-link-status");
     if (!status) return;
     status.textContent = msg;
     clearTimeout(status._t);
@@ -22,6 +32,7 @@
       await navigator.clipboard.writeText(text);
       return true;
     }
+    // Fallback for older browsers / non-secure contexts
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.setAttribute("readonly", "");
@@ -30,25 +41,3 @@
     document.body.appendChild(ta);
     ta.select();
     const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
-  }
-
-  document.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".copy-link-btn");
-    if (!btn) return;
-
-    const wrap = btn.closest(".copy-link-wrap");
-    const url = window.location.href;
-
-    try {
-      await copyText(url);
-      btn.classList.add("is-copied");
-      setStatus(wrap, "Copied!");
-      setTimeout(() => btn.classList.remove("is-copied"), 800);
-    } catch {
-      setStatus(wrap, "Couldn’t copy — please copy from the address bar.");
-    }
-  });
-})();
-</script>
