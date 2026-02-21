@@ -1,0 +1,40 @@
+Here is the latest footer: <script src="https://will196410.github.io/site-apps/loader.js?v=1"></script>
+
+<script src="https://will196410.github.io/site-apps/mdse.js?v=118"></script>
+<script src="https://will196410.github.io/site-apps/sorter.js?v=1"></script>
+<script src="https://will196410.github.io/site-apps/numberer.js?v=2"></script>
+<script src="https://will196410.github.io/site-apps/invisible.js?v=1"></script>
+<script src="https://will196410.github.io/site-apps/palette.js?v=2"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://will196410.github.io/site-apps/imageprintprep.js?v=106"></script>
+
+<!-- If you have an explicit init call, it goes LAST -->
+<script>window.SiteApps && window.SiteApps.initAll && window.SiteApps.initAll();</script>
+
+<script>
+(() => {
+  "use strict";
+
+  function setStatus(wrap, msg) {
+    const status = wrap.querySelector(".copy-link-status");
+    if (!status) return;
+    status.textContent = msg;
+    clearTimeout(status._t);
+    status._t = setTimeout(() => (status.textContent = ""), 2000);
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    // Fallback for older browsers / non-secure contexts
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
