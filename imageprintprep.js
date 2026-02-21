@@ -192,6 +192,11 @@
     <select class="preset"></select>
   </label>
 
+<label class="check">
+  <input class="orientation" type="checkbox">
+  Landscape
+</label>
+
   <label>
     Units
     <select class="units">
@@ -303,6 +308,7 @@
     const file = $(".file");
 
     const preset = $(".preset");
+    const orientationToggle = $(".orientation");
     const units = $(".units");
     const wInp = $(".w");
     const hInp = $(".h");
@@ -423,8 +429,18 @@
       // default units mm for ISO, in for photo
       if (p.wMm && p.hMm) {
         units.value = "mm";
-        wInp.value = String(p.wMm);
-        hInp.value = String(p.hMm);
+let wVal = p.wMm || p.wIn;
+let hVal = p.hMm || p.hIn;
+
+if (orientationToggle.checked) {
+  const temp = wVal;
+  wVal = hVal;
+  hVal = temp;
+}
+
+wInp.value = String(wVal);
+hInp.value = String(hVal);
+        
       } else if (p.wIn && p.hIn) {
         units.value = "in";
         wInp.value = String(p.wIn);
@@ -433,6 +449,19 @@
       updatePxInfo();
     }
 
+function swapWidthHeight() {
+  const w = wInp.value;
+  const h = hInp.value;
+  wInp.value = h;
+  hInp.value = w;
+  updatePxInfo();
+  if (img) draw();
+}
+
+orientationToggle.addEventListener("change", () => {
+  swapWidthHeight();
+});
+    
     function setAspectLockedFromImageIfNeeded() {
       if (!img || !lock.checked) return;
       imgAspect = img.width / img.height;
