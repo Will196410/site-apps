@@ -738,8 +738,6 @@ if (fmt === "pdf") {
   pdf.save("print-ready.pdf");
   return;
 }
-        pdf.addImage(jpgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
-        pdf.save("print-ready.pdf");
       } else {
         canvas.toBlob(
           (blob) => {
