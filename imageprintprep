@@ -9,7 +9,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-imageresize-style";
+  const STYLE_ID = "siteapps-imageprintprep-style";
 
   function ensureStyle() {
     let style = document.getElementById(STYLE_ID);
@@ -20,43 +20,26 @@
     }
 
     style.textContent = `
-[data-app="imageresize"]{
+[data-app="imageprintprep"]{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  max-width: 900px;
+  max-width: 1000px;
   margin: 20px auto;
   border:2px solid #111;
   border-radius:16px;
   padding:20px;
   background:#fff;
 }
-[data-app="imageresize"] h3{
-  margin:0 0 14px;
-}
-[data-app="imageresize"] .dropzone{
-  border:3px dashed #111;
-  border-radius:16px;
-  padding:40px;
-  text-align:center;
-  font-weight:900;
-  cursor:pointer;
-  background:#fafafa;
-}
-[data-app="imageresize"] .dropzone.dragover{
-  background:#eef6ff;
-}
-[data-app="imageresize"] .controls{
-  margin-top:20px;
-  display:grid;
-  gap:12px;
-}
-[data-app="imageresize"] input,
-[data-app="imageresize"] select{
+[data-app="imageprintprep"] h3{ margin:0 0 16px; }
+
+[data-app="imageprintprep"] input,
+[data-app="imageprintprep"] select{
   padding:10px;
   border:2px solid #111;
   border-radius:10px;
   font-weight:700;
 }
-[data-app="imageresize"] button{
+
+[data-app="imageprintprep"] button{
   padding:10px 14px;
   border:2px solid #111;
   border-radius:10px;
@@ -64,188 +47,197 @@
   cursor:pointer;
   background:#fff;
 }
-[data-app="imageresize"] button.primary{
+[data-app="imageprintprep"] button.primary{
   background:#111;
   color:#fff;
 }
-[data-app="imageresize"] .preview{
-  margin-top:20px;
-  text-align:center;
+
+[data-app="imageprintprep"] .grid{
+  display:grid;
+  gap:12px;
+  margin-top:16px;
 }
-[data-app="imageresize"] canvas{
+
+[data-app="imageprintprep"] canvas{
   max-width:100%;
+  margin-top:20px;
   border:2px solid #111;
   border-radius:10px;
+}
+
+[data-app="imageprintprep"] .drop{
+  border:3px dashed #111;
+  border-radius:14px;
+  padding:30px;
+  text-align:center;
+  font-weight:900;
+  cursor:pointer;
+  background:#fafafa;
 }
 `;
   }
 
-  window.SiteApps.register("imageresize", (container) => {
+  window.SiteApps.register("imageprintprep", (container) => {
+
     ensureStyle();
-    container.setAttribute("data-app", "imageresize");
+    container.setAttribute("data-app","imageprintprep");
 
     container.innerHTML = `
-<h3>Image Resizer & Exporter</h3>
+<h3>Print Preparation Tool (iPad Optimised)</h3>
 
-<div class="dropzone">Drag image here or click to upload</div>
+<div class="drop">Tap to Upload Image</div>
 <input type="file" accept="image/*" style="display:none">
 
-<div class="controls">
-  <label>Resize Mode:
-    <select class="mode">
-      <option value="percent">Percentage</option>
-      <option value="width">Width</option>
-      <option value="height">Height</option>
-      <option value="exact">Exact</option>
-    </select>
-  </label>
+<div class="grid">
 
-  <label>Value:
-    <input type="number" class="value" value="50">
-  </label>
+<label>Output Width (px)
+<input type="number" class="outW" value="4000">
+</label>
 
-  <label>
-    <input type="checkbox" class="lock" checked>
-    Keep aspect ratio
-  </label>
+<label>Output Height (px)
+<input type="number" class="outH" value="3000">
+</label>
 
-  <label>Export format:
-    <select class="format">
-      <option value="image/png">PNG</option>
-      <option value="image/jpeg">JPG</option>
-      <option value="image/webp">WebP</option>
-      <option value="pdf">PDF</option>
-    </select>
-  </label>
+<label>
+<input type="checkbox" class="contain" checked>
+Maintain aspect ratio (letterbox)
+</label>
 
-  <label>JPG/WebP Quality (0.1–1):
-    <input type="number" class="quality" min="0.1" max="1" step="0.1" value="0.9">
-  </label>
+<label>Fill Colour
+<select class="fill">
+  <option value="white">White</option>
+  <option value="black">Black</option>
+  <option value="auto">Auto (average image)</option>
+  <option value="custom">Custom</option>
+</select>
+</label>
 
-  <button class="primary resizeBtn">Resize</button>
-  <button class="downloadBtn">Download</button>
+<input type="color" class="customColour" value="#ffffff" style="display:none">
+
+<label>Export Format
+<select class="format">
+  <option value="image/jpeg">JPG (print safe)</option>
+  <option value="image/png">PNG</option>
+  <option value="image/webp">WebP</option>
+</select>
+</label>
+
+<label>Quality (JPG/WebP)
+<input type="number" min="0.1" max="1" step="0.1" value="0.95" class="quality">
+</label>
+
+<button class="primary process">Generate</button>
+<button class="download">Download</button>
+
 </div>
 
-<div class="preview">
-  <canvas></canvas>
-</div>
+<canvas></canvas>
 `;
 
-    const dropzone = container.querySelector(".dropzone");
+    const drop = container.querySelector(".drop");
     const fileInput = container.querySelector("input[type=file]");
     const canvas = container.querySelector("canvas");
     const ctx = canvas.getContext("2d");
 
-    const modeSel = container.querySelector(".mode");
-    const valueInput = container.querySelector(".value");
-    const lockInput = container.querySelector(".lock");
+    const outW = container.querySelector(".outW");
+    const outH = container.querySelector(".outH");
+    const contain = container.querySelector(".contain");
+    const fillSel = container.querySelector(".fill");
+    const customColour = container.querySelector(".customColour");
     const formatSel = container.querySelector(".format");
     const qualityInput = container.querySelector(".quality");
+    const processBtn = container.querySelector(".process");
+    const downloadBtn = container.querySelector(".download");
 
-    const resizeBtn = container.querySelector(".resizeBtn");
-    const downloadBtn = container.querySelector(".downloadBtn");
+    let image = null;
 
-    let originalImg = null;
-    let originalWidth = 0;
-    let originalHeight = 0;
+    drop.addEventListener("click", () => fileInput.click());
 
-    function loadFile(file) {
+    fileInput.addEventListener("change", () => {
+      if (!fileInput.files[0]) return;
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         const img = new Image();
         img.onload = () => {
-          originalImg = img;
-          originalWidth = img.width;
-          originalHeight = img.height;
-          drawImage(img.width, img.height);
+          image = img;
+          drawPreview();
         };
         img.src = e.target.result;
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(fileInput.files[0]);
+    });
+
+    fillSel.addEventListener("change", () => {
+      customColour.style.display = fillSel.value === "custom" ? "block" : "none";
+    });
+
+    function getAverageColour(img) {
+      const temp = document.createElement("canvas");
+      const tctx = temp.getContext("2d");
+      temp.width = 50;
+      temp.height = 50;
+      tctx.drawImage(img,0,0,50,50);
+      const data = tctx.getImageData(0,0,50,50).data;
+      let r=0,g=0,b=0,count=0;
+      for(let i=0;i<data.length;i+=4){
+        r+=data[i];
+        g+=data[i+1];
+        b+=data[i+2];
+        count++;
+      }
+      return `rgb(${Math.round(r/count)},${Math.round(g/count)},${Math.round(b/count)})`;
     }
 
-    function drawImage(w, h) {
+    function drawPreview(){
+      if(!image) return;
+
+      const w = parseInt(outW.value);
+      const h = parseInt(outH.value);
+
       canvas.width = w;
       canvas.height = h;
-      ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(originalImg, 0, 0, w, h);
+
+      let fillColour = "#ffffff";
+      if(fillSel.value==="black") fillColour="#000000";
+      if(fillSel.value==="custom") fillColour=customColour.value;
+      if(fillSel.value==="auto") fillColour=getAverageColour(image);
+
+      ctx.fillStyle = fillColour;
+      ctx.fillRect(0,0,w,h);
+
+      let drawW = w;
+      let drawH = h;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if(contain.checked){
+        const ratio = Math.min(w/image.width, h/image.height);
+        drawW = image.width * ratio;
+        drawH = image.height * ratio;
+        offsetX = (w - drawW)/2;
+        offsetY = (h - drawH)/2;
+      }
+
+      ctx.drawImage(image, offsetX, offsetY, drawW, drawH);
     }
 
-    dropzone.addEventListener("click", () => fileInput.click());
-
-    dropzone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropzone.classList.add("dragover");
-    });
-
-    dropzone.addEventListener("dragleave", () => {
-      dropzone.classList.remove("dragover");
-    });
-
-    dropzone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropzone.classList.remove("dragover");
-      const file = e.dataTransfer.files[0];
-      if (file) loadFile(file);
-    });
-
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files[0]) loadFile(fileInput.files[0]);
-    });
-
-    resizeBtn.addEventListener("click", () => {
-      if (!originalImg) return;
-
-      const mode = modeSel.value;
-      const val = parseFloat(valueInput.value);
-      let newW = originalWidth;
-      let newH = originalHeight;
-
-      if (mode === "percent") {
-        newW = originalWidth * (val / 100);
-        newH = originalHeight * (val / 100);
-      } else if (mode === "width") {
-        newW = val;
-        if (lockInput.checked)
-          newH = originalHeight * (val / originalWidth);
-      } else if (mode === "height") {
-        newH = val;
-        if (lockInput.checked)
-          newW = originalWidth * (val / originalHeight);
-      } else if (mode === "exact") {
-        newW = val;
-        newH = val;
-      }
-
-      drawImage(Math.round(newW), Math.round(newH));
-    });
+    processBtn.addEventListener("click", drawPreview);
 
     downloadBtn.addEventListener("click", () => {
-      if (!originalImg) return;
+      if(!image) return;
 
       const format = formatSel.value;
+      const quality = parseFloat(qualityInput.value) || 0.95;
 
-      if (format === "pdf") {
-        const imgData = canvas.toDataURL("image/jpeg", 1.0);
-
-        const pdfWindow = window.open("");
-        pdfWindow.document.write(`
-          <html>
-          <body style="margin:0">
-          <img src="${imgData}" style="width:100%">
-          <script>
-          window.print();
-          </script>
-          </body>
-          </html>
-        `);
-      } else {
-        const quality = parseFloat(qualityInput.value) || 0.9;
-        const link = document.createElement("a");
-        link.download = "resized-image";
-        link.href = canvas.toDataURL(format, quality);
-        link.click();
-      }
+      canvas.toBlob(blob=>{
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "print-ready-image";
+        a.click();
+        URL.revokeObjectURL(url);
+      }, format, quality);
     });
+
   });
 })();
