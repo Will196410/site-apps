@@ -1,284 +1,444 @@
-/* SiteApps: Snippets v3 (self-init + loader-friendly) */
 (() => {
   "use strict";
 
-  const APP = "snippets";
+  // Ensure registry exists (works with your loader.js)
+  window.SiteApps = window.SiteApps || {};
+  window.SiteApps.registry = window.SiteApps.registry || {};
+  window.SiteApps.register =
+    window.SiteApps.register ||
+    function (name, initFn) {
+      window.SiteApps.registry[name] = initFn;
+    };
 
-  // Accept multiple placeholder patterns (because different apps/loader versions vary)
-  const SELECTORS = [
-    '[data-siteapp="snippets"]',
-    '[data-siteapps="snippets"]',
-    '[data-siteapps-app="snippets"]',
-    '[data-app="snippets"]'
-  ];
+  const STYLE_ID = "siteapps-snippets-style-v10";
 
-  function qsaAny() {
-    for (const sel of SELECTORS) {
-      const nodes = document.querySelectorAll(sel);
-      if (nodes && nodes.length) return Array.from(nodes);
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+[data-app="snippets"]{
+  font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#fff;
+  border:2px solid #111;
+  padding:18px;
+  border-radius:14px;
+  color:#111;
+  max-width:980px;
+  margin:14px auto;
+}
+[data-app="snippets"] .top-row{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+[data-app="snippets"] h3{
+  margin:0;
+  font-size:20px;
+  font-weight:900;
+}
+[data-app="snippets"] .status-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+[data-app="snippets"] .badge{
+  font-size:14px;
+  font-weight:900;
+  padding:6px 10px;
+  border:2px solid #111;
+  border-radius:999px;
+  background:#fff;
+}
+[data-app="snippets"] .badge.good{ border-color:#0b3d0b; color:#0b3d0b; }
+[data-app="snippets"] .badge.warn{ border-color:#7a0000; color:#7a0000; }
+[data-app="snippets"] .badge.dim{ border-color:#444; color:#444; }
+
+[data-app="snippets"] label{
+  display:block;
+  margin:10px 0 6px;
+  font-weight:900;
+  font-size:14px;
+}
+[data-app="snippets"] textarea{
+  width:100%;
+  min-height:120px;
+  padding:12px;
+  border:2px solid #111;
+  border-radius:10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+  font-size:15px;
+  line-height:1.35;
+}
+[data-app="snippets"] textarea:focus{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(11,95,255,0.25);
+}
+
+[data-app="snippets"] .row{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+[data-app="snippets"] .col{
+  flex:1 1 260px;
+  min-width:240px;
+}
+
+[data-app="snippets"] .controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:12px 0 10px;
+  align-items:center;
+}
+[data-app="snippets"] .controls button,
+[data-app="snippets"] .actions button{
+  border:2px solid #111;
+  border-radius:10px;
+  cursor:pointer;
+  padding:10px 12px;
+  font-weight:900;
+  font-size:14px;
+  background:#fff;
+  color:#111;
+}
+[data-app="snippets"] .btn-primary{ background:#0b5fff; border-color:#0b5fff; color:#fff; }
+[data-app="snippets"] .btn-copy{ background:#111; border-color:#111; color:#fff; }
+[data-app="snippets"] .btn-clear{ background:#fff; border-color:#7a0000; color:#7a0000; }
+
+[data-app="snippets"] .pill{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 10px;
+  border:2px solid #111;
+  border-radius:10px;
+}
+[data-app="snippets"] input[type="checkbox"]{ width:20px; height:20px; }
+[data-app="snippets"] input[type="text"]{
+  width:260px; max-width:100%;
+  padding:10px 10px;
+  border:2px solid #111;
+  border-radius:10px;
+  font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+}
+
+[data-app="snippets"] .feedback{
+  background:#0b7a2b;
+  color:#fff;
+  padding:8px 12px;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:900;
+  opacity:0;
+  transition:opacity .2s;
+}
+[data-app="snippets"] .feedback.show{ opacity:1; }
+
+@media (max-width:700px){
+  [data-app="snippets"] .controls,
+  [data-app="snippets"] .actions{ flex-direction:column; }
+  [data-app="snippets"] .controls button,
+  [data-app="snippets"] .actions button{ width:100%; }
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  function safeJsonParse(s) {
+    try { return JSON.parse(s); } catch { return null; }
+  }
+
+  function makeStorageKey(container) {
+    const k = container.getAttribute("data-storage-key");
+    if (k && k.trim()) return `siteapps:snippets:${k.trim()}`;
+    return `siteapps:snippets:${(location.pathname || "/")}`;
+  }
+
+  function normalizeLineEndings(s) {
+    return String(s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  }
+
+  window.SiteApps.register("snippets", (container) => {
+    ensureStyle();
+
+    const storageKey = makeStorageKey(container);
+
+    // State
+    let copiedSinceChange = false;
+    let lastCopyAt = null;
+
+    function setCopied(flag) {
+      copiedSinceChange = !!flag;
+      if (copiedSinceChange) lastCopyAt = new Date().toISOString();
+      renderBadges();
+      saveState();
     }
-    return [];
-  }
 
-  function markInited(root) {
-    root.setAttribute("data-siteapp-inited", "1");
-  }
-  function isInited(root) {
-    return root.getAttribute("data-siteapp-inited") === "1";
-  }
-
-  function renderError(root, err) {
-    try {
-      console.error("[SiteApps:snippets] init failed:", err);
-      root.innerHTML = `
-        <div style="border:1px solid rgba(0,0,0,.2);border-radius:12px;padding:12px;font:14px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
-          <div style="font-weight:700;margin-bottom:6px">Snippets app failed to load</div>
-          <pre style="white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);padding:10px;border-radius:10px;margin:0">${String(err && (err.stack || err.message || err))}</pre>
-        </div>
-      `;
-    } catch (_) {}
-  }
-
-  function ensureStyles() {
-    const id = "siteapps-snippets-style";
-    if (document.getElementById(id)) return;
-    const s = document.createElement("style");
-    s.id = id;
-    s.textContent = `
-      .sa-snippets{max-width:980px}
-      .sa-snippets *{box-sizing:border-box}
-      .sa-snippets .row{display:flex;gap:12px;flex-wrap:wrap}
-      .sa-snippets .col{flex:1 1 280px;min-width:260px}
-      .sa-snippets label{display:block;font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0 0 6px}
-      .sa-snippets textarea{
-        width:100%;
-        min-height:110px;
-        padding:10px 12px;
-        border:1px solid rgba(0,0,0,.18);
-        border-radius:10px;
-        font:14px/1.35 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
-        background:#fff;
-        resize:vertical;
-      }
-      .sa-snippets .controls{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
-      .sa-snippets button{
-        appearance:none;
-        border:1px solid rgba(0,0,0,.18);
-        background:#fff;
-        border-radius:999px;
-        padding:8px 12px;
-        font:600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-        cursor:pointer;
-      }
-      .sa-snippets button:active{transform:translateY(1px)}
-      .sa-snippets .muted{opacity:.72;font:12px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-      .sa-snippets .sep{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 12px}
-      .sa-snippets .sep input[type="text"]{
-        width:260px; max-width:100%;
-        padding:8px 10px;
-        border:1px solid rgba(0,0,0,.18);
-        border-radius:10px;
-        font:13px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
-      }
-      .sa-snippets .pill{
-        display:inline-flex;align-items:center;gap:8px;
-        border:1px solid rgba(0,0,0,.12);
-        border-radius:999px;
-        padding:6px 10px;
-        background:rgba(0,0,0,.03);
-        font:600 12px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      }
-    `;
-    document.head.appendChild(s);
-  }
-
-  function uid() {
-    return Math.random().toString(36).slice(2, 10);
-  }
-  function storageKey(instanceId) {
-    return `SiteApps:${APP}:${location.pathname}:${instanceId}`;
-  }
-
-  function toast(msg) {
-    let t = document.getElementById("siteapps-snippets-toast");
-    if (!t) {
-      t = document.createElement("div");
-      t.id = "siteapps-snippets-toast";
-      t.style.cssText =
-        "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);" +
-        "background:#111;color:#fff;padding:10px 12px;border-radius:999px;" +
-        "font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;" +
-        "z-index:999999;opacity:0;transition:opacity .15s ease;";
-      document.body.appendChild(t);
-    }
-    t.textContent = msg;
-    t.style.opacity = "1";
-    clearTimeout(t._t);
-    t._t = setTimeout(() => (t.style.opacity = "0"), 1400);
-  }
-
-  async function copyText(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.top = "-9999px";
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    let ok = false;
-    try { ok = document.execCommand("copy"); } catch { ok = false; }
-    document.body.removeChild(ta);
-    return ok;
-  }
-
-  function el(tag, attrs, children) {
-    const node = document.createElement(tag);
-    if (attrs) {
-      for (const [k, v] of Object.entries(attrs)) {
-        if (k === "class") node.className = v;
-        else if (k === "text") node.textContent = v;
-        else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2), v);
-        else node.setAttribute(k, v);
+    function renderBadges() {
+      if (copiedSinceChange) {
+        copyBadge.className = "badge good";
+        copyBadge.textContent = "Copied ✓";
+        copyBadge.title = lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
+      } else {
+        copyBadge.className = "badge warn";
+        copyBadge.textContent = "Not copied";
+        copyBadge.title = "You’ve changed something since last copy.";
       }
     }
-    if (children) for (const c of children) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-    return node;
-  }
 
-  function initSnippets(root) {
-    if (!root || isInited(root)) return;
-    markInited(root);
-
-    try {
-      ensureStyles();
-
-      const instanceId = root.getAttribute("data-siteapp-id") || uid();
-      root.setAttribute("data-siteapp-id", instanceId);
-
-      const key = storageKey(instanceId);
-      const saved = (() => {
-        try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
-      })();
-
-      const taA = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-      const taB = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-      const taC = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-      const taOut = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-
-      taA.value = saved.a || "";
-      taB.value = saved.b || "";
-      taC.value = saved.c || "";
-      taOut.value = saved.out || "";
-
-      const sepInput = el("input", { type: "text", value: saved.sep ?? "\n" });
-      const chkTrim = el("input", { type: "checkbox" }); chkTrim.checked = !!saved.trim;
-      const chkSkipEmpty = el("input", { type: "checkbox" }); chkSkipEmpty.checked = saved.skipEmpty !== false;
-
-      function persist() {
-        try {
-          localStorage.setItem(key, JSON.stringify({
-            a: taA.value, b: taB.value, c: taC.value, out: taOut.value,
-            sep: sepInput.value, trim: chkTrim.checked, skipEmpty: chkSkipEmpty.checked
-          }));
-        } catch (_) {}
-      }
-
-      function getParts() {
-        let parts = [taA.value, taB.value, taC.value];
-        if (chkTrim.checked) parts = parts.map((s) => s.trim());
-        if (chkSkipEmpty.checked) parts = parts.filter((s) => s.length > 0);
-        return parts;
-      }
-
-      function joinIntoOutput(replace) {
-        const joined = getParts().join(sepInput.value);
-        taOut.value = replace ? joined : (taOut.value ? taOut.value + sepInput.value : "") + joined;
-        persist();
-        toast(replace ? "Built output" : "Appended");
-      }
-
-      async function copyFrom(textarea) {
-        const text = textarea.value || "";
-        if (!text) return toast("Nothing to copy");
-        try { toast((await copyText(text)) ? "Copied" : "Couldn’t copy"); }
-        catch { toast("Couldn’t copy"); }
-      }
-
-      function clearAll() {
-        taA.value = taB.value = taC.value = taOut.value = "";
-        persist();
-        toast("Cleared");
-      }
-
-      const onInput = () => persist();
-      taA.addEventListener("input", onInput, { passive: true });
-      taB.addEventListener("input", onInput, { passive: true });
-      taC.addEventListener("input", onInput, { passive: true });
-      taOut.addEventListener("input", onInput, { passive: true });
-      sepInput.addEventListener("input", onInput, { passive: true });
-      chkTrim.addEventListener("change", persist, { passive: true });
-      chkSkipEmpty.addEventListener("change", persist, { passive: true });
-
-      const ui = el("div", { class: "sa-snippets" }, [
-        el("div", { class: "muted", text: "Paste fragments into A/B/C, then build or append into Output." }),
-        el("div", { class: "sep" }, [
-          el("span", { class: "pill" }, [el("span", { text: "Separator" }), sepInput]),
-          el("label", { class: "pill" }, [chkTrim, el("span", { text: "Trim parts" })]),
-          el("label", { class: "pill" }, [chkSkipEmpty, el("span", { text: "Skip empty" })])
-        ]),
-        el("div", { class: "controls" }, [
-          el("button", { type: "button", onclick: () => joinIntoOutput(true), text: "Build Output" }),
-          el("button", { type: "button", onclick: () => joinIntoOutput(false), text: "Append to Output" }),
-          el("button", { type: "button", onclick: () => copyFrom(taOut), text: "Copy Output" }),
-          el("button", { type: "button", onclick: clearAll, text: "Reset All" })
-        ]),
-        el("div", { class: "row" }, [
-          el("div", { class: "col" }, [el("label", { text: "Snippet A" }), taA]),
-          el("div", { class: "col" }, [el("label", { text: "Snippet B" }), taB]),
-          el("div", { class: "col" }, [el("label", { text: "Snippet C" }), taC])
-        ]),
-        el("div", { style: "margin-top:10px" }, [el("label", { text: "Output" }), taOut])
-      ]);
-
-      root.innerHTML = "";
-      root.appendChild(ui);
-
-      // expose tiny debug
-      window.SiteAppsSnippetsDebug = window.SiteAppsSnippetsDebug || {};
-      window.SiteAppsSnippetsDebug.lastInit = { ok: true, instanceId };
-
-    } catch (err) {
-      window.SiteAppsSnippetsDebug = { ok: false, err: String(err) };
-      renderError(root, err);
-    }
-  }
-
-  function initAllSnippetsOnPage() {
-    const nodes = qsaAny();
-    for (const n of nodes) initSnippets(n);
-  }
-
-  // 1) Register with loader (whatever signature it expects)
-  try {
-    if (window.SiteApps && typeof window.SiteApps.register === "function") {
+    let saveTimer = null;
+    function saveState() {
       try {
-        window.SiteApps.register(APP, { selector: SELECTORS[0], init: initSnippets });
-      } catch (_) {
-        window.SiteApps.register(APP, initSnippets);
+        const state = {
+          v: 10,
+          a: taA.value,
+          b: taB.value,
+          c: taC.value,
+          out: taOut.value,
+          sep: sepIn.value,
+          trim: trimCB.checked,
+          skipEmpty: skipCB.checked,
+          copiedSinceChange,
+          lastCopyAt,
+        };
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        saveBadge.className = "badge good";
+        saveBadge.textContent = "Saved ✓";
+      } catch {
+        saveBadge.className = "badge warn";
+        saveBadge.textContent = "Not saved";
       }
     }
-  } catch (e) {
-    console.error("[SiteApps:snippets] register failed:", e);
-  }
 
-  // 2) Self-init (prevents “blank” if loader misses selector or runs too early)
-  try { initAllSnippetsOnPage(); } catch (_) {}
-  document.addEventListener("DOMContentLoaded", () => { try { initAllSnippetsOnPage(); } catch (_) {} }, { once: true });
-  window.addEventListener("load", () => { try { initAllSnippetsOnPage(); } catch (_) {} }, { once: true });
+    function saveStateDebounced() {
+      saveBadge.className = "badge dim";
+      saveBadge.textContent = "Unsaved…";
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        saveState();
+      }, 500);
+    }
 
+    function restoreState() {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return;
+        const s = safeJsonParse(raw);
+        if (!s || typeof s !== "object") return;
+        if (typeof s.a === "string") taA.value = s.a;
+        if (typeof s.b === "string") taB.value = s.b;
+        if (typeof s.c === "string") taC.value = s.c;
+        if (typeof s.out === "string") taOut.value = s.out;
+        if (typeof s.sep === "string") sepIn.value = s.sep;
+        trimCB.checked = !!s.trim;
+        skipCB.checked = s.skipEmpty !== false; // default true
+        copiedSinceChange = !!s.copiedSinceChange;
+        lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
+      } catch {}
+    }
+
+    function markChanged() {
+      copiedSinceChange = false;
+      renderBadges();
+      saveStateDebounced();
+    }
+
+    function getParts() {
+      let parts = [taA.value, taB.value, taC.value].map(normalizeLineEndings);
+      if (trimCB.checked) parts = parts.map((x) => x.trim());
+      if (skipCB.checked) parts = parts.filter((x) => x.length > 0);
+      return parts;
+    }
+
+    function buildOutput(replace) {
+      const joined = getParts().join(sepIn.value);
+      if (replace) taOut.value = joined;
+      else taOut.value = (taOut.value ? taOut.value + sepIn.value : "") + joined;
+      markChanged();
+    }
+
+    async function copyToClipboard() {
+      const text = taOut.value || "";
+      if (!text.trim()) {
+        alert("No output to copy");
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(text);
+        feedback.classList.add("show");
+        setTimeout(() => feedback.classList.remove("show"), 1200);
+        setCopied(true);
+        return;
+      } catch {}
+
+      // Fallback
+      try {
+        taOut.focus();
+        taOut.select();
+        const ok = document.execCommand("copy");
+        if (!ok) throw new Error("execCommand failed");
+        feedback.classList.add("show");
+        setTimeout(() => feedback.classList.remove("show"), 1200);
+        setCopied(true);
+      } catch {
+        alert("Copy failed. Tap and hold to copy, or try a different browser.");
+      }
+    }
+
+    function clearAll() {
+      if (!confirm("Clear all text?")) return;
+      taA.value = "";
+      taB.value = "";
+      taC.value = "";
+      taOut.value = "";
+      copiedSinceChange = false;
+      lastCopyAt = null;
+      renderBadges();
+      saveStateDebounced();
+    }
+
+    // Build UI
+    container.innerHTML = "";
+
+    const topRow = document.createElement("div");
+    topRow.className = "top-row";
+
+    const title = document.createElement("h3");
+    title.textContent = "Snippets — Build & Copy";
+
+    const statusRow = document.createElement("div");
+    statusRow.className = "status-row";
+
+    const saveBadge = document.createElement("span");
+    saveBadge.className = "badge dim";
+    saveBadge.textContent = "";
+
+    const copyBadge = document.createElement("span");
+    copyBadge.className = "badge warn";
+    copyBadge.textContent = "Not copied";
+
+    statusRow.append(saveBadge, copyBadge);
+    topRow.append(title, statusRow);
+
+    const optsRow = document.createElement("div");
+    optsRow.className = "controls";
+
+    const sepWrap = document.createElement("div");
+    sepWrap.className = "pill";
+
+    const sepLbl = document.createElement("span");
+    sepLbl.style.fontWeight = "900";
+    sepLbl.textContent = "Separator";
+
+    const sepIn = document.createElement("input");
+    sepIn.type = "text";
+    sepIn.value = "\n";
+
+    sepWrap.append(sepLbl, sepIn);
+
+    const trimWrap = document.createElement("div");
+    trimWrap.className = "pill";
+    const trimCB = document.createElement("input");
+    trimCB.type = "checkbox";
+    const trimText = document.createElement("span");
+    trimText.textContent = "Trim parts";
+    trimWrap.append(trimCB, trimText);
+
+    const skipWrap = document.createElement("div");
+    skipWrap.className = "pill";
+    const skipCB = document.createElement("input");
+    skipCB.type = "checkbox";
+    skipCB.checked = true;
+    const skipText = document.createElement("span");
+    skipText.textContent = "Skip empty";
+    skipWrap.append(skipCB, skipText);
+
+    optsRow.append(sepWrap, trimWrap, skipWrap);
+
+    const mkBtn = (text, cls, fn) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = cls;
+      b.textContent = text;
+      b.addEventListener("click", fn);
+      return b;
+    };
+
+    const actionRow = document.createElement("div");
+    actionRow.className = "actions";
+
+    const btnBuild = mkBtn("Build output", "btn-primary", () => buildOutput(true));
+    const btnAppend = mkBtn("Append", "btn-primary", () => buildOutput(false));
+    const btnCopy = mkBtn("📋 Copy output", "btn-copy", copyToClipboard);
+    const btnClear = mkBtn("🗑️ Clear all", "btn-clear", clearAll);
+
+    actionRow.append(btnBuild, btnAppend, btnCopy, btnClear);
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const colA = document.createElement("div");
+    colA.className = "col";
+    const labA = document.createElement("label");
+    labA.textContent = "Snippet A:";
+    const taA = document.createElement("textarea");
+    taA.placeholder = "Paste fragment A…";
+    colA.append(labA, taA);
+
+    const colB = document.createElement("div");
+    colB.className = "col";
+    const labB = document.createElement("label");
+    labB.textContent = "Snippet B:";
+    const taB = document.createElement("textarea");
+    taB.placeholder = "Paste fragment B…";
+    colB.append(labB, taB);
+
+    const colC = document.createElement("div");
+    colC.className = "col";
+    const labC = document.createElement("label");
+    labC.textContent = "Snippet C:";
+    const taC = document.createElement("textarea");
+    taC.placeholder = "Paste fragment C…";
+    colC.append(labC, taC);
+
+    row.append(colA, colB, colC);
+
+    const outLabel = document.createElement("label");
+    outLabel.textContent = "Output:";
+
+    const taOut = document.createElement("textarea");
+    taOut.placeholder = "Built text appears here…";
+
+    const feedback = document.createElement("div");
+    feedback.className = "feedback";
+    feedback.textContent = "Copied!";
+
+    container.append(topRow, optsRow, actionRow, row, outLabel, taOut, feedback);
+
+    // Events
+    const onChange = () => markChanged();
+    taA.addEventListener("input", onChange);
+    taB.addEventListener("input", onChange);
+    taC.addEventListener("input", onChange);
+    taOut.addEventListener("input", onChange);
+    sepIn.addEventListener("input", onChange);
+    trimCB.addEventListener("change", onChange);
+    skipCB.addEventListener("change", onChange);
+
+    // Restore + badges
+    restoreState();
+    renderBadges();
+    saveBadge.className = "badge good";
+    saveBadge.textContent = "Saved ✓";
+    saveStateDebounced();
+  });
 })();
