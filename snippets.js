@@ -1,9 +1,31 @@
-/* SiteApps: Snippets v2 (debug-friendly) */
+/* SiteApps: Snippets v3 (self-init + loader-friendly) */
 (() => {
   "use strict";
 
   const APP = "snippets";
-  const SELECTOR = '[data-siteapp="snippets"]';
+
+  // Accept multiple placeholder patterns (because different apps/loader versions vary)
+  const SELECTORS = [
+    '[data-siteapp="snippets"]',
+    '[data-siteapps="snippets"]',
+    '[data-siteapps-app="snippets"]',
+    '[data-app="snippets"]'
+  ];
+
+  function qsaAny() {
+    for (const sel of SELECTORS) {
+      const nodes = document.querySelectorAll(sel);
+      if (nodes && nodes.length) return Array.from(nodes);
+    }
+    return [];
+  }
+
+  function markInited(root) {
+    root.setAttribute("data-siteapp-inited", "1");
+  }
+  function isInited(root) {
+    return root.getAttribute("data-siteapp-inited") === "1";
+  }
 
   function renderError(root, err) {
     try {
@@ -11,13 +33,10 @@
       root.innerHTML = `
         <div style="border:1px solid rgba(0,0,0,.2);border-radius:12px;padding:12px;font:14px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
           <div style="font-weight:700;margin-bottom:6px">Snippets app failed to load</div>
-          <div style="opacity:.75;margin-bottom:8px">Open console for details. Common causes: missing file (404), register mismatch, syntax error.</div>
           <pre style="white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);padding:10px;border-radius:10px;margin:0">${String(err && (err.stack || err.message || err))}</pre>
         </div>
       `;
-    } catch (_) {
-      // last resort: do nothing
-    }
+    } catch (_) {}
   }
 
   function ensureStyles() {
@@ -76,7 +95,6 @@
   function uid() {
     return Math.random().toString(36).slice(2, 10);
   }
-
   function storageKey(instanceId) {
     return `SiteApps:${APP}:${location.pathname}:${instanceId}`;
   }
@@ -133,6 +151,9 @@
   }
 
   function initSnippets(root) {
+    if (!root || isInited(root)) return;
+    markInited(root);
+
     try {
       ensureStyles();
 
@@ -217,53 +238,47 @@
           el("button", { type: "button", onclick: clearAll, text: "Reset All" })
         ]),
         el("div", { class: "row" }, [
-          el("div", { class: "col" }, [
-            el("label", { text: "Snippet A" }), taA,
-            el("div", { class: "controls" }, [
-              el("button", { type: "button", onclick: () => copyFrom(taA), text: "Copy A" }),
-              el("button", { type: "button", onclick: () => { taA.value=""; persist(); toast("Cleared A"); }, text: "Clear A" })
-            ])
-          ]),
-          el("div", { class: "col" }, [
-            el("label", { text: "Snippet B" }), taB,
-            el("div", { class: "controls" }, [
-              el("button", { type: "button", onclick: () => copyFrom(taB), text: "Copy B" }),
-              el("button", { type: "button", onclick: () => { taB.value=""; persist(); toast("Cleared B"); }, text: "Clear B" })
-            ])
-          ]),
-          el("div", { class: "col" }, [
-            el("label", { text: "Snippet C" }), taC,
-            el("div", { class: "controls" }, [
-              el("button", { type: "button", onclick: () => copyFrom(taC), text: "Copy C" }),
-              el("button", { type: "button", onclick: () => { taC.value=""; persist(); toast("Cleared C"); }, text: "Clear C" })
-            ])
-          ])
+          el("div", { class: "col" }, [el("label", { text: "Snippet A" }), taA]),
+          el("div", { class: "col" }, [el("label", { text: "Snippet B" }), taB]),
+          el("div", { class: "col" }, [el("label", { text: "Snippet C" }), taC])
         ]),
-        el("div", { style: "margin-top:10px" }, [
-          el("label", { text: "Output" }), taOut
-        ])
+        el("div", { style: "margin-top:10px" }, [el("label", { text: "Output" }), taOut])
       ]);
 
       root.innerHTML = "";
       root.appendChild(ui);
+
+      // expose tiny debug
+      window.SiteAppsSnippetsDebug = window.SiteAppsSnippetsDebug || {};
+      window.SiteAppsSnippetsDebug.lastInit = { ok: true, instanceId };
+
     } catch (err) {
+      window.SiteAppsSnippetsDebug = { ok: false, err: String(err) };
       renderError(root, err);
     }
   }
 
-  // Register (supports both patterns)
+  function initAllSnippetsOnPage() {
+    const nodes = qsaAny();
+    for (const n of nodes) initSnippets(n);
+  }
+
+  // 1) Register with loader (whatever signature it expects)
   try {
     if (window.SiteApps && typeof window.SiteApps.register === "function") {
-      // Pattern A: register(name, {selector, init})
       try {
-        window.SiteApps.register(APP, { selector: SELECTOR, init: initSnippets });
+        window.SiteApps.register(APP, { selector: SELECTORS[0], init: initSnippets });
       } catch (_) {
-        // Pattern B: register(name, initFn)
         window.SiteApps.register(APP, initSnippets);
       }
     }
   } catch (e) {
-    // If register itself explodes, nothing else to do.
     console.error("[SiteApps:snippets] register failed:", e);
   }
+
+  // 2) Self-init (prevents “blank” if loader misses selector or runs too early)
+  try { initAllSnippetsOnPage(); } catch (_) {}
+  document.addEventListener("DOMContentLoaded", () => { try { initAllSnippetsOnPage(); } catch (_) {} }, { once: true });
+  window.addEventListener("load", () => { try { initAllSnippetsOnPage(); } catch (_) {} }, { once: true });
+
 })();
