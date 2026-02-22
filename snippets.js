@@ -1,9 +1,24 @@
-/* SiteApps: Snippets v1 */
+/* SiteApps: Snippets v2 (debug-friendly) */
 (() => {
   "use strict";
 
   const APP = "snippets";
   const SELECTOR = '[data-siteapp="snippets"]';
+
+  function renderError(root, err) {
+    try {
+      console.error("[SiteApps:snippets] init failed:", err);
+      root.innerHTML = `
+        <div style="border:1px solid rgba(0,0,0,.2);border-radius:12px;padding:12px;font:14px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
+          <div style="font-weight:700;margin-bottom:6px">Snippets app failed to load</div>
+          <div style="opacity:.75;margin-bottom:8px">Open console for details. Common causes: missing file (404), register mismatch, syntax error.</div>
+          <pre style="white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);padding:10px;border-radius:10px;margin:0">${String(err && (err.stack || err.message || err))}</pre>
+        </div>
+      `;
+    } catch (_) {
+      // last resort: do nothing
+    }
+  }
 
   function ensureStyles() {
     const id = "siteapps-snippets-style";
@@ -38,7 +53,6 @@
       }
       .sa-snippets button:active{transform:translateY(1px)}
       .sa-snippets .muted{opacity:.72;font:12px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-      .sa-snippets .status{min-height:18px;margin-top:6px}
       .sa-snippets .sep{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 12px}
       .sa-snippets .sep input[type="text"]{
         width:260px; max-width:100%;
@@ -64,7 +78,6 @@
   }
 
   function storageKey(instanceId) {
-    // Keep keys stable per page + instance
     return `SiteApps:${APP}:${location.pathname}:${instanceId}`;
   }
 
@@ -91,7 +104,6 @@
       await navigator.clipboard.writeText(text);
       return true;
     }
-    // Fallback (best-effort for iPad Safari)
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.setAttribute("readonly", "");
@@ -101,11 +113,7 @@
     ta.focus();
     ta.select();
     let ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch (e) {
-      ok = false;
-    }
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
     document.body.removeChild(ta);
     return ok;
   }
@@ -120,172 +128,142 @@
         else node.setAttribute(k, v);
       }
     }
-    if (children) {
-      for (const c of children) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-    }
+    if (children) for (const c of children) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
     return node;
   }
 
   function initSnippets(root) {
-    ensureStyles();
+    try {
+      ensureStyles();
 
-    const instanceId = root.getAttribute("data-siteapp-id") || uid();
-    root.setAttribute("data-siteapp-id", instanceId);
+      const instanceId = root.getAttribute("data-siteapp-id") || uid();
+      root.setAttribute("data-siteapp-id", instanceId);
 
-    const key = storageKey(instanceId);
-    const saved = (() => {
-      try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
-    })();
+      const key = storageKey(instanceId);
+      const saved = (() => {
+        try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
+      })();
 
-    const taA = el("textarea", { "data-ta": "a", autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-    const taB = el("textarea", { "data-ta": "b", autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-    const taC = el("textarea", { "data-ta": "c", autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
-    const taOut = el("textarea", { "data-ta": "out", autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
+      const taA = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
+      const taB = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
+      const taC = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
+      const taOut = el("textarea", { autocapitalize: "off", autocomplete: "off", spellcheck: "false" });
 
-    taA.value = saved.a || "";
-    taB.value = saved.b || "";
-    taC.value = saved.c || "";
-    taOut.value = saved.out || "";
+      taA.value = saved.a || "";
+      taB.value = saved.b || "";
+      taC.value = saved.c || "";
+      taOut.value = saved.out || "";
 
-    const sepInput = el("input", { type: "text", value: saved.sep ?? "\n", "aria-label": "Separator" });
-    const chkTrim = el("input", { type: "checkbox" });
-    chkTrim.checked = !!saved.trim;
-    const chkSkipEmpty = el("input", { type: "checkbox" });
-    chkSkipEmpty.checked = saved.skipEmpty !== false; // default true
+      const sepInput = el("input", { type: "text", value: saved.sep ?? "\n" });
+      const chkTrim = el("input", { type: "checkbox" }); chkTrim.checked = !!saved.trim;
+      const chkSkipEmpty = el("input", { type: "checkbox" }); chkSkipEmpty.checked = saved.skipEmpty !== false;
 
-    function persist() {
-      try {
-        localStorage.setItem(
-          key,
-          JSON.stringify({
-            a: taA.value,
-            b: taB.value,
-            c: taC.value,
-            out: taOut.value,
-            sep: sepInput.value,
-            trim: chkTrim.checked,
-            skipEmpty: chkSkipEmpty.checked
-          })
-        );
-      } catch (e) {
-        // If storage fails (private mode, quota), just ignore.
+      function persist() {
+        try {
+          localStorage.setItem(key, JSON.stringify({
+            a: taA.value, b: taB.value, c: taC.value, out: taOut.value,
+            sep: sepInput.value, trim: chkTrim.checked, skipEmpty: chkSkipEmpty.checked
+          }));
+        } catch (_) {}
       }
-    }
 
-    function getParts() {
-      let parts = [taA.value, taB.value, taC.value];
-      if (chkTrim.checked) parts = parts.map((s) => s.trim());
-      if (chkSkipEmpty.checked) parts = parts.filter((s) => s.length > 0);
-      return parts;
-    }
-
-    function joinIntoOutput(replace) {
-      const parts = getParts();
-      const joined = parts.join(sepInput.value);
-      if (replace) taOut.value = joined;
-      else taOut.value = (taOut.value ? taOut.value + sepInput.value : "") + joined;
-      persist();
-      toast(replace ? "Built output" : "Appended to output");
-    }
-
-    async function copyFrom(textarea) {
-      const text = textarea.value || "";
-      if (!text) return toast("Nothing to copy");
-      try {
-        const ok = await copyText(text);
-        toast(ok ? "Copied" : "Couldn’t copy");
-      } catch {
-        toast("Couldn’t copy");
+      function getParts() {
+        let parts = [taA.value, taB.value, taC.value];
+        if (chkTrim.checked) parts = parts.map((s) => s.trim());
+        if (chkSkipEmpty.checked) parts = parts.filter((s) => s.length > 0);
+        return parts;
       }
-    }
 
-    function clearAll() {
-      taA.value = "";
-      taB.value = "";
-      taC.value = "";
-      taOut.value = "";
-      persist();
-      toast("Cleared");
-    }
+      function joinIntoOutput(replace) {
+        const joined = getParts().join(sepInput.value);
+        taOut.value = replace ? joined : (taOut.value ? taOut.value + sepInput.value : "") + joined;
+        persist();
+        toast(replace ? "Built output" : "Appended");
+      }
 
-    // Save on input (lightweight)
-    const onInput = () => persist();
-    taA.addEventListener("input", onInput, { passive: true });
-    taB.addEventListener("input", onInput, { passive: true });
-    taC.addEventListener("input", onInput, { passive: true });
-    taOut.addEventListener("input", onInput, { passive: true });
-    sepInput.addEventListener("input", onInput, { passive: true });
-    chkTrim.addEventListener("change", persist, { passive: true });
-    chkSkipEmpty.addEventListener("change", persist, { passive: true });
+      async function copyFrom(textarea) {
+        const text = textarea.value || "";
+        if (!text) return toast("Nothing to copy");
+        try { toast((await copyText(text)) ? "Copied" : "Couldn’t copy"); }
+        catch { toast("Couldn’t copy"); }
+      }
 
-    const ui = el("div", { class: "sa-snippets" }, [
-      el("div", { class: "muted", text: "Paste fragments into A/B/C, then build or append into Output." }),
-      el("div", { class: "sep" }, [
-        el("span", { class: "pill" }, [
-          el("span", { text: "Separator" }),
-          sepInput
+      function clearAll() {
+        taA.value = taB.value = taC.value = taOut.value = "";
+        persist();
+        toast("Cleared");
+      }
+
+      const onInput = () => persist();
+      taA.addEventListener("input", onInput, { passive: true });
+      taB.addEventListener("input", onInput, { passive: true });
+      taC.addEventListener("input", onInput, { passive: true });
+      taOut.addEventListener("input", onInput, { passive: true });
+      sepInput.addEventListener("input", onInput, { passive: true });
+      chkTrim.addEventListener("change", persist, { passive: true });
+      chkSkipEmpty.addEventListener("change", persist, { passive: true });
+
+      const ui = el("div", { class: "sa-snippets" }, [
+        el("div", { class: "muted", text: "Paste fragments into A/B/C, then build or append into Output." }),
+        el("div", { class: "sep" }, [
+          el("span", { class: "pill" }, [el("span", { text: "Separator" }), sepInput]),
+          el("label", { class: "pill" }, [chkTrim, el("span", { text: "Trim parts" })]),
+          el("label", { class: "pill" }, [chkSkipEmpty, el("span", { text: "Skip empty" })])
         ]),
-        el("label", { class: "pill" }, [
-          chkTrim,
-          el("span", { text: "Trim parts" })
+        el("div", { class: "controls" }, [
+          el("button", { type: "button", onclick: () => joinIntoOutput(true), text: "Build Output" }),
+          el("button", { type: "button", onclick: () => joinIntoOutput(false), text: "Append to Output" }),
+          el("button", { type: "button", onclick: () => copyFrom(taOut), text: "Copy Output" }),
+          el("button", { type: "button", onclick: clearAll, text: "Reset All" })
         ]),
-        el("label", { class: "pill" }, [
-          chkSkipEmpty,
-          el("span", { text: "Skip empty" })
+        el("div", { class: "row" }, [
+          el("div", { class: "col" }, [
+            el("label", { text: "Snippet A" }), taA,
+            el("div", { class: "controls" }, [
+              el("button", { type: "button", onclick: () => copyFrom(taA), text: "Copy A" }),
+              el("button", { type: "button", onclick: () => { taA.value=""; persist(); toast("Cleared A"); }, text: "Clear A" })
+            ])
+          ]),
+          el("div", { class: "col" }, [
+            el("label", { text: "Snippet B" }), taB,
+            el("div", { class: "controls" }, [
+              el("button", { type: "button", onclick: () => copyFrom(taB), text: "Copy B" }),
+              el("button", { type: "button", onclick: () => { taB.value=""; persist(); toast("Cleared B"); }, text: "Clear B" })
+            ])
+          ]),
+          el("div", { class: "col" }, [
+            el("label", { text: "Snippet C" }), taC,
+            el("div", { class: "controls" }, [
+              el("button", { type: "button", onclick: () => copyFrom(taC), text: "Copy C" }),
+              el("button", { type: "button", onclick: () => { taC.value=""; persist(); toast("Cleared C"); }, text: "Clear C" })
+            ])
+          ])
+        ]),
+        el("div", { style: "margin-top:10px" }, [
+          el("label", { text: "Output" }), taOut
         ])
-      ]),
-      el("div", { class: "controls" }, [
-        el("button", { type: "button", onclick: () => joinIntoOutput(true), text: "Build Output" }),
-        el("button", { type: "button", onclick: () => joinIntoOutput(false), text: "Append to Output" }),
-        el("button", { type: "button", onclick: () => copyFrom(taOut), text: "Copy Output" }),
-        el("button", { type: "button", onclick: clearAll, text: "Reset All" })
-      ]),
-      el("div", { class: "row" }, [
-        el("div", { class: "col" }, [
-          el("label", { text: "Snippet A" }),
-          taA,
-          el("div", { class: "controls" }, [
-            el("button", { type: "button", onclick: () => copyFrom(taA), text: "Copy A" }),
-            el("button", { type: "button", onclick: () => { taA.value=""; persist(); toast("Cleared A"); }, text: "Clear A" })
-          ])
-        ]),
-        el("div", { class: "col" }, [
-          el("label", { text: "Snippet B" }),
-          taB,
-          el("div", { class: "controls" }, [
-            el("button", { type: "button", onclick: () => copyFrom(taB), text: "Copy B" }),
-            el("button", { type: "button", onclick: () => { taB.value=""; persist(); toast("Cleared B"); }, text: "Clear B" })
-          ])
-        ]),
-        el("div", { class: "col" }, [
-          el("label", { text: "Snippet C" }),
-          taC,
-          el("div", { class: "controls" }, [
-            el("button", { type: "button", onclick: () => copyFrom(taC), text: "Copy C" }),
-            el("button", { type: "button", onclick: () => { taC.value=""; persist(); toast("Cleared C"); }, text: "Clear C" })
-          ])
-        ])
-      ]),
-      el("div", { style: "margin-top:10px" }, [
-        el("label", { text: "Output" }),
-        taOut
-      ]),
-      el("div", { class: "status muted" })
-    ]);
+      ]);
 
-    // Clear and render
-    root.innerHTML = "";
-    root.appendChild(ui);
+      root.innerHTML = "";
+      root.appendChild(ui);
+    } catch (err) {
+      renderError(root, err);
+    }
   }
 
-  // Register with your loader
-  if (window.SiteApps && typeof window.SiteApps.register === "function") {
-    window.SiteApps.register(APP, {
-      selector: SELECTOR,
-      init: initSnippets
-    });
-  } else {
-    // If loader isn't ready yet, fail quietly
-    // (your initAll will run after loader in normal use)
+  // Register (supports both patterns)
+  try {
+    if (window.SiteApps && typeof window.SiteApps.register === "function") {
+      // Pattern A: register(name, {selector, init})
+      try {
+        window.SiteApps.register(APP, { selector: SELECTOR, init: initSnippets });
+      } catch (_) {
+        // Pattern B: register(name, initFn)
+        window.SiteApps.register(APP, initSnippets);
+      }
+    }
+  } catch (e) {
+    // If register itself explodes, nothing else to do.
+    console.error("[SiteApps:snippets] register failed:", e);
   }
 })();
