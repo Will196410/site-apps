@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-snippets-style-v10";
+  const STYLE_ID = "siteapps-snippets-style-v11";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -67,7 +67,6 @@
 }
 [data-app="snippets"] textarea{
   width:100%;
-  min-height:120px;
   padding:12px;
   border:2px solid #111;
   border-radius:10px;
@@ -79,15 +78,11 @@
   outline:none;
   box-shadow:0 0 0 3px rgba(11,95,255,0.25);
 }
-
-[data-app="snippets"] .row{
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
+[data-app="snippets"] textarea.input{
+  min-height:120px;
 }
-[data-app="snippets"] .col{
-  flex:1 1 260px;
-  min-width:240px;
+[data-app="snippets"] textarea.output{
+  min-height:360px; /* taller output */
 }
 
 [data-app="snippets"] .controls{
@@ -121,13 +116,6 @@
   border-radius:10px;
 }
 [data-app="snippets"] input[type="checkbox"]{ width:20px; height:20px; }
-[data-app="snippets"] input[type="text"]{
-  width:260px; max-width:100%;
-  padding:10px 10px;
-  border:2px solid #111;
-  border-radius:10px;
-  font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-}
 
 [data-app="snippets"] .feedback{
   background:#0b7a2b;
@@ -138,6 +126,8 @@
   font-weight:900;
   opacity:0;
   transition:opacity .2s;
+  margin-top:10px;
+  display:inline-block;
 }
 [data-app="snippets"] .feedback.show{ opacity:1; }
 
@@ -163,6 +153,17 @@
 
   function normalizeLineEndings(s) {
     return String(s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  }
+
+  function trimLinesAndClearEmpty(s, clearEmptyLines) {
+    const raw = normalizeLineEndings(s);
+    const lines = raw.split("\n");
+
+    // Trim each line (always), then optionally remove empty lines
+    const trimmed = lines.map((l) => l.trim());
+    return clearEmptyLines
+      ? trimmed.filter((l) => l !== "").join("\n")
+      : trimmed.join("\n");
   }
 
   window.SiteApps.register("snippets", (container) => {
@@ -197,14 +198,11 @@
     function saveState() {
       try {
         const state = {
-          v: 10,
-          a: taA.value,
-          b: taB.value,
-          c: taC.value,
-          out: taOut.value,
-          sep: sepIn.value,
+          v: 11,
+          input: inputTA.value,
+          output: outputTA.value,
           trim: trimCB.checked,
-          skipEmpty: skipCB.checked,
+          clearEmpty: emptyCB.checked,
           copiedSinceChange,
           lastCopyAt,
         };
@@ -224,7 +222,7 @@
       saveTimer = setTimeout(() => {
         saveTimer = null;
         saveState();
-      }, 500);
+      }, 400);
     }
 
     function restoreState() {
@@ -233,13 +231,10 @@
         if (!raw) return;
         const s = safeJsonParse(raw);
         if (!s || typeof s !== "object") return;
-        if (typeof s.a === "string") taA.value = s.a;
-        if (typeof s.b === "string") taB.value = s.b;
-        if (typeof s.c === "string") taC.value = s.c;
-        if (typeof s.out === "string") taOut.value = s.out;
-        if (typeof s.sep === "string") sepIn.value = s.sep;
-        trimCB.checked = !!s.trim;
-        skipCB.checked = s.skipEmpty !== false; // default true
+        if (typeof s.input === "string") inputTA.value = s.input;
+        if (typeof s.output === "string") outputTA.value = s.output;
+        trimCB.checked = s.trim !== false; // default true
+        emptyCB.checked = !!s.clearEmpty;
         copiedSinceChange = !!s.copiedSinceChange;
         lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
       } catch {}
@@ -251,22 +246,50 @@
       saveStateDebounced();
     }
 
-    function getParts() {
-      let parts = [taA.value, taB.value, taC.value].map(normalizeLineEndings);
-      if (trimCB.checked) parts = parts.map((x) => x.trim());
-      if (skipCB.checked) parts = parts.filter((x) => x.length > 0);
-      return parts;
+    function getProcessedInput() {
+      let text = inputTA.value || "";
+      // Options:
+      // - "Trim" means trim each line's leading/trailing whitespace (keeps blank lines unless clear empty is on)
+      // - "Clear empty lines" removes empty lines after trimming
+      if (trimCB.checked) {
+        text = trimLinesAndClearEmpty(text, emptyCB.checked);
+      } else if (emptyCB.checked) {
+        // If they untick trim but want clear-empty, still do a safe normalize + empty removal
+        const raw = normalizeLineEndings(text);
+        text = raw.split("\n").filter((l) => l.trim() !== "").join("\n");
+      } else {
+        text = normalizeLineEndings(text);
+      }
+      return text;
     }
 
-    function buildOutput(replace) {
-      const joined = getParts().join(sepIn.value);
-      if (replace) taOut.value = joined;
-      else taOut.value = (taOut.value ? taOut.value + sepIn.value : "") + joined;
+    function prepend() {
+      const chunk = getProcessedInput();
+      if (!chunk) return;
+      const out = outputTA.value || "";
+      outputTA.value = out ? (chunk + "\n" + out) : chunk;
+      inputTA.value = "";
+      markChanged();
+    }
+
+    function append() {
+      const chunk = getProcessedInput();
+      if (!chunk) return;
+      const out = outputTA.value || "";
+      outputTA.value = out ? (out + "\n" + chunk) : chunk;
+      inputTA.value = "";
+      markChanged();
+    }
+
+    function replaceOut() {
+      const chunk = getProcessedInput();
+      outputTA.value = chunk;
+      inputTA.value = "";
       markChanged();
     }
 
     async function copyToClipboard() {
-      const text = taOut.value || "";
+      const text = outputTA.value || "";
       if (!text.trim()) {
         alert("No output to copy");
         return;
@@ -282,8 +305,8 @@
 
       // Fallback
       try {
-        taOut.focus();
-        taOut.select();
+        outputTA.focus();
+        outputTA.select();
         const ok = document.execCommand("copy");
         if (!ok) throw new Error("execCommand failed");
         feedback.classList.add("show");
@@ -295,11 +318,9 @@
     }
 
     function clearAll() {
-      if (!confirm("Clear all text?")) return;
-      taA.value = "";
-      taB.value = "";
-      taC.value = "";
-      taOut.value = "";
+      if (!confirm("Clear input and output?")) return;
+      inputTA.value = "";
+      outputTA.value = "";
       copiedSinceChange = false;
       lastCopyAt = null;
       renderBadges();
@@ -313,7 +334,7 @@
     topRow.className = "top-row";
 
     const title = document.createElement("h3");
-    title.textContent = "Snippets — Build & Copy";
+    title.textContent = "Snippets — Prepend / Append";
 
     const statusRow = document.createElement("div");
     statusRow.className = "status-row";
@@ -332,37 +353,24 @@
     const optsRow = document.createElement("div");
     optsRow.className = "controls";
 
-    const sepWrap = document.createElement("div");
-    sepWrap.className = "pill";
-
-    const sepLbl = document.createElement("span");
-    sepLbl.style.fontWeight = "900";
-    sepLbl.textContent = "Separator";
-
-    const sepIn = document.createElement("input");
-    sepIn.type = "text";
-    sepIn.value = "\n";
-
-    sepWrap.append(sepLbl, sepIn);
-
     const trimWrap = document.createElement("div");
     trimWrap.className = "pill";
     const trimCB = document.createElement("input");
     trimCB.type = "checkbox";
+    trimCB.checked = true;
     const trimText = document.createElement("span");
-    trimText.textContent = "Trim parts";
+    trimText.textContent = "Trim";
     trimWrap.append(trimCB, trimText);
 
-    const skipWrap = document.createElement("div");
-    skipWrap.className = "pill";
-    const skipCB = document.createElement("input");
-    skipCB.type = "checkbox";
-    skipCB.checked = true;
-    const skipText = document.createElement("span");
-    skipText.textContent = "Skip empty";
-    skipWrap.append(skipCB, skipText);
+    const emptyWrap = document.createElement("div");
+    emptyWrap.className = "pill";
+    const emptyCB = document.createElement("input");
+    emptyCB.type = "checkbox";
+    const emptyText = document.createElement("span");
+    emptyText.textContent = "Clear empty lines";
+    emptyWrap.append(emptyCB, emptyText);
 
-    optsRow.append(sepWrap, trimWrap, skipWrap);
+    optsRow.append(trimWrap, emptyWrap);
 
     const mkBtn = (text, cls, fn) => {
       const b = document.createElement("button");
@@ -373,66 +381,43 @@
       return b;
     };
 
-    const actionRow = document.createElement("div");
-    actionRow.className = "actions";
+    const actions = document.createElement("div");
+    actions.className = "actions";
 
-    const btnBuild = mkBtn("Build output", "btn-primary", () => buildOutput(true));
-    const btnAppend = mkBtn("Append", "btn-primary", () => buildOutput(false));
+    const btnPre = mkBtn("⬆️ Prepend", "btn-primary", prepend);
+    const btnApp = mkBtn("⬇️ Append", "btn-primary", append);
+    const btnRep = mkBtn("Replace output", "btn-primary", replaceOut);
     const btnCopy = mkBtn("📋 Copy output", "btn-copy", copyToClipboard);
     const btnClear = mkBtn("🗑️ Clear all", "btn-clear", clearAll);
 
-    actionRow.append(btnBuild, btnAppend, btnCopy, btnClear);
+    actions.append(btnPre, btnApp, btnRep, btnCopy, btnClear);
 
-    const row = document.createElement("div");
-    row.className = "row";
+    const inLabel = document.createElement("label");
+    inLabel.textContent = "Input:";
 
-    const colA = document.createElement("div");
-    colA.className = "col";
-    const labA = document.createElement("label");
-    labA.textContent = "Snippet A:";
-    const taA = document.createElement("textarea");
-    taA.placeholder = "Paste fragment A…";
-    colA.append(labA, taA);
-
-    const colB = document.createElement("div");
-    colB.className = "col";
-    const labB = document.createElement("label");
-    labB.textContent = "Snippet B:";
-    const taB = document.createElement("textarea");
-    taB.placeholder = "Paste fragment B…";
-    colB.append(labB, taB);
-
-    const colC = document.createElement("div");
-    colC.className = "col";
-    const labC = document.createElement("label");
-    labC.textContent = "Snippet C:";
-    const taC = document.createElement("textarea");
-    taC.placeholder = "Paste fragment C…";
-    colC.append(labC, taC);
-
-    row.append(colA, colB, colC);
+    const inputTA = document.createElement("textarea");
+    inputTA.className = "input";
+    inputTA.placeholder = "Paste your fragment here…";
 
     const outLabel = document.createElement("label");
     outLabel.textContent = "Output:";
 
-    const taOut = document.createElement("textarea");
-    taOut.placeholder = "Built text appears here…";
+    const outputTA = document.createElement("textarea");
+    outputTA.className = "output";
+    outputTA.placeholder = "Your built text appears here…";
 
     const feedback = document.createElement("div");
     feedback.className = "feedback";
     feedback.textContent = "Copied!";
 
-    container.append(topRow, optsRow, actionRow, row, outLabel, taOut, feedback);
+    container.append(topRow, optsRow, actions, inLabel, inputTA, outLabel, outputTA, feedback);
 
-    // Events
+    // Change tracking
     const onChange = () => markChanged();
-    taA.addEventListener("input", onChange);
-    taB.addEventListener("input", onChange);
-    taC.addEventListener("input", onChange);
-    taOut.addEventListener("input", onChange);
-    sepIn.addEventListener("input", onChange);
+    inputTA.addEventListener("input", onChange);
+    outputTA.addEventListener("input", onChange);
     trimCB.addEventListener("change", onChange);
-    skipCB.addEventListener("change", onChange);
+    emptyCB.addEventListener("change", onChange);
 
     // Restore + badges
     restoreState();
