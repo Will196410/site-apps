@@ -1,19 +1,19 @@
 (() => {
 “use strict”;
 
-// ── SiteApps registry ──────────────────────────────────────────────────────
+// \u2500\u2500 SiteApps registry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.SiteApps = window.SiteApps || {};
 window.SiteApps.registry = window.SiteApps.registry || {};
 window.SiteApps.register =
 window.SiteApps.register ||
 function (name, fn) { window.SiteApps.registry[name] = fn; };
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// \u2500\u2500 Constants \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const STYLE_ID = “siteapps-mdse2-style”;
 const EST_H    = 96;    // fallback estimated node height (px)
 const WIN_PAD  = 1200;  // px of buffer above + below viewport to keep rendered
 
-// ── Styles ─────────────────────────────────────────────────────────────────
+// \u2500\u2500 Styles \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function ensureStyle() {
 if (document.getElementById(STYLE_ID)) return;
 const s = document.createElement(“style”);
@@ -230,7 +230,7 @@ font-weight:700; text-align:right;
 document.head.appendChild(s);
 }
 
-// ── Pure utilities ─────────────────────────────────────────────────────────
+// \u2500\u2500 Pure utilities \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const uid   = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
@@ -261,7 +261,7 @@ return !!ok;
 } catch { return false; }
 }
 
-// ── Tag helpers ────────────────────────────────────────────────────────────
+// \u2500\u2500 Tag helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const TAG_LINE_RE  = /^\s*\?%%\s*tag\s+(.*)\s*$/i;
 const normaliseTag = t => (t || “”).trim().replace(/\s+/g, “ “).toLowerCase();
 const normaliseNL  = s => (s || “”).replace(/\r\n/g, “\n”).replace(/\r/g, “\n”);
@@ -324,13 +324,13 @@ return !(m && (m[1] || “”).trim().toLowerCase() === want);
 .trimEnd();
 }
 
-// ── App ────────────────────────────────────────────────────────────────────
+// \u2500\u2500 App \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 window.SiteApps.register(“mdse2”, container => {
 ensureStyle();
 const KEY = storageKey(container);
 
 ```
-// ── Data state
+// \u2500\u2500 Data state
 let nodes = [];
 let sourceId           = null;
 let lastCreatedId      = null;
@@ -345,22 +345,22 @@ let matchPos           = -1;
 let activeTab          = "structure";
 let activeTag          = "";
 
-// ── Virtual render state
-// domCache: id → { el, pin, colBtn, lvlPill, titleTA, bodyTA, bodyWrap,
+// \u2500\u2500 Virtual render state
+// domCache: id \u2192 { el, pin, colBtn, lvlPill, titleTA, bodyTA, bodyWrap,
 //                  bodyBtn, tagKidsBtn, untagKidsBtn }
 const domCache  = new Map();
-const heightMap = new Map(); // id → measured height (px)
+const heightMap = new Map(); // id \u2192 measured height (px)
 let   visibleArr = [];        // [{n, idx}] after level/collapse/reveal filter
 let   winStart   = 0;
 let   winEnd     = -1;
 
-// ── Timers / rAF
+// \u2500\u2500 Timers / rAF
 let saveTimer  = null;
 let matchTimer = null;
 let tagTimer   = null;
 let scrollRaf  = null;
 
-// ── Shell HTML ─────────────────────────────────────────────────────────
+// \u2500\u2500 Shell HTML \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 container.innerHTML = "";
 container.setAttribute("data-app", "mdse2");
 container.innerHTML = `
@@ -369,7 +369,7 @@ container.innerHTML = `
 <div class="topbar">
   <div class="left">
     <h3>Markdown Structure Editor</h3>
-    <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
+    <div class="muted">Paste Markdown \u2192 Load \u2192 reorder / tweak headings \u2192 Copy Result</div>
     <div class="tabs" role="tablist" aria-label="Views">
       <button type="button" class="tabbtn tabStructure" role="tab">Structure</button>
       <button type="button" class="tabbtn tabSearch"    role="tab">Search</button>
@@ -398,7 +398,7 @@ container.innerHTML = `
     <button type="button" class="btnLvl3">H1\u2013H3</button>
     <button type="button" class="btnLvlAll">All</button>
   </div>
-  <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
+  <div class="hint">Tip: Tap \u283F PIN on a heading, then tap a green target heading to move the whole branch.</div>
   <div class="canvas">
     <div class="vSpacer top"></div>
     <div class="vSpacer bot"></div>
@@ -478,7 +478,7 @@ const tagAllBtn       = $(".tagAll");
 const tagCloud        = $(".tagCloud");
 const tagResults      = $(".tagResults");
 
-// ── Outline helpers ────────────────────────────────────────────────────
+// \u2500\u2500 Outline helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const indexById = id => nodes.findIndex(n => n.id === id);
 
 function familyIndices(si) {
@@ -525,7 +525,7 @@ function bulkTagDirectChildren(parentId, payload, mode) {
   markChangedFull();
 }
 
-// ── Search helpers ─────────────────────────────────────────────────────
+// \u2500\u2500 Search helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const normS = s => (s || "").toLowerCase();
 
 function nodeMatches(n, q) {
@@ -542,7 +542,7 @@ function nodeMatchesBodyOnly(n, q) {
   return !normS(n.title).includes(qq) && normS(n.body).includes(qq);
 }
 
-// ── Virtual render helpers ─────────────────────────────────────────────
+// \u2500\u2500 Virtual render helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 function computeRevealSet() {
   const reveal = new Set();
@@ -609,7 +609,7 @@ function getSpacerHeights() {
   return { topH, botH };
 }
 
-// ── Node DOM builders ──────────────────────────────────────────────────
+// \u2500\u2500 Node DOM builders \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 function nodeClass(n, isSource, isTarget, isMatch, isActive) {
   return "node level-" + n.level
@@ -632,19 +632,19 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
   el.className        = nodeClass(n, isSource, isTarget, isMatch, isActive);
   el.dataset.isTarget = isTarget ? "1" : "0";
 
-  // ── Header grid
+  // \u2500\u2500 Header grid
   const hdr = document.createElement("div");
   hdr.className = "hdr";
 
   const pin = document.createElement("div");
   pin.className   = "pill gray";
-  pin.textContent = isSource ? "📍 PIN" : "⠿";
+  pin.textContent = isSource ? "\u{1F4CD} PIN" : "\u283F";
   pin.title       = "Pin branch to move";
   pin.addEventListener("click", e => { e.stopPropagation(); toggleMove(n.id); });
 
   const colBtn = document.createElement("div");
   colBtn.className   = "pill gray";
-  colBtn.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "\u2022";
+  colBtn.textContent = hasChildren(idx) ? (n.isCollapsed ? "\u25B6" : "\u25BC") : "\u2022";
   colBtn.title       = hasChildren(idx) ? "Fold/unfold branch" : "No children";
   colBtn.addEventListener("click", e => {
     e.stopPropagation();
@@ -671,7 +671,7 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
     markChangedTyping();
   });
 
-  // ── Tool buttons
+  // \u2500\u2500 Tool buttons
   const tools = document.createElement("div");
   tools.className = "tools";
   tools.addEventListener("click", e => e.stopPropagation());
@@ -687,21 +687,21 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
 
   const hasBody = !!(n.body && n.body.trim());
   const bodyBtn = mkBtn(
-    n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text"),
+    n.showBody ? "\u{1F4DD} Hide text" : (hasBody ? "\u{1F4DD} Show text" : "\u2795 Add text"),
     hasBody ? "primary" : "",
     "", () => toggleBody(n.id)
   );
 
-  const dup  = mkBtn("⧉ Duplicate", "", "",                          () => duplicateBranch(n.id));
+  const dup  = mkBtn("\u29C9 Duplicate", "", "",                          () => duplicateBranch(n.id));
   const add  = mkBtn("+ Add",        "", "",                          () => addNewAfter(n.id));
-  const lft  = mkBtn("←", "",  "Promote (H-1) for this branch",      () => changeLevel(n.id, -1));
-  const rgt  = mkBtn("→", "",  "Demote (H+1) for this branch",       () => changeLevel(n.id, +1));
-  const del  = mkBtn("✕", "warn", "Delete branch",                   () => deleteBranch(n.id));
+  const lft  = mkBtn("\u2190", "",  "Promote (H-1) for this branch",      () => changeLevel(n.id, -1));
+  const rgt  = mkBtn("\u2192", "",  "Demote (H+1) for this branch",       () => changeLevel(n.id, +1));
+  const del  = mkBtn("\u2715", "warn", "Delete branch",                   () => deleteBranch(n.id));
 
   let tagKidsBtn = null, untagKidsBtn = null;
   if (n.level < 6) {
     tagKidsBtn = mkBtn(
-      `🏷 Tag H${n.level + 1}`,
+      `\u{1F3F7} Tag H${n.level + 1}`,
       "",
       `Add a %% tag line to every direct H${n.level + 1} under this heading`,
       () => {
@@ -713,7 +713,7 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
       }
     );
     untagKidsBtn = mkBtn(
-      `🧽 Untag H${n.level + 1}`,
+      `\u{1F9FD} Untag H${n.level + 1}`,
       "",
       `Remove that exact %% tag line from every direct H${n.level + 1} under this heading`,
       () => {
@@ -732,7 +732,7 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
   hdr.append(pin, colBtn, lvlPill, titleTA, tools);
   el.appendChild(hdr);
 
-  // ── Body area
+  // \u2500\u2500 Body area
   const shouldShow = n.showBody ||
     (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
 
@@ -775,11 +775,11 @@ function updateNodeEntry(entry, n, idx, movingSet, revealSet, matchSet) {
   if (el.className !== nc)       el.className = nc;
   el.dataset.isTarget = isTarget ? "1" : "0";
 
-  const pinTxt = isSource ? "📍 PIN" : "⠿";
+  const pinTxt = isSource ? "\u{1F4CD} PIN" : "\u283F";
   if (pin.textContent !== pinTxt) pin.textContent = pinTxt;
 
   const hc = hasChildren(idx);
-  const colTxt = hc ? (n.isCollapsed ? "▶" : "▼") : "\u2022";
+  const colTxt = hc ? (n.isCollapsed ? "\u25B6" : "\u25BC") : "\u2022";
   if (colBtn.textContent !== colTxt) colBtn.textContent = colTxt;
   colBtn.title = hc ? "Fold/unfold branch" : "No children";
 
@@ -798,22 +798,22 @@ function updateNodeEntry(entry, n, idx, movingSet, revealSet, matchSet) {
   bodyWrap.classList.toggle("show", shouldShow);
 
   const hasBodyNow = !!(n.body && n.body.trim());
-  const wantBtnTxt = n.showBody ? "📝 Hide text" : (hasBodyNow ? "📝 Show text" : "➕ Add text");
+  const wantBtnTxt = n.showBody ? "\u{1F4DD} Hide text" : (hasBodyNow ? "\u{1F4DD} Show text" : "\u2795 Add text");
   if (bodyBtn.textContent !== wantBtnTxt) bodyBtn.textContent = wantBtnTxt;
   const wantBtnCls = hasBodyNow ? "primary" : "";
   if (bodyBtn.className !== wantBtnCls) bodyBtn.className = wantBtnCls;
 
   if (tagKidsBtn) {
-    const t = `🏷 Tag H${n.level + 1}`;
+    const t = `\u{1F3F7} Tag H${n.level + 1}`;
     if (tagKidsBtn.textContent !== t) tagKidsBtn.textContent = t;
   }
   if (untagKidsBtn) {
-    const t = `🧽 Untag H${n.level + 1}`;
+    const t = `\u{1F9FD} Untag H${n.level + 1}`;
     if (untagKidsBtn.textContent !== t) untagKidsBtn.textContent = t;
   }
 }
 
-// ── Main render ────────────────────────────────────────────────────────
+// \u2500\u2500 Main render \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Called on any structural change. Does:
 //   1. Compute which nodes are logically visible (level + collapse filter)
 //   2. Evict domCache entries for nodes that no longer exist
@@ -932,7 +932,7 @@ function renderStructure() {
   }
 }
 
-// ── Scroll-driven window updates ───────────────────────────────────────
+// \u2500\u2500 Scroll-driven window updates \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function onScroll() {
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
@@ -964,12 +964,12 @@ window.addEventListener("resize", () => {
   remObs.observe(document.body, { childList: true, subtree: true });
 }
 
-// ── Persistence ────────────────────────────────────────────────────────
+// \u2500\u2500 Persistence \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function setCopiedFlag(flag) {
   copiedSinceChange = !!flag;
   if (copiedSinceChange) lastCopyAt = new Date().toISOString();
   badgeCopy.className   = "badge " + (copiedSinceChange ? "good" : "warn");
-  badgeCopy.textContent = copiedSinceChange ? "Copied ✓" : "Not copied";
+  badgeCopy.textContent = copiedSinceChange ? "Copied \u2713" : "Not copied";
   badgeCopy.title       = copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
 }
 
@@ -981,7 +981,7 @@ function saveNow() {
       revealMatches, activeTab, activeTag,
     }));
     badgeSave.className   = "badge good badgeSave";
-    badgeSave.textContent = "Saved ✓";
+    badgeSave.textContent = "Saved \u2713";
   } catch {
     badgeSave.className   = "badge warn badgeSave";
     badgeSave.textContent = "Not saved";
@@ -1030,7 +1030,7 @@ function loadPref() {
   });
 }
 
-// ── Markdown parse / export ────────────────────────────────────────────
+// \u2500\u2500 Markdown parse / export \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function parseMarkdown(text) {
   const out = []; let current = null;
   for (const line of (text || "").split("\n")) {
@@ -1055,7 +1055,7 @@ function toMarkdown() {
   }).join("\n\n");
 }
 
-// ── Match helpers ──────────────────────────────────────────────────────
+// \u2500\u2500 Match helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function updateCount() {
   if (!searchQuery.trim()) { countEl.textContent = ""; return; }
   if (!matchIds.length)    { countEl.textContent = "0 matches"; return; }
@@ -1093,7 +1093,7 @@ function jumpMatch(delta) {
   }
 }
 
-// ── Tags tab ───────────────────────────────────────────────────────────
+// \u2500\u2500 Tags tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function allTags() {
   const set = new Set();
   nodes.forEach(n => (n.tags || []).forEach(t => set.add(t)));
@@ -1147,7 +1147,7 @@ function rebuildTagUIDebounced() {
   tagTimer = setTimeout(() => { tagTimer = null; if (activeTab === "tags") rebuildTagUI(); }, 150);
 }
 
-// ── Search results tab ─────────────────────────────────────────────────
+// \u2500\u2500 Search results tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function renderSearchResults() {
   searchResults.innerHTML = "";
   if (!searchQuery.trim()) {
@@ -1205,7 +1205,7 @@ function jumpToNode(id) {
   });
 }
 
-// ── Change triggers ────────────────────────────────────────────────────
+// \u2500\u2500 Change triggers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Full structural change: recompute matches + re-render + save
 function markChangedFull() {
   setCopiedFlag(false);
@@ -1222,7 +1222,7 @@ function markChangedTyping() {
   saveDebounced();
 }
 
-// ── Outline actions ────────────────────────────────────────────────────
+// \u2500\u2500 Outline actions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function toggleBranchCollapse(id) {
   const idx = indexById(id);
   if (idx < 0) return;
@@ -1310,7 +1310,7 @@ function setMaxLevel(level) {
   markChangedFull();
 }
 
-// ── Tabs ───────────────────────────────────────────────────────────────
+// \u2500\u2500 Tabs \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function setTab(tab) {
   activeTab = ["structure","search","tags"].includes(tab) ? tab : "structure";
 
@@ -1327,7 +1327,7 @@ function setTab(tab) {
   saveDebounced();
 }
 
-// ── Event listeners ────────────────────────────────────────────────────
+// \u2500\u2500 Event listeners \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 btnTabStructure.addEventListener("click", () => setTab("structure"));
 btnTabSearch   .addEventListener("click", () => setTab("search"));
 btnTabTags     .addEventListener("click", () => setTab("tags"));
@@ -1423,7 +1423,7 @@ inSearch.addEventListener("keydown", e => {
 
 taInput.addEventListener("input", () => { setCopiedFlag(false); saveDebounced(); });
 
-// ── Init ───────────────────────────────────────────────────────────────
+// \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 loadPref();
 setCopiedFlag(copiedSinceChange);
 
@@ -1433,7 +1433,7 @@ cbBody.checked   = searchInBody;
 cbReveal.checked = revealMatches;
 
 badgeSave.className   = "badge good badgeSave";
-badgeSave.textContent = "Saved ✓";
+badgeSave.textContent = "Saved \u2713";
 
 rebuildMatches();
 rebuildTagUI();
