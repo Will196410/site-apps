@@ -378,7 +378,7 @@ container.innerHTML = `
 
 ```
 <div class="tabPanel panelStructure" role="tabpanel">
-  <textarea class="mdInput" placeholder="Paste Markdown here…"></textarea>
+  <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
   <div class="btnrow">
     <button class="primary btnLoad"   type="button">Load Markdown</button>
     <button class="btnUpdate"         type="button">Update Input Area</button>
@@ -394,8 +394,8 @@ container.innerHTML = `
       <option value="5">H5</option><option value="6">H6 (All)</option>
     </select>
     <button type="button" class="btnLvl1">H1</button>
-    <button type="button" class="btnLvl2">H1–H2</button>
-    <button type="button" class="btnLvl3">H1–H3</button>
+    <button type="button" class="btnLvl2">H1\u2013H2</button>
+    <button type="button" class="btnLvl3">H1\u2013H3</button>
     <button type="button" class="btnLvlAll">All</button>
   </div>
   <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
@@ -407,7 +407,7 @@ container.innerHTML = `
 
 <div class="tabPanel panelSearch" role="tabpanel">
   <div class="searchRow" role="search" aria-label="Outline search">
-    <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
+    <input id="mdseSearch" type="search" placeholder="Search..." autocomplete="off" />
     <button type="button" class="btnPrev">Prev</button>
     <button type="button" class="btnNext">Next</button>
     <label class="searchOpt"><input id="mdseSearchBody" type="checkbox" /> Body</label>
@@ -433,12 +433,12 @@ container.innerHTML = `
 
   <div class="right">
     <div class="badges">
-      <span class="badge dim badgeSave">Unsaved…</span>
+      <span class="badge dim badgeSave">Unsaved...</span>
       <span class="badge warn badgeCopy">Not copied</span>
     </div>
   </div>
 </div>
-<div class="footer">v2.0 — DOM reconciliation + virtual windowing</div>
+<div class="footer">v2.0  -  DOM reconciliation + virtual windowing</div>
 `;
 
 ```
@@ -644,7 +644,7 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
 
   const colBtn = document.createElement("div");
   colBtn.className   = "pill gray";
-  colBtn.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "•";
+  colBtn.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "\u2022";
   colBtn.title       = hasChildren(idx) ? "Fold/unfold branch" : "No children";
   colBtn.addEventListener("click", e => {
     e.stopPropagation();
@@ -762,7 +762,7 @@ function buildNodeEntry(n, idx, movingSet, revealSet, matchSet) {
   return { el, pin, colBtn, lvlPill, titleTA, bodyTA, bodyWrap, bodyBtn, tagKidsBtn, untagKidsBtn };
 }
 
-// Patch an existing entry in-place — no DOM teardown, no event re-binding.
+// Patch an existing entry in-place  -  no DOM teardown, no event re-binding.
 function updateNodeEntry(entry, n, idx, movingSet, revealSet, matchSet) {
   const { el, pin, colBtn, lvlPill, titleTA, bodyTA, bodyWrap, bodyBtn, tagKidsBtn, untagKidsBtn } = entry;
 
@@ -779,7 +779,7 @@ function updateNodeEntry(entry, n, idx, movingSet, revealSet, matchSet) {
   if (pin.textContent !== pinTxt) pin.textContent = pinTxt;
 
   const hc = hasChildren(idx);
-  const colTxt = hc ? (n.isCollapsed ? "▶" : "▼") : "•";
+  const colTxt = hc ? (n.isCollapsed ? "▶" : "▼") : "\u2022";
   if (colBtn.textContent !== colTxt) colBtn.textContent = colTxt;
   colBtn.title = hc ? "Fold/unfold branch" : "No children";
 
@@ -882,10 +882,10 @@ function renderStructure() {
       entry = buildNodeEntry(n, idx, movingSet, revealSet, matchSet);
       domCache.set(n.id, entry);
       canvas.insertBefore(entry.el, cursor);
-      // cursor stays — next item goes after this new element
+      // cursor stays  -  next item goes after this new element
 
     } else if (entry.el.parentNode === canvas) {
-      // Already in DOM — update and check position
+      // Already in DOM  -  update and check position
       updateNodeEntry(entry, n, idx, movingSet, revealSet, matchSet);
       if (entry.el === cursor) {
         cursor = cursor.nextSibling || botSpacer; // already correct, advance
@@ -990,7 +990,7 @@ function saveNow() {
 
 function saveDebounced() {
   badgeSave.className   = "badge dim badgeSave";
-  badgeSave.textContent = "Unsaved…";
+  badgeSave.textContent = "Unsaved...";
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { saveTimer = null; saveNow(); }, 500);
 }
