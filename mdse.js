@@ -959,15 +959,15 @@
 
     function rebuildMatches() {
       rebuildMatchesNoRender();
-      renderStructure();
-      if (activeTab === "search") renderSearchResults();
+      scheduleRenderStructure();
+      if (activeTab === "search") scheduleRenderSearchResults();
     }
 
     function jumpMatch(delta) {
       if (!matchIds.length) return;
       matchPos = (matchPos + delta + matchIds.length) % matchIds.length;
       updateCount();
-      renderStructure();
+      scheduleRenderStructure();
 
       const id = matchIds[matchPos];
       const el = canvas.querySelector(`[data-node-id="${id}"]`);
@@ -1011,6 +1011,10 @@
         tagCloud.appendChild(btn);
       });
     }
+    
+// PATCH: add directly under
+const scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
+
 
     function renderTagResults() {
       tagResults.innerHTML = "";
@@ -1065,12 +1069,17 @@
       });
     }
 
+    
+// PATCH: add directly under
+const scheduleRenderTagResults = makeRafScheduler(renderTagResults);
+
+
     function rebuildTagUI() {
       tagAllBtn.classList.toggle("active", !activeTag);
       const tags = allTags();
       const counts = tagsCountMap();
       renderTagCloud(tags, counts);
-      renderTagResults();
+      scheduleRenderTagResults();
     }
 
     function rebuildTagUIDebounced() {
@@ -1128,6 +1137,10 @@
         searchResults.appendChild(card);
       });
     }
+    
+// PATCH: add directly under
+const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
+
 
     function jumpToNode(id) {
       setTab("structure");
@@ -1138,7 +1151,7 @@
         selMax.value = "6";
       }
 
-      renderStructure();
+      scheduleRenderStructure();
 
       const el = canvas.querySelector(`[data-node-id="${id}"]`);
       if (el) {
@@ -1238,20 +1251,20 @@
     function toggleMove(id) {
       if (!sourceId) {
         sourceId = id;
-        renderStructure();
+        scheduleRenderStructure();
         return;
       }
 
       if (sourceId === id) {
         sourceId = null;
-        renderStructure();
+        scheduleRenderStructure();
         return;
       }
 
       const movingIds = new Set(familyIds(sourceId));
       if (movingIds.has(id)) {
         sourceId = null;
-        renderStructure();
+        scheduleRenderStructure();
         return;
       }
 
@@ -1297,7 +1310,7 @@
       panelTags.classList.toggle("active", activeTab === "tags");
 
       if (activeTab === "tags") rebuildTagUI();
-      if (activeTab === "search") renderSearchResults();
+      if (activeTab === "search") scheduleRenderSearchResults();
 
       saveDebounced();
     }
@@ -1496,6 +1509,10 @@
         lastCreatedId = null;
       }
     }
+   
+// PATCH: add directly under
+const scheduleRenderStructure = makeRafScheduler(renderStructure);
+
 
     // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
@@ -1546,10 +1563,10 @@
       setCopiedFlag(false);
       try { localStorage.removeItem(KEY); } catch {}
       saveDebounced();
-      renderStructure();
+      scheduleRenderStructure();
       rebuildTagUI();
       rebuildMatchesNoRender();
-      renderSearchResults();
+      scheduleRenderSearchResults();
     });
 
     btnAddTop.addEventListener("click", () => addNewAfter(null));
@@ -1563,20 +1580,20 @@
     inSearch.addEventListener("input", () => {
       searchQuery = inSearch.value || "";
       rebuildMatches();
-      if (activeTab === "search") renderSearchResults();
+      if (activeTab === "search") scheduleRenderSearchResults();
       saveDebounced();
     });
 
     cbBody.addEventListener("change", () => {
       searchInBody = !!cbBody.checked;
       rebuildMatches();
-      if (activeTab === "search") renderSearchResults();
+      if (activeTab === "search") scheduleRenderSearchResults();
       saveDebounced();
     });
 
     cbReveal.addEventListener("change", () => {
       revealMatches = !!cbReveal.checked;
-      renderStructure();
+      scheduleRenderStructure();
       saveDebounced();
     });
 
@@ -1596,8 +1613,8 @@
         matchPos = -1;
         inSearch.value = "";
         updateCount();
-        renderStructure();
-        renderSearchResults();
+        scheduleRenderStructure();
+        scheduleRenderSearchResults();
         saveDebounced();
       }
     });
