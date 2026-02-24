@@ -1011,9 +1011,24 @@
         tagCloud.appendChild(btn);
       });
     }
+
+function makeRafScheduler(renderFn) {
+  let queued = false;
+  return function () {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      renderFn();
+    });
+  };
+}
     
 // PATCH: add directly under
-const scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
+// const scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
+    
+let scheduleRenderTagCloud = function(){};
+scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
 
 
     function renderTagResults() {
@@ -1071,7 +1086,10 @@ const scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
 
     
 // PATCH: add directly under
-const scheduleRenderTagResults = makeRafScheduler(renderTagResults);
+// const scheduleRenderTagResults = makeRafScheduler(renderTagResults);
+
+let scheduleRenderTagResults = function(){};
+scheduleRenderTagResults = makeRafScheduler(renderTagResults);
 
 
     function rebuildTagUI() {
@@ -1139,7 +1157,10 @@ const scheduleRenderTagResults = makeRafScheduler(renderTagResults);
     }
     
 // PATCH: add directly under
-const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
+// const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
+
+let scheduleRenderSearchResults = function(){};
+scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 
 
     function jumpToNode(id) {
@@ -1511,7 +1532,10 @@ const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
    
 // PATCH: add directly under
-const scheduleRenderStructure = makeRafScheduler(renderStructure);
+// const scheduleRenderStructure = makeRafScheduler(renderStructure);
+    
+let scheduleRenderStructure = function(){};
+scheduleRenderStructure = makeRafScheduler(renderStructure);
 
 
     // ---- Buttons / events ----
