@@ -903,6 +903,75 @@
         .join("\n\n");
     }
 
+    // ---- Clipboard paste as sibling ----
+async function readClipboardTextFallback() {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    // iPad Safari can be picky; fallback lets you paste manually.
+    return prompt("Clipboard read blocked. Paste the markdown here:","") || "";
+  }
+}
+
+function normalizeClipboardToLevel(clip, targetLevel) {
+  const text = (clip || "").replace(/\r\n?/g, "\n").trim();
+  if (!text) return "";
+
+  const lines = text.split("\n");
+
+  // Find first markdown heading
+  let firstHeadingLine = null;
+  for (const ln of lines) {
+    const m = ln.match(/^(#{1,6})\s+(.+)/);
+    if (m) { firstHeadingLine = ln; break; }
+  }
+
+  // If no heading, make one from first non-empty line
+  if (!firstHeadingLine) {
+    const firstNonEmpty = lines.find((l) => l.trim().length) || "New node";
+    const rest = lines.slice(lines.indexOf(firstNonEmpty) + 1);
+    return (`${"#".repeat(targetLevel)} ${firstNonEmpty.trim()}\n` + rest.join("\n")).trimEnd();
+  }
+
+  const m0 = firstHeadingLine.match(/^(#{1,6})\s+/);
+  const clipLevel = m0 ? m0[1].length : 2;
+  const delta = targetLevel - clipLevel;
+
+  const adjusted = lines.map((ln) => {
+    const m = ln.match(/^(#{1,6})(\s+.*)$/);
+    if (!m) return ln;
+    let lvl = m[1].length + delta;
+    lvl = Math.max(1, Math.min(6, lvl));
+    return "#".repeat(lvl) + m[2];
+  });
+
+  return adjusted.join("\n").trimEnd();
+}
+
+async function pasteClipboardAsSiblingAfter(nodeId) {
+  const idx = indexById(nodeId);
+  if (idx < 0) return;
+
+  const clip = await readClipboardTextFallback();
+  if (!clip.trim()) return;
+
+  const targetLevel = nodes[idx].level;
+  const adjusted = normalizeClipboardToLevel(clip, targetLevel);
+  if (!adjusted.trim()) return;
+
+  const newNodes = parseMarkdown(adjusted);
+  if (!newNodes.length) return;
+
+  // Insert AFTER this node’s whole branch
+  const fam = familyIndices(idx);
+  const insertAt = fam[fam.length - 1] + 1;
+
+  nodes.splice(insertAt, 0, ...newNodes);
+
+  lastCreatedId = newNodes[0].id; // focus it after render
+  markChangedFull();
+}
+
     // ---- Matches ----
     function updateCount() {
       if (!searchQuery.trim()) {
@@ -1437,6 +1506,12 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         add.textContent = "+ Add";
         add.addEventListener("click", () => addNewAfter(n.id));
 
+        const paste = document.createElement("button");
+paste.type = "button";
+paste.textContent = "📋 Paste";
+paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
+paste.addEventListener("click", () => pasteClipboardAsSiblingAfter(n.id));
+
         const left = document.createElement("button");
         left.type = "button";
         left.textContent = "←";
@@ -1482,8 +1557,8 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         del.title = "Delete branch";
         del.addEventListener("click", () => deleteBranch(n.id));
 
-        if (n.level < 6) tools.append(bodyBtn, dup, add, left, right, tagKids, untagKids, del);
-        else tools.append(bodyBtn, dup, add, left, right, del);
+        if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
+        else tools.append(bodyBtn, dup, add, paste, left, right, del);
 
         hdr.append(pin, col, lvl, title, tools);
         node.appendChild(hdr);
