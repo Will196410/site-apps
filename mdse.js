@@ -1510,7 +1510,12 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 paste.type = "button";
 paste.textContent = "📋 Paste";
 paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
-paste.addEventListener("click", () => pasteClipboardAsSiblingAfter(n.id));
+// paste.addEventListener("click", () => pasteClipboardAsSiblingAfter(n.id));
+        paste.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  pasteClipboardAsSiblingAfter(n.id);
+});
 
         const left = document.createElement("button");
         left.type = "button";
