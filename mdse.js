@@ -243,12 +243,6 @@
   font-size: 13px;
 }
 
-[data-app="mdse"] .tools,
-[data-app="mdse"] .tools *{
-  -webkit-user-select: none;
-  user-select: none;
-}
-
 [data-app="mdse"] .body textarea{ white-space: pre-wrap; }
 [data-app="mdse"] .body{ margin-top: 10px; display:none; }
 [data-app="mdse"] .body.show{ display:block; }
