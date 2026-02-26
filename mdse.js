@@ -212,6 +212,13 @@
   justify-content:flex-start;
 }
 
+[data-app="mdse"] .tools{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid rgba(0,0,0,.08);
+  justify-content: flex-start;
+}
+
 [data-app="mdse"] .pill{
   border:2px solid #111;
   border-radius: 12px;
@@ -1579,7 +1586,8 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
         else tools.append(bodyBtn, dup, add, paste, left, right, del);
 
         // hdr.append(pin, col, lvl, title, tools);
-        hdr.append(pin, col, lvl, tools, title);
+        // hdr.append(pin, col, lvl, tools, title);
+        hdr.append(pin, col, lvl, title);
         node.appendChild(hdr);
 
         // Body area: show if toggled, OR reveal+body-match-only while searching
@@ -1606,10 +1614,19 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
           markChangedTyping();
         });
 
-        bodyWrap.appendChild(bodyTA);
-        node.appendChild(bodyWrap);
+        // bodyWrap.appendChild(bodyTA);
+        // node.appendChild(bodyWrap);
 
-        canvas.appendChild(node);
+        // canvas.appendChild(node);
+
+bodyWrap.appendChild(bodyTA);
+node.appendChild(bodyWrap);
+
+// NEW: controls under title + body
+node.appendChild(tools);
+
+canvas.appendChild(node);
+        
         autoResizeTA(title);
       });
 
