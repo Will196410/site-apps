@@ -196,12 +196,21 @@
 /* iPad/Safari flex squeeze fix: grid header */
 [data-app="mdse"] .hdr{
   display: grid !important;
-  grid-template-columns: auto auto auto minmax(240px, 1fr) auto;
+  grid-template-columns: auto auto auto 1fr;
   column-gap: 10px;
+  row-gap: 8px;
   align-items: start;
   min-width: 0;
 }
 [data-app="mdse"] .hdr > *{ min-width: 0; }
+
+[data-app="mdse"] .tools{
+  grid-column: 1 / -1;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  justify-content:flex-start;
+}
 
 [data-app="mdse"] .pill{
   border:2px solid #111;
@@ -227,6 +236,10 @@
   min-height: 44px;
   background: #fbfbfb;
   display:block;
+}
+
+[data-app="mdse"] .title{
+  grid-column: 1 / -1;
 }
 
 [data-app="mdse"] .tools{
@@ -1565,7 +1578,8 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
         if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
         else tools.append(bodyBtn, dup, add, paste, left, right, del);
 
-        hdr.append(pin, col, lvl, title, tools);
+        // hdr.append(pin, col, lvl, title, tools);
+        hdr.append(pin, col, lvl, tools, title);
         node.appendChild(hdr);
 
         // Body area: show if toggled, OR reveal+body-match-only while searching
