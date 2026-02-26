@@ -212,10 +212,6 @@
   justify-content: flex-start;
 }
 
-/* Hide tools until node is active */
-[data-app="mdse"] .tools{ display:none; }
-[data-app="mdse"] .node.activeNode .tools{ display:flex; }
-
 /* Optional: subtle highlight for the active node */
 [data-app="mdse"] .node.activeNode{
   border-color: rgba(11,95,255,.45);
@@ -406,6 +402,13 @@
   font-weight: 700;
   text-align:right;
 }
+
+
+/* Hide tools until node is active */
+[data-app="mdse"] .tools{ display:none; }
+[data-app="mdse"] .node.activeNode .tools{ display:flex; }
+
+
 `;
   }
 
@@ -1467,14 +1470,17 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
           (isMatch ? " match" : "") +
           (isActive ? " activeMatch" : "");
 
-node.addEventListener("click", (e) => {
-  // If you clicked a button inside tools, it will stopPropagation already
-  // so this only runs for taps on the node area.
+        node.addEventListener("click", (e) => {
+  // If this node is a valid move target, clicking it should MOVE, not select.
+  if (isValidTarget) {
+    toggleMove(n.id);
+    return;
+  }
+
+  // Otherwise, toggle "active" state to show/hide controls.
   activeNodeId = (activeNodeId === n.id) ? "" : n.id;
   scheduleRenderStructure();
 });
-        
-        if (isValidTarget) node.addEventListener("click", () => toggleMove(n.id));
 
         const hdr = document.createElement("div");
         hdr.className = "hdr";
