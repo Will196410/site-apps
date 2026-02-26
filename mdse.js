@@ -205,14 +205,6 @@
 [data-app="mdse"] .hdr > *{ min-width: 0; }
 
 [data-app="mdse"] .tools{
-  grid-column: 1 / -1;
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
-  justify-content:flex-start;
-}
-
-[data-app="mdse"] .tools{
   margin-top: 10px;
   padding-top: 10px;
   border-top: 2px solid rgba(0,0,0,.08);
