@@ -205,6 +205,7 @@
 [data-app="mdse"] .hdr > *{ min-width: 0; }
 
 [data-app="mdse"] .tools{
+  display:flex;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 2px solid rgba(0,0,0,.08);
