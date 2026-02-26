@@ -873,15 +873,18 @@ async function addFiles(files, startAtFirstEmpty = true) {
       picker.click();
     });
 
-    picker.addEventListener("change", async () => {
-      const files = picker.files;
-      picker.value = ""; // allow selecting same file again
-      try {
-        await addFiles(files, true);
-      } catch (e) {
-        toast("Couldn’t add image");
-      }
-    });
+
+picker.addEventListener("change", async () => {
+  // IMPORTANT: copy the FileList BEFORE clearing the input (Safari!)
+  const files = Array.from(picker.files || []);
+  picker.value = ""; // now safe
+
+  try {
+    await addFiles(files, true);
+  } catch (_) {
+    toast("Couldn’t add image");
+  }
+});    
 
     root.querySelector('[data-act="clearAll"]').addEventListener("click", clearAll);
     root.querySelector('[data-act="export"]').addEventListener("click", () => {
