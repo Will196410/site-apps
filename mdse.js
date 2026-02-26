@@ -211,6 +211,16 @@
   justify-content: flex-start;
 }
 
+/* Hide tools until node is active */
+[data-app="mdse"] .tools{ display:none; }
+[data-app="mdse"] .node.activeNode .tools{ display:flex; }
+
+/* Optional: subtle highlight for the active node */
+[data-app="mdse"] .node.activeNode{
+  border-color: rgba(11,95,255,.45);
+  box-shadow: 0 8px 22px rgba(11,95,255,.08);
+}
+
 [data-app="mdse"] .pill{
   border:2px solid #111;
   border-radius: 12px;
@@ -538,6 +548,8 @@
     let activeTab = "structure"; // "structure" | "search" | "tags"
     let activeTag = ""; // normalised tag or ""
 
+    let activeNodeId = ""; // which node is "selected" for showing controls
+    
     let saveTimer = null;
     let matchTimer = null;
     let tagTimer = null;
@@ -1447,12 +1459,20 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         node.setAttribute("data-node-id", n.id);
         node.className =
           `node level-${n.level}` +
+          (activeNodeId === n.id ? " activeNode" : "") +
           (isSource ? " movingSource" : "") +
           (isValidTarget ? " moveTarget" : "") +
           (n.isCollapsed ? " collapsed" : "") +
           (isMatch ? " match" : "") +
           (isActive ? " activeMatch" : "");
 
+node.addEventListener("click", (e) => {
+  // If you clicked a button inside tools, it will stopPropagation already
+  // so this only runs for taps on the node area.
+  activeNodeId = (activeNodeId === n.id) ? "" : n.id;
+  scheduleRenderStructure();
+});
+        
         if (isValidTarget) node.addEventListener("click", () => toggleMove(n.id));
 
         const hdr = document.createElement("div");
@@ -1606,6 +1626,8 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
           markChangedTyping();
         });
 
+        bodyTA.addEventListener("click", (e) => e.stopPropagation());
+        
         // bodyWrap.appendChild(bodyTA);
         // node.appendChild(bodyWrap);
 
@@ -1752,6 +1774,15 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
       saveDebounced();
     });
 
+    canvas.addEventListener("click", (e) => {
+  // If the click wasn't on a node, clear selection
+  const nodeEl = e.target.closest && e.target.closest(".node");
+  if (!nodeEl) {
+    activeNodeId = "";
+    scheduleRenderStructure();
+  }
+});
+    
     // ---- Init ----
     loadPref();
     setCopiedFlag(copiedSinceChange);
