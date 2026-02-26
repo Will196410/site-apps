@@ -405,9 +405,11 @@
 
 
 /* Hide tools until node is active */
-[data-app="mdse"] .tools{ display:none; }
-[data-app="mdse"] .node.activeNode .tools{ display:flex; }
-
+// [data-app="mdse"] .tools{ display:none; }
+// [data-app="mdse"] .node.activeNode .tools{ display:flex; }
+/* Hide tools until node is active (MUST be last) */
+[data-app="mdse"] .node .tools{ display:none !important; }
+[data-app="mdse"] .node.activeNode .tools{ display:flex !important; }
 
 `;
   }
