@@ -62,35 +62,53 @@ function revokeBlobURL(url) {
   }
 
   // Draw image into rect with "cover"
-  function drawCover(ctx, img, x, y, w, h) {
-    const iw = img.naturalWidth || img.width;
-    const ih = img.naturalHeight || img.height;
-    if (!iw || !ih) return;
+function drawCover(ctx, img, x, y, w, h) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
 
-    const scale = Math.max(w / iw, h / ih);
-    const sw = w / scale;
-    const sh = h / scale;
-    const sx = (iw - sw) / 2;
-    const sy = (ih - sh) / 2;
-
-    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  // If image smaller than slot, just centre it
+  if (iw <= w && ih <= h) {
+    const dx = x + (w - iw) / 2;
+    const dy = y + (h - ih) / 2;
+    ctx.drawImage(img, dx, dy, iw, ih);
+    return;
   }
 
+  // Otherwise behave like normal cover
+  const scale = Math.max(w / iw, h / ih);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = (iw - sw) / 2;
+  const sy = (ih - sh) / 2;
+
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+  
   // Draw image into rect with "contain"
-  function drawContain(ctx, img, x, y, w, h) {
-    const iw = img.naturalWidth || img.width;
-    const ih = img.naturalHeight || img.height;
-    if (!iw || !ih) return;
+function drawContain(ctx, img, x, y, w, h) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
 
-    const scale = Math.min(w / iw, h / ih);
-    const dw = iw * scale;
-    const dh = ih * scale;
-    const dx = x + (w - dw) / 2;
-    const dy = y + (h - dh) / 2;
-
-    ctx.drawImage(img, dx, dy, dw, dh);
+  // If image already fits inside slot, do NOT scale up
+  if (iw <= w && ih <= h) {
+    const dx = x + (w - iw) / 2;
+    const dy = y + (h - ih) / 2;
+    ctx.drawImage(img, dx, dy, iw, ih);
+    return;
   }
 
+  // Otherwise scale down proportionally
+  const scale = Math.min(w / iw, h / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = x + (w - dw) / 2;
+  const dy = y + (h - dh) / 2;
+
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+  
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
