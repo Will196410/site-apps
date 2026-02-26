@@ -36,6 +36,13 @@
     return Math.max(a, Math.min(b, n));
   }
 
+function toBlobURL(file) {
+  try { return URL.createObjectURL(file); } catch (_) { return ""; }
+}
+function revokeBlobURL(url) {
+  try { url && url.startsWith("blob:") && URL.revokeObjectURL(url); } catch (_) {}
+}
+  
   function readFileAsDataURL(file) {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -429,7 +436,7 @@
     function ensureSlots() {
       const n = slotCount();
       if (slots.length < n) {
-        while (slots.length < n) slots.push({ src: "", name: "", w: 0, h: 0 });
+        while (slots.length < n) slots.push({ src: "", name: "", w: 0, h: 0, _blob: "" });
       } else if (slots.length > n) {
         slots = slots.slice(0, n);
       }
@@ -517,7 +524,9 @@
         clr.textContent = "Clear";
         clr.addEventListener("click", (e) => {
           e.stopPropagation();
-          slots[i] = { src: "", name: "", w: 0, h: 0 };
+          // slots[i] = { src: "", name: "", w: 0, h: 0 };
+          revokeBlobURL(slots[i]._blob || "");
+slots[i] = { src: "", name: "", w: 0, h: 0, _blob: "" };
           if (selectedIndex === i) selectedIndex = -1;
           render();
         });
@@ -615,20 +624,26 @@
         if (p >= positions.length) break;
         const idx = positions[p++];
 
-        const src = await readFileAsDataURL(file);
-        let w = 0, h = 0;
-        try {
-          const img = await loadImage(src);
-          w = img.naturalWidth || img.width || 0;
-          h = img.naturalHeight || img.height || 0;
-        } catch (_) {}
+// revoke old blob url in the target slot (if any)
+revokeBlobURL(slots[idx]._blob || "");
 
-        slots[idx] = {
-          src,
-          name: file.name || `Image ${idx + 1}`,
-          w,
-          h
-        };
+const blobUrl = toBlobURL(file);
+if (!blobUrl) continue;
+
+let w = 0, h = 0;
+try {
+  const img = await loadImage(blobUrl);
+  w = img.naturalWidth || img.width || 0;
+  h = img.naturalHeight || img.height || 0;
+} catch (_) {}
+
+slots[idx] = {
+  src: blobUrl,          // use blob url for preview + export
+  _blob: blobUrl,        // track for cleanup
+  name: file.name || `Image ${idx + 1}`,
+  w, h
+};
+        
       }
 
       pendingReplaceIndex = -1;
@@ -637,6 +652,7 @@
     }
 
     function clearAll() {
+      slots.forEach(s => revokeBlobURL(s._blob || ""));
       slots = [];
       selectedIndex = -1;
       pendingReplaceIndex = -1;
