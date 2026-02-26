@@ -549,11 +549,40 @@ slots[i] = { src: "", name: "", w: 0, h: 0, _blob: "" };
 
         // Tap to select / swap / add
         slot.addEventListener("click", () => {
-          if (selectedIndex === -1) {
-            selectedIndex = i;
-            render();
-            return;
-          }
+
+slot.addEventListener("click", () => {
+  const isEmpty = !slots[i] || !slots[i].src;
+
+  // If the slot is empty, tap should add/replace directly
+  if (isEmpty) {
+    selectedIndex = -1;
+    pendingReplaceIndex = i;   // target this slot
+    picker.click();            // open selector (user gesture)
+    return;
+  }
+
+  // Otherwise: tap-to-select / tap-to-swap
+  if (selectedIndex === -1) {
+    selectedIndex = i;
+    render();
+    return;
+  }
+  if (selectedIndex === i) {
+    selectedIndex = -1;
+    render();
+    return;
+  }
+
+  // swap
+  const a = selectedIndex;
+  const tmp = slots[a];
+  slots[a] = slots[i];
+  slots[i] = tmp;
+  selectedIndex = -1;
+  render();
+  toast("Swapped");
+});
+          
           if (selectedIndex === i) {
             selectedIndex = -1;
             render();
@@ -601,56 +630,80 @@ slots[i] = { src: "", name: "", w: 0, h: 0, _blob: "" };
       }
     }
 
-    async function addFiles(files, startAtFirstEmpty = true) {
-      const list = Array.from(files || []).filter(Boolean);
-      if (!list.length) return;
+function getInsertionPositions(startAtFirstEmpty) {
+  // If we're replacing a specific slot, only use that one.
+  if (pendingReplaceIndex >= 0) return [pendingReplaceIndex];
 
-      ensureSlots();
-
-      // Decide insertion positions
-      let positions = [];
-      if (pendingReplaceIndex >= 0) {
-        positions = [pendingReplaceIndex];
-      } else if (startAtFirstEmpty) {
-        for (let i = 0; i < slots.length; i++) {
-          if (!slots[i].src) positions.push(i);
-        }
-      } else {
-        for (let i = 0; i < slots.length; i++) positions.push(i);
-      }
-
-      let p = 0;
-      for (const file of list) {
-        if (p >= positions.length) break;
-        const idx = positions[p++];
-
-// revoke old blob url in the target slot (if any)
-revokeBlobURL(slots[idx]._blob || "");
-
-const blobUrl = toBlobURL(file);
-if (!blobUrl) continue;
-
-let w = 0, h = 0;
-try {
-  const img = await loadImage(blobUrl);
-  w = img.naturalWidth || img.width || 0;
-  h = img.naturalHeight || img.height || 0;
-} catch (_) {}
-
-slots[idx] = {
-  src: blobUrl,          // use blob url for preview + export
-  _blob: blobUrl,        // track for cleanup
-  name: file.name || `Image ${idx + 1}`,
-  w, h
-};
-        
-      }
-
-      pendingReplaceIndex = -1;
-      render();
-      toast("Added");
+  // Otherwise, fill empty slots first (common case).
+  if (startAtFirstEmpty) {
+    const empties = [];
+    for (let i = 0; i < slots.length; i++) {
+      if (!slots[i].src) empties.push(i);
     }
+    return empties;
+  }
 
+  // Or: fill from slot 0 onward.
+  return Array.from({ length: slots.length }, (_, i) => i);
+}
+
+async function fileToSlot(file, idx) {
+  // Clean up old blob URL in that slot
+  revokeBlobURL(slots[idx]._blob || "");
+
+  const blobUrl = toBlobURL(file);
+  if (!blobUrl) return false;
+
+  let w = 0, h = 0;
+  try {
+    const img = await loadImage(blobUrl);
+    w = img.naturalWidth || img.width || 0;
+    h = img.naturalHeight || img.height || 0;
+  } catch (_) {
+    // If we can't load it, revoke and bail
+    revokeBlobURL(blobUrl);
+    return false;
+  }
+
+  slots[idx] = {
+    src: blobUrl,
+    _blob: blobUrl,
+    name: file.name || `Image ${idx + 1}`,
+    w, h
+  };
+
+  return true;
+}
+
+async function addFiles(files, startAtFirstEmpty = true) {
+  const list = Array.from(files || []).filter(Boolean);
+  if (!list.length) return;
+
+  ensureSlots();
+
+  const positions = getInsertionPositions(startAtFirstEmpty);
+  if (!positions.length) {
+    pendingReplaceIndex = -1;
+    toast("No empty slots");
+    return;
+  }
+
+  let used = 0;
+  for (let f = 0; f < list.length; f++) {
+    if (used >= positions.length) break;
+
+    const idx = positions[used];
+    const ok = await fileToSlot(list[f], idx);
+
+    // Only advance to the next slot if we successfully filled this one
+    if (ok) used++;
+  }
+
+  pendingReplaceIndex = -1;
+  render();
+  toast(used ? "Added" : "Couldn’t add image");
+}
+    
     function clearAll() {
       slots.forEach(s => revokeBlobURL(s._blob || ""));
       slots = [];
