@@ -212,6 +212,34 @@
   justify-content: flex-start;
 }
 
+// PASTE START
+
+[data-app="mdse"] .miniTools{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  justify-content:flex-end;
+}
+
+[data-app="mdse"] .miniBtn{
+  border:2px solid rgba(0,0,0,.15);
+  border-radius:10px;
+  padding:5px 7px;
+  font-weight:1000;
+  font-size:11px;
+  line-height:1;
+  background:#fff;
+}
+
+[data-app="mdse"] .miniBtn.primary{
+  border-color:#111;
+  background:#111;
+  color:#fff;
+}
+
+// PASTE STOP
+
+
 /* Optional: subtle highlight for the active node */
 [data-app="mdse"] .node.activeNode{
   border-color: rgba(11,95,255,.45);
@@ -1509,6 +1537,36 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         lvl.className = "pill";
         lvl.textContent = `H${n.level}`;
 
+// PASTE START
+
+// --- MINI tools (always visible) ---
+const miniTools = document.createElement("div");
+miniTools.className = "miniTools";
+miniTools.addEventListener("click", (e) => e.stopPropagation());
+
+// Use a different variable name to avoid collisions
+const miniHasBody = !!(n.body && n.body.trim());
+
+// Mini: toggle body
+const miniBody = document.createElement("button");
+miniBody.type = "button";
+miniBody.className = "miniBtn" + (miniHasBody ? " primary" : "");
+miniBody.title = miniHasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text";
+miniBody.textContent = "📝";
+miniBody.addEventListener("click", () => toggleBody(n.id));
+
+// Mini: add sibling
+const miniAdd = document.createElement("button");
+miniAdd.type = "button";
+miniAdd.className = "miniBtn";
+miniAdd.title = "Add a new sibling after this branch";
+miniAdd.textContent = "＋";
+miniAdd.addEventListener("click", () => addNewAfter(n.id));
+
+miniTools.append(miniBody, miniAdd);
+        
+// PASTE STOP
+        
         // --- TITLE: single-line ---
         const title = document.createElement("textarea");
         title.className = "title";
@@ -1608,7 +1666,8 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
 
         // hdr.append(pin, col, lvl, title, tools);
         // hdr.append(pin, col, lvl, tools, title);
-        hdr.append(pin, col, lvl, title);
+        // hdr.append(pin, col, lvl, title);
+        hdr.append(pin, col, lvl, miniTools, title);
         node.appendChild(hdr);
 
         // Body area: show if toggled, OR reveal+body-match-only while searching
