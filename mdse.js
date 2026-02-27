@@ -204,30 +204,6 @@
 }
 [data-app="mdse"] .hdr > *{ min-width: 0; }
 
-/* Mini tools (always visible) */
-[data-app="mdse"] .miniTools{
-  display:flex;
-  gap:6px;
-  align-items:center;
-  justify-content:flex-end;
-}
-
-[data-app="mdse"] .miniBtn{
-  border:2px solid rgba(0,0,0,.15);
-  border-radius: 10px;
-  padding: 6px 8px;
-  font-weight: 1000;
-  font-size: 12px;
-  line-height: 1;
-  background:#fff;
-}
-
-[data-app="mdse"] .miniBtn.primary{
-  border-color:#111;
-  background:#111;
-  color:#fff;
-}
-
 [data-app="mdse"] .tools{
   display:flex;
   margin-top: 10px;
@@ -1180,30 +1156,6 @@ scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
         lvl.className = "lvl";
         lvl.textContent = `H${n.level}`;
 
-const miniTools = document.createElement("div");
-miniTools.className = "miniTools";
-miniTools.addEventListener("click", (e) => e.stopPropagation());
-
-const hasBody = !!(n.body && n.body.trim());
-
-// Mini: Show/Hide/Add text
-const miniBody = document.createElement("button");
-miniBody.type = "button";
-miniBody.className = "miniBtn" + (hasBody ? " primary" : "");
-miniBody.title = hasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text";
-miniBody.textContent = n.showBody ? "📝" : (hasBody ? "📝" : "➕📝");
-miniBody.addEventListener("click", () => toggleBody(n.id));
-
-// Mini: Add node after this branch
-const miniAdd = document.createElement("button");
-miniAdd.type = "button";
-miniAdd.className = "miniBtn";
-miniAdd.title = "Add a new sibling node after this branch";
-miniAdd.textContent = "＋";
-miniAdd.addEventListener("click", () => addNewAfter(n.id));
-
-miniTools.append(miniBody, miniAdd);
-        
         const title = document.createElement("span");
         title.className = "titleline";
         title.textContent = n.title || "(untitled)";
@@ -1578,12 +1530,12 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         tools.className = "tools";
         tools.addEventListener("click", (e) => e.stopPropagation());
 
-        // const hasBody = !!(n.body && n.body.trim());
-        // const bodyBtn = document.createElement("button");
-        // bodyBtn.type = "button";
-        // bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
-        // bodyBtn.className = hasBody ? "primary" : "";
-        // bodyBtn.addEventListener("click", () => toggleBody(n.id));
+        const hasBody = !!(n.body && n.body.trim());
+        const bodyBtn = document.createElement("button");
+        bodyBtn.type = "button";
+        bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
+        bodyBtn.className = hasBody ? "primary" : "";
+        bodyBtn.addEventListener("click", () => toggleBody(n.id));
 
         const dup = document.createElement("button");
         dup.type = "button";
@@ -1651,15 +1603,12 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
         del.title = "Delete branch";
         del.addEventListener("click", () => deleteBranch(n.id));
 
-        // if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
-        // else tools.append(bodyBtn, dup, add, paste, left, right, del);
-if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
-else tools.append(dup, paste, left, right, del);
-        
+        if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
+        else tools.append(bodyBtn, dup, add, paste, left, right, del);
+
         // hdr.append(pin, col, lvl, title, tools);
         // hdr.append(pin, col, lvl, tools, title);
-        // hdr.append(pin, col, lvl, title);
-        hdr.append(pin, col, lvl, miniTools, title);
+        hdr.append(pin, col, lvl, title);
         node.appendChild(hdr);
 
         // Body area: show if toggled, OR reveal+body-match-only while searching
