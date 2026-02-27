@@ -1598,22 +1598,22 @@ miniTools.append(miniBody, miniAdd);
         tools.className = "tools";
         tools.addEventListener("click", (e) => e.stopPropagation());
 
-        const hasBody = !!(n.body && n.body.trim());
-        const bodyBtn = document.createElement("button");
-        bodyBtn.type = "button";
-        bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
-        bodyBtn.className = hasBody ? "primary" : "";
-        bodyBtn.addEventListener("click", () => toggleBody(n.id));
+        // const hasBody = !!(n.body && n.body.trim());
+        // const bodyBtn = document.createElement("button");
+        // bodyBtn.type = "button";
+        // bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
+        // bodyBtn.className = hasBody ? "primary" : "";
+        // bodyBtn.addEventListener("click", () => toggleBody(n.id));
 
         const dup = document.createElement("button");
         dup.type = "button";
         dup.textContent = "⧉ Duplicate";
         dup.addEventListener("click", () => duplicateBranch(n.id));
 
-        const add = document.createElement("button");
-        add.type = "button";
-        add.textContent = "+ Add";
-        add.addEventListener("click", () => addNewAfter(n.id));
+        // const add = document.createElement("button");
+        // add.type = "button";
+        // add.textContent = "+ Add";
+        // add.addEventListener("click", () => addNewAfter(n.id));
 
         const paste = document.createElement("button");
 paste.type = "button";
@@ -1671,8 +1671,11 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
         del.title = "Delete branch";
         del.addEventListener("click", () => deleteBranch(n.id));
 
-        if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
-        else tools.append(bodyBtn, dup, add, paste, left, right, del);
+        // if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
+        // else tools.append(bodyBtn, dup, add, paste, left, right, del);
+
+        if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
+        else tools.append(dup, paste, left, right, del);
 
         // hdr.append(pin, col, lvl, title, tools);
         // hdr.append(pin, col, lvl, tools, title);
