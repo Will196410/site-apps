@@ -1542,7 +1542,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 // --- MINI tools (always visible) ---
 const miniTools = document.createElement("div");
 miniTools.className = "miniTools";
-miniTools.addEventListener("click", (e) => e.stopPropagation());
+// miniTools.addEventListener("click", (e) => e.stopPropagation());
 
 // Use a different variable name to avoid collisions
 const miniHasBody = !!(n.body && n.body.trim());
@@ -1553,7 +1553,7 @@ miniBody.type = "button";
 miniBody.className = "miniBtn" + (miniHasBody ? " primary" : "");
 miniBody.title = miniHasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text";
 miniBody.textContent = "📝";
-miniBody.addEventListener("click", () => toggleBody(n.id));
+// miniBody.addEventListener("click", () => toggleBody(n.id));
 
 // Mini: add sibling
 const miniAdd = document.createElement("button");
@@ -1561,8 +1561,18 @@ miniAdd.type = "button";
 miniAdd.className = "miniBtn";
 miniAdd.title = "Add a new sibling after this branch";
 miniAdd.textContent = "＋";
-miniAdd.addEventListener("click", () => addNewAfter(n.id));
+// miniAdd.addEventListener("click", () => addNewAfter(n.id));
 
+miniBody.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleBody(n.id);
+});
+
+miniAdd.addEventListener("click", (e) => {
+  e.stopPropagation();
+  addNewAfter(n.id);
+});
+        
 miniTools.append(miniBody, miniAdd);
         
 // PASTE STOP
