@@ -224,7 +224,7 @@
 [data-app="mdse"] .miniBtn{
   border:2px solid rgba(0,0,0,.15);
   border-radius:10px;
-  padding:5px 7px;
+  padding:4px 6px;
   font-weight:1000;
   font-size:11px;
   line-height:1;
@@ -1537,7 +1537,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         lvl.className = "pill";
         lvl.textContent = `H${n.level}`;
 
-// PASTE START
+// PASTE START MINITOOLS
 
 // --- MINI tools (always visible) ---
 const miniTools = document.createElement("div");
@@ -1572,10 +1572,32 @@ miniAdd.addEventListener("click", (e) => {
   e.stopPropagation();
   addNewAfter(n.id);
 });
+
+const miniPromote = document.createElement("button");
+miniPromote.type = "button";
+miniPromote.className = "miniBtn";
+miniPromote.title = "Promote branch (H-1)";
+miniPromote.textContent = "←";
+miniPromote.addEventListener("click", (e) => {
+  e.stopPropagation();
+  changeLevel(n.id, -1);
+});
+
+const miniDemote = document.createElement("button");
+miniDemote.type = "button";
+miniDemote.className = "miniBtn";
+miniDemote.title = "Demote branch (H+1)";
+miniDemote.textContent = "→";
+miniDemote.addEventListener("click", (e) => {
+  e.stopPropagation();
+  changeLevel(n.id, +1);
+});
+
+// APPEND
+// miniTools.append(miniBody, miniAdd);
+miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
         
-miniTools.append(miniBody, miniAdd);
-        
-// PASTE STOP
+// PASTE STOP MINITOOLS
         
         // --- TITLE: single-line ---
         const title = document.createElement("textarea");
