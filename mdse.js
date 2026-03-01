@@ -588,6 +588,64 @@
     let activeTag = ""; // normalised tag or ""
 
     let activeNodeId = ""; // which node is "selected" for showing controls
+
+// START UNDO STATE
+
+    // ---- Undo (structural) ----
+const UNDO_LIMIT = 60;
+let undoStack = [];
+
+function snapshotNodes() {
+  // JSON clone is simplest and iPad-safe
+  return JSON.stringify(nodes);
+}
+
+function restoreNodes(snapshot) {
+  const arr = safeJsonParse(snapshot);
+  if (!Array.isArray(arr)) return false;
+
+  nodes = arr
+    .filter((n) => n && typeof n === "object")
+    .map((n) => {
+      const body = typeof n.body === "string" ? n.body : "";
+      return {
+        id: typeof n.id === "string" ? n.id : uid(),
+        level: clamp(parseInt(n.level, 10) || 1, 1, 6),
+        title: typeof n.title === "string" ? n.title : "",
+        body,
+        isCollapsed: !!n.isCollapsed,
+        showBody: !!n.showBody,
+        tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
+      };
+    });
+
+  // ensure these don't point at missing nodes
+  if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
+  if (activeNodeId && !nodes.some((n) => n.id === activeNodeId)) activeNodeId = "";
+  return true;
+}
+
+function pushUndo(label) {
+  // label is optional; handy if you ever want a history viewer
+  undoStack.push({ label: label || "", snap: snapshotNodes() });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  const prev = undoStack.pop();
+  if (!restoreNodes(prev.snap)) return;
+
+  setCopiedFlag(false);
+  rebuildMatchesNoRender();
+  // tags/search derived from nodes; rebuild UI
+  if (activeTab === "tags") rebuildTagUI();
+  if (activeTab === "search") scheduleRenderSearchResults();
+  scheduleRenderStructure();
+  saveDebounced();
+}
+
+// STOP UNDO STATE
     
     let saveTimer = null;
     let matchTimer = null;
@@ -674,6 +732,7 @@
     }
 
     function bulkTagDirectChildren(parentId, payload, mode /* "add" | "remove" */) {
+      pushUndo("bulk tag");
       const parentIdx = indexById(parentId);
       if (parentIdx < 0) return;
 
@@ -738,6 +797,7 @@
       <div class="btnrow">
         <button class="primary btnLoad" type="button">Load Markdown</button>
         <button class="btnUpdate" type="button">Update Input Area</button>
+        <button class="btnUndo" type="button">↺ Undo</button>
         <button class="primary btnCopy" type="button">Copy Result</button>
         <button class="warn btnReset" type="button">Reset Everything</button>
         <button class="btnAddTop" type="button">+ Add H1</button>
@@ -821,6 +881,7 @@
 
     const btnLoad = $(".btnLoad");
     const btnUpdate = $(".btnUpdate");
+    const btnUndo = $(".btnUndo");
     const btnCopy = $(".btnCopy");
     const btnReset = $(".btnReset");
     const btnAddTop = $(".btnAddTop");
@@ -1012,6 +1073,7 @@ function normalizeClipboardToLevel(clip, targetLevel) {
 }
 
 async function pasteClipboardAsSiblingAfter(nodeId) {
+  pushUndo("paste");
   const idx = indexById(nodeId);
   if (idx < 0) return;
 
@@ -1330,6 +1392,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function toggleBranchCollapse(id) {
+      pushUndo("collapse");
       const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
@@ -1337,6 +1400,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function toggleBody(id) {
+      pushUndo("toggle body"); 
       const idx = indexById(id);
       if (idx < 0) return;
       nodes[idx].showBody = !nodes[idx].showBody;
@@ -1344,6 +1408,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function changeLevel(id, delta) {
+      pushUndo("promote/demote");
       const idx = indexById(id);
       if (idx < 0) return;
       const fam = familyIndices(idx);
@@ -1352,6 +1417,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function addNewAfter(idOrNull) {
+       pushUndo("add");
       if (!nodes.length || !idOrNull) {
         const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
         nodes.push(newNode);
@@ -1370,6 +1436,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function duplicateBranch(id) {
+      pushUndo("duplicate");
       const idx = indexById(id);
       if (idx < 0) return;
       const fam = familyIndices(idx);
@@ -1392,6 +1459,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function deleteBranch(id) {
+      pushUndo("delete");
       const idx = indexById(id);
       if (idx < 0) return;
       if (!confirm("Delete this heading and its children?")) return;
@@ -1402,6 +1470,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     function toggleMove(id) {
+      pushUndo("move");
       if (!sourceId) {
         sourceId = id;
         scheduleRenderStructure();
@@ -1801,6 +1870,24 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
       markChangedFull();
     });
 
+    // UNDO FUNCTION 
+    btnUndo.addEventListener("click", () => undo());
+    document.addEventListener("keydown", (e) => {
+  const k = (e.key || "").toLowerCase();
+  const mod = e.metaKey || e.ctrlKey;
+
+  // Cmd/Ctrl+Z => structural undo only when NOT typing in an input/textarea
+  if (mod && k === "z" && !e.shiftKey) {
+    const t = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+    const isTyping = t === "textarea" || t === "input";
+    if (!isTyping) {
+      e.preventDefault();
+      undo();
+    }
+  }
+});
+    // END UNDO 
+    
     btnCopy.addEventListener("click", async () => {
       const md = toMarkdown();
       taInput.value = md;
