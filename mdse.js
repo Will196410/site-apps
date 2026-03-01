@@ -231,6 +231,11 @@
   background:#fff;
 }
 
+[data-app="mdse"] .miniBtn:disabled{
+  opacity:0.35;
+  cursor:not-allowed;
+}
+
 [data-app="mdse"] .miniBtn.primary{
   border-color:#111;
   background:#111;
@@ -1578,9 +1583,10 @@ miniPromote.type = "button";
 miniPromote.className = "miniBtn";
 miniPromote.title = "Promote branch (H-1)";
 miniPromote.textContent = "←";
+miniPromote.disabled = n.level <= 1;
 miniPromote.addEventListener("click", (e) => {
   e.stopPropagation();
-  changeLevel(n.id, -1);
+  if (n.level > 1) changeLevel(n.id, -1);
 });
 
 const miniDemote = document.createElement("button");
@@ -1588,11 +1594,12 @@ miniDemote.type = "button";
 miniDemote.className = "miniBtn";
 miniDemote.title = "Demote branch (H+1)";
 miniDemote.textContent = "→";
+miniDemote.disabled = n.level >= 6;
 miniDemote.addEventListener("click", (e) => {
   e.stopPropagation();
-  changeLevel(n.id, +1);
+  if (n.level < 6) changeLevel(n.id, +1);
 });
-
+        
 // APPEND
 // miniTools.append(miniBody, miniAdd);
 miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
