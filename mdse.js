@@ -1697,7 +1697,7 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
         // else tools.append(bodyBtn, dup, add, paste, left, right, del);
 
         // if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
-        j// else tools.append(dup, paste, left, right, del);
+        // else tools.append(dup, paste, left, right, del);
 
 if (n.level < 6) tools.append(dup, paste, tagKids, untagKids, del);
 else tools.append(dup, paste, del);
