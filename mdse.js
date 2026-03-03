@@ -359,6 +359,11 @@
   padding: 12px 14px;
 }
 
+[data-app="mdse"] .title{
+  font-weight: 1000;
+  letter-spacing: .2px;
+}
+
 // STOP TITLE ENLARGE 
 
 [data-app="mdse"] .tools{
