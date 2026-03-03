@@ -355,7 +355,7 @@
 
 [data-app="mdse"] .title{
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 950;
   padding: 12px 14px;
 }
 
