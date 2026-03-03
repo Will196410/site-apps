@@ -219,6 +219,9 @@
   gap:6px;
   align-items:center;
   justify-content:flex-end;
+}
+
+[data-app="mdse"] .miniTools{
   white-space: nowrap;
 }
 
@@ -276,11 +279,10 @@
   min-height: 44px;
   background: #fbfbfb;
   display:block;
-  grid-column: 1 / -1;   /* full width */
 }
 
 [data-app="mdse"] .title{
-  grid-column: 1 / -1;
+  grid-column: 1 / -1;   /* full width */
 }
 
 [data-app="mdse"] .tools{
