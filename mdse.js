@@ -1588,6 +1588,40 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
       markChangedFull();
     }
 
+    // START DELETE AND PROMOTE
+
+function deleteAndPromoteChildren(id) {
+  const idx = indexById(id);
+  if (idx < 0) return;
+
+  const parentLevel = nodes[idx].level;
+
+  // Get full subtree indices
+  const fam = familyIndices(idx);
+
+  if (fam.length <= 1) {
+    // No children → just delete normally
+    deleteBranch(id);
+    return;
+  }
+
+  // Promote only direct children
+  for (let i = idx + 1; i < nodes.length; i++) {
+    if (nodes[i].level <= parentLevel) break;
+
+    if (nodes[i].level === parentLevel + 1) {
+      nodes[i].level -= 1;
+    }
+  }
+
+  // Remove just the parent node
+  nodes.splice(idx, 1);
+
+  markChangedFull();
+}
+    
+    // END DELETE AND PROMOTE
+
     function toggleMove(id) {
       pushUndo("move");
       if (!sourceId) {
@@ -1911,13 +1945,28 @@ paste.title = "Paste clipboard markdown as a sibling node after this branch (lev
         del.title = "Delete branch";
         del.addEventListener("click", () => deleteBranch(n.id));
 
+// START DELETE AND PROMOTE 
+
+const unwrap = document.createElement("button");
+unwrap.type = "button";
+unwrap.textContent = "⇪ Unwrap";
+unwrap.title = "Delete this heading and promote its children";
+unwrap.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!confirm("Delete this heading and promote its children?")) return;
+  deleteAndPromoteChildren(n.id);
+});
+        
+// STOP DELETE AND PROMOTE 
+
+        
         // if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
         // else tools.append(bodyBtn, dup, add, paste, left, right, del);
 
         // if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
         // else tools.append(dup, paste, left, right, del);
 
-if (n.level < 6) tools.append(dup, paste, tagKids, untagKids, del);
+if (n.level < 6) tools.append(dup, paste, tagKids, untagKids, unwrap, del);
 else tools.append(dup, paste, del);
         
 
