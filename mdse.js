@@ -264,7 +264,22 @@
   background:#fff;
   user-select: none;
 }
+/* Compact structural controls */
+[data-app="mdse"] .hdr .pill{
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 10px;
+}
 [data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
+[data-app="mdse"] .hdr .pill.gray{
+  border: 1px solid rgba(0,0,0,.15);
+  padding: 4px 6px;
+  font-size: 11px;
+}
+[data-app="mdse"] .hdr .pill:not(.gray){
+  padding: 4px 10px;
+  font-size: 12px;
+}
 
 [data-app="mdse"] .title{
   width: 100% !important;
