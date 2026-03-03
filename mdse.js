@@ -677,6 +677,29 @@ function undo() {
       return familyIndices(idx).length > 1;
     }
 
+    // START CHILD NODE COUNTS
+
+function countDirectChildren(idx) {
+  if (idx < 0 || idx >= nodes.length) return 0;
+  const parentLevel = nodes[idx].level;
+  let count = 0;
+
+  for (let i = idx + 1; i < nodes.length; i++) {
+    const lvl = nodes[i].level;
+    if (lvl <= parentLevel) break;
+    if (lvl === parentLevel + 1) count++;
+  }
+
+  return count;
+}
+
+function countSubtree(idx) {
+  if (idx < 0 || idx >= nodes.length) return 0;
+  return familyIndices(idx).length - 1; // exclude self
+}
+    
+    // STOP CHILD NODE COUNTS
+
     // ---- Bulk tag helpers (DIRECT CHILDREN ONLY) ----
     function normaliseNewlines(s) {
       return (s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -1611,6 +1634,24 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
         lvl.className = "pill";
         lvl.textContent = `H${n.level}`;
 
+// START COUNTER BADGE
+
+        const childCount = countDirectChildren(idx);
+const subtreeCount = countSubtree(idx);
+
+const meta = document.createElement("div");
+meta.className = "pill gray";
+meta.style.fontSize = "11px";
+// meta.textContent = `(${childCount},${subtreeCount})`;
+if (subtreeCount > 0) {
+  meta.textContent = `(${childCount},${subtreeCount})`;
+} else {
+  meta.textContent = "";
+}
+meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
+        
+// STOP COUNTER BADGE
+        
 // PASTE START MINITOOLS
 
 // --- MINI tools (always visible) ---
@@ -1782,7 +1823,8 @@ else tools.append(dup, paste, del);
         // hdr.append(pin, col, lvl, title, tools);
         // hdr.append(pin, col, lvl, tools, title);
         // hdr.append(pin, col, lvl, title);
-        hdr.append(pin, col, lvl, miniTools, title);
+        // hdr.append(pin, col, lvl, miniTools, title);
+        hdr.append(pin, col, lvl, meta, miniTools, title);
         node.appendChild(hdr);
 
         // Body area: show if toggled, OR reveal+body-match-only while searching
