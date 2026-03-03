@@ -258,7 +258,7 @@
 [data-app="mdse"] .pill{
   border:2px solid #111;
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: 4px 5px;
   font-weight: 900;
   font-size: 13px;
   background:#fff;
