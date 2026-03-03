@@ -1840,6 +1840,7 @@ else tools.append(dup, paste, del);
         // hdr.append(pin, col, lvl, tools, title);
         // hdr.append(pin, col, lvl, title);
         // hdr.append(pin, col, lvl, miniTools, title);
+        // hdr.append(pin, col, lvl, meta, miniTools, title);
         hdr.append(pin, col, lvl, meta, miniTools, title);
         node.appendChild(hdr);
 
