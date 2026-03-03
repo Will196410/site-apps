@@ -436,6 +436,17 @@
   text-align:right;
 }
 
+// NODE COUNTS START
+
+[data-app="mdse"] .nodeMeta{
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+// NODE COUTNS STOP
 
 /* Hide tools until node is active */
 // [data-app="mdse"] .tools{ display:none; }
@@ -1640,8 +1651,13 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 const subtreeCount = countSubtree(idx);
 
 const meta = document.createElement("div");
-meta.className = "pill gray";
-meta.style.fontSize = "11px";
+// meta.className = "pill gray";
+// meta.style.fontSize = "11px";
+meta.className = "nodeMeta";
+meta.textContent = subtreeCount > 0 ? `(${childCount},${subtreeCount})` : "";
+meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
+
+        
 // meta.textContent = `(${childCount},${subtreeCount})`;
 if (subtreeCount > 0) {
   meta.textContent = `(${childCount},${subtreeCount})`;
