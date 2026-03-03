@@ -360,7 +360,7 @@
 }
 
 [data-app="mdse"] .title{
-  font-weight: 1000;
+  font-weight: 950;
   letter-spacing: .2px;
 }
 
