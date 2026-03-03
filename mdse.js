@@ -280,6 +280,20 @@
   padding: 4px 10px;
   font-size: 12px;
 }
+[data-app="mdse"] .hdr .pill:not(.gray){
+  padding: 4px 12px;
+  font-size: 13px;
+  border: 3px solid #111;
+}
+/* Structural controls — compact but crisp */
+[data-app="mdse"] .hdr .pill.gray{
+  padding: 2px 6px;
+  font-size: 12px;
+  border: 2px solid rgba(0,0,0,.35);
+  background: #fff;
+  min-width: 28px;
+  text-align: center;
+}
 
 [data-app="mdse"] .title{
   width: 100% !important;
@@ -1860,7 +1874,8 @@ else tools.append(dup, paste, del);
         // hdr.append(pin, col, lvl, title);
         // hdr.append(pin, col, lvl, miniTools, title);
         // hdr.append(pin, col, lvl, meta, miniTools, title);
-        hdr.append(pin, col, lvl, meta, miniTools, title);
+        // hdr.append(pin, col, lvl, meta, miniTools, title);
+        hdr.append(lvl, pin, col, meta, miniTools, title);
         node.appendChild(hdr);
 
         // Body area: show if toggled, OR reveal+body-match-only while searching
