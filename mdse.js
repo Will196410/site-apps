@@ -1591,6 +1591,8 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     // START DELETE AND PROMOTE
 
 function deleteAndPromoteChildren(id) {
+  pushUndo("unwrap");   // <-- ADD THIS FIRST
+  
   const idx = indexById(id);
   if (idx < 0) return;
 
