@@ -196,7 +196,7 @@
 /* iPad/Safari flex squeeze fix: grid header */
 [data-app="mdse"] .hdr{
   display: grid !important;
-  grid-template-columns: auto auto auto 1fr;
+  grid-template-columns: auto auto auto auto auto; /* pin, col, Hx, (2,5), miniTools */
   column-gap: 10px;
   row-gap: 8px;
   align-items: start;
@@ -219,6 +219,7 @@
   gap:6px;
   align-items:center;
   justify-content:flex-end;
+  white-space: nowrap;
 }
 
 [data-app="mdse"] .miniBtn{
@@ -275,6 +276,7 @@
   min-height: 44px;
   background: #fbfbfb;
   display:block;
+  grid-column: 1 / -1;   /* full width */
 }
 
 [data-app="mdse"] .title{
