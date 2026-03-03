@@ -295,6 +295,43 @@
   text-align: center;
 }
 
+// REDUCE TOOLBAR IMPACT
+
+/* Make structural row compact */
+[data-app="mdse"] .hdr{
+  align-items: center;
+}
+
+[data-app="mdse"] .hdr .pill{
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+/* Make structural row compact */
+[data-app="mdse"] .hdr{
+  align-items: center;
+}
+
+[data-app="mdse"] .hdr .pill{
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+/* Make structural row compact */
+[data-app="mdse"] .hdr{
+  align-items: center;
+}
+
+[data-app="mdse"] .hdr .pill{
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+// REDUCE TOOLBAR IMPACT
+
 [data-app="mdse"] .title{
   width: 100% !important;
   min-width: 240px !important;
@@ -313,6 +350,16 @@
 [data-app="mdse"] .title{
   grid-column: 1 / -1;   /* full width */
 }
+
+// START TITLE ENLARFGE
+
+[data-app="mdse"] .title{
+  font-size: 17px;
+  font-weight: 900;
+  padding: 12px 14px;
+}
+
+// STOP TITLE ENLARGE 
 
 [data-app="mdse"] .tools{
   display:flex;
