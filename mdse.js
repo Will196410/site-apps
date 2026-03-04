@@ -1808,26 +1808,13 @@ const meta = document.createElement("div");
 // meta.className = "pill gray";
 // meta.style.fontSize = "11px";
 meta.className = "nodeMeta";
-// meta.textContent = subtreeCount > 0 ? `(${childCount},${subtreeCount})` : "";
         meta.textContent =
   subtreeCount > 0
     ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
     : `n(${childCount},0)`;
         //
-meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 
-        
-// meta.textContent = `(${childCount},${subtreeCount})`;
-if (subtreeCount > 0) {
-  meta.textContent = `(${childCount},${subtreeCount})`;
-} else {
-  meta.textContent = "";
-}
 meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
-        
-// STOP COUNTER BADGE
-        
-// PASTE START MINITOOLS
 
 // --- MINI tools (always visible) ---
 const miniTools = document.createElement("div");
