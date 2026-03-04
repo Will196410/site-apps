@@ -1705,9 +1705,19 @@ function deleteAndPromoteChildren(id) {
 
 function countWords(text) {
   if (!text) return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
 
+  const cleaned = text
+    .split("\n")
+    .filter(line => !line.trim().startsWith("%% tag"))
+    .join(" ");
+
+  return cleaned
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+    
 function subtreeWordCount(idx) {
   const fam = familyIndices(idx);
   let total = 0;
