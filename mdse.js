@@ -1808,12 +1808,11 @@ const meta = document.createElement("div");
 // meta.className = "pill gray";
 // meta.style.fontSize = "11px";
 meta.className = "nodeMeta";
-        meta.textContent =
+meta.textContent =
   subtreeCount > 0
     ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
-    : `n(${childCount},0)`;
-        //
-
+    : `(${childCount},0 • ${wordCount}w)`;
+/
 meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 
 // --- MINI tools (always visible) ---
