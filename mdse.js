@@ -1812,7 +1812,7 @@ meta.className = "nodeMeta";
         meta.textContent =
   subtreeCount > 0
     ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
-    : `(${childCount},0)`;
+    : `n(${childCount},0)`;
         //
 meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 
