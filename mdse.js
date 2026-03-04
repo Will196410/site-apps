@@ -1812,7 +1812,7 @@ meta.textContent =
   subtreeCount > 0
     ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
     : `(${childCount},0 • ${wordCount}w)`;
-/
+
 meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 
 // --- MINI tools (always visible) ---
