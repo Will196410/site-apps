@@ -1701,6 +1701,29 @@ function deleteAndPromoteChildren(id) {
       saveDebounced();
     }
 
+// START WORDCOUNT 
+
+function countWords(text) {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function subtreeWordCount(idx) {
+  const fam = familyIndices(idx);
+  let total = 0;
+
+  for (const i of fam) {
+    const n = nodes[i];
+    total += countWords(n.title);
+    total += countWords(n.body);
+  }
+
+  return total;
+}
+    
+// STOP WORDCOUNT
+
+    
     // ---- Render (Structure tab) ----
     function renderStructure() {
       const scrollPos = window.scrollY;
@@ -1778,13 +1801,19 @@ function deleteAndPromoteChildren(id) {
 // START COUNTER BADGE
 
         const childCount = countDirectChildren(idx);
-const subtreeCount = countSubtree(idx);
+        const subtreeCount = countSubtree(idx);
+        const wordCount = subtreeWordCount(idx);
 
 const meta = document.createElement("div");
 // meta.className = "pill gray";
 // meta.style.fontSize = "11px";
 meta.className = "nodeMeta";
-meta.textContent = subtreeCount > 0 ? `(${childCount},${subtreeCount})` : "";
+// meta.textContent = subtreeCount > 0 ? `(${childCount},${subtreeCount})` : "";
+        meta.textContent =
+  subtreeCount > 0
+    ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
+    : `(${childCount},0)`;
+        //
 meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 
         
