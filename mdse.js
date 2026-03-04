@@ -1803,7 +1803,7 @@ function subtreeWordCount(idx) {
         const childCount = countDirectChildren(idx);
         const subtreeCount = countSubtree(idx);
         const wordCount = subtreeWordCount(idx);
-
+console.log("wordCount", wordCount) ;
 const meta = document.createElement("div");
 // meta.className = "pill gray";
 // meta.style.fontSize = "11px";
