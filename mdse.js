@@ -1590,6 +1590,14 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 
     // START DELETE AND PROMOTE
 
+function titleToTag(title) {
+  return (title || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s:-]/g, "")
+    .replace(/\s+/g, "-");
+}
+    
 function deleteAndPromoteChildren(id) {
   pushUndo("unwrap");
 
