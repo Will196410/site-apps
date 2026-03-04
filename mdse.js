@@ -1591,32 +1591,33 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     // START DELETE AND PROMOTE
 
 function deleteAndPromoteChildren(id) {
-  pushUndo("unwrap");   // <-- ADD THIS FIRST
-  
+  pushUndo("unwrap");
+
   const idx = indexById(id);
   if (idx < 0) return;
 
-  const parentLevel = nodes[idx].level;
+  const parent = nodes[idx];
+  const L = parent.level;
 
-  // Get full subtree indices
-  const fam = familyIndices(idx);
+  const parentTitle = (parent.title || "").trim();
+  const tagPayload = parentTitle ? ("seq:" + titleToTag(parentTitle)) : "";
 
-  if (fam.length <= 1) {
-    // No children → just delete normally
-    deleteBranch(id);
-    return;
-  }
-
-  // Promote only direct children
+  // Walk subtree until we exit it
   for (let i = idx + 1; i < nodes.length; i++) {
-    if (nodes[i].level <= parentLevel) break;
+    const oldLevel = nodes[i].level;
+    if (oldLevel <= L) break;
 
-    if (nodes[i].level === parentLevel + 1) {
-      nodes[i].level -= 1;
+    // Tag only direct children of wrapper (before promotion)
+    if (tagPayload && oldLevel === L + 1) {
+      nodes[i].body = addTagLineToBody(nodes[i].body || "", tagPayload);
+      nodes[i].tags = extractTagsFromBody(nodes[i].body);
     }
+
+    // Promote every descendant by 1 (undo the temporary demotion)
+    nodes[i].level = clamp(oldLevel - 1, 1, 6);
   }
 
-  // Remove just the parent node
+  // Remove wrapper itself
   nodes.splice(idx, 1);
 
   markChangedFull();
