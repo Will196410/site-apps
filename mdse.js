@@ -1106,33 +1106,61 @@ function countSubtree(idx) {
     }
 
     // ---- Markdown parse / export ----
+/ * Gemini version of parseMarkdown */
     function parseMarkdown(text) {
-      const lines = (text || "").split("\n");
-      const out = [];
-      let current = null;
+  const lines = (text || "").split("\n");
+  const out = [];
+  let current = null;
 
-      for (const line of lines) {
-        const m = line.match(/^(#{1,6})\s+(.*)/);
-        if (m) {
-          current = {
-            id: uid(),
-            level: m[1].length,
-            title: m[2] || "",
-            body: "",
-            isCollapsed: false,
-            showBody: false,
-            tags: [],
-          };
-          out.push(current);
-        } else if (current) {
-          current.body += line + "\n";
-        }
+  for (const line of lines) {
+    // Regex to find Markdown headings (H1 - H6)
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
+
+    if (headingMatch) {
+      // 1. Found a heading: Create a new node
+      current = {
+        id: uid(),
+        level: headingMatch[1].length,
+        title: headingMatch[2].trim() || "(Untitled)",
+        body: "",
+        isCollapsed: false,
+        showBody: false,
+        tags: [],
+      };
+      out.push(current);
+    } else {
+      // 2. Found non-heading text:
+      // If we haven't hit a heading yet, create a Preamble node so data isn't lost
+      if (!current && line.trim().length > 0) {
+        current = {
+          id: uid(),
+          level: 1, 
+          title: "(Start / Preamble)",
+          body: "",
+          isCollapsed: false,
+          showBody: true,
+          tags: [],
+        };
+        out.push(current);
       }
 
-      out.forEach((n) => (n.tags = extractTagsFromBody(n.body)));
-      return out;
+      // 3. Append the line to the current node's body
+      if (current) {
+        current.body += line + "\n";
+      }
     }
+  }
 
+  // Final cleanup pass
+  out.forEach((n) => {
+    n.body = n.body.trim();
+    n.tags = extractTagsFromBody(n.body);
+  });
+
+  return out;
+}
+
+    
     function toMarkdown() {
       return nodes
         .map((n) => {
@@ -1810,7 +1838,7 @@ function subtreeWordCount(idx) {
         const childCount = countDirectChildren(idx);
         const subtreeCount = countSubtree(idx);
         const wordCount = subtreeWordCount(idx);
-console.log("wordCount", wordCount) ;
+
 const meta = document.createElement("div");
 // meta.className = "pill gray";
 // meta.style.fontSize = "11px";
