@@ -1535,52 +1535,45 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
       rebuildTagUIDebounced();
       saveDebounced();
     }
-    */ 
-
-function updateNodeStatsUI(id) {
+    */
+    
+function updateNodeStatsUI(id, liveBodyCount = null) {
   const idx = indexById(id);
   if (idx < 0) return;
   const nodeEl = canvas.querySelector(`[data-node-id="${id}"]`);
   if (!nodeEl) return;
-  
   const metaEl = nodeEl.querySelector(".nodeMeta");
   if (!metaEl) return;
 
-  // KEY FIX: If we are currently typing in THIS node, 
-  // use the live textarea value for the word count
-  const activeTA = nodeEl.querySelector('.body textarea');
-  let wordCount;
-  
-  if (activeTA && document.activeElement === activeTA) {
-      // Calculate subtree count normally, but swap the current node's 
-      // body for the live text so the count ticks up instantly.
-      const fam = familyIndices(idx);
-      wordCount = 0;
-      for (const i of fam) {
-        const n = nodes[i];
-        wordCount += countWords(n.title);
-        wordCount += (i === idx) ? countWords(activeTA.value) : countWords(n.body);
-      }
-  } else {
-      wordCount = subtreeWordCount(idx);
+  const fam = familyIndices(idx);
+  let totalWords = 0;
+
+  for (const i of fam) {
+    const node = nodes[i];
+    totalWords += countWords(node.title);
+    // If this is the active node and we have a live count, use it. 
+    // Otherwise, use the stored body.
+    if (i === idx && liveBodyCount !== null) {
+      totalWords += liveBodyCount;
+    } else {
+      totalWords += countWords(node.body);
+    }
   }
 
   const childCount = countDirectChildren(idx);
   const subtreeCount = countSubtree(idx);
 
   metaEl.textContent = subtreeCount > 0
-    ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
-    : `(${childCount},0 • ${wordCount}w)`;
+    ? `(${childCount},${subtreeCount} • ${totalWords.toLocaleString()}w)`
+    : `(${childCount},0 • ${totalWords}w)`;
 }
 
-    
-function markChangedTyping(id) {
+function markChangedTyping(id, liveBodyCount = null) {
   setCopiedFlag(false);
 
-  // 1. Surgical update: Update only the text of the count badge
-  if (id) updateNodeStatsUI(id);
+  // Pass the live count to the surgical update
+  if (id) updateNodeStatsUI(id, liveBodyCount);
 
-  // 2. Heavy Lifting (Debounced): Search & Tags
   if (tagTimer) clearTimeout(tagTimer);
   tagTimer = setTimeout(() => {
     tagTimer = null;
@@ -1589,11 +1582,9 @@ function markChangedTyping(id) {
     if (activeTab === "search") renderSearchResults();
   }, 450);
 
-  // 3. Persistence (Debounced)
   saveDebounced();
 }
-
-
+    
     function toggleBranchCollapse(id) {
       pushUndo("collapse");
       const idx = indexById(id);
@@ -2127,21 +2118,14 @@ else tools.append(dup, paste, del);
         bodyTA.addEventListener("keydown", stop);
         bodyTA.addEventListener("keypress", stop);
         bodyTA.addEventListener("keyup", stop);
-/*
         bodyTA.addEventListener("input", () => {
           n.body = bodyTA.value;
           n.tags = extractTagsFromBody(n.body);
-          markChangedTyping();
-        });
-*/
-bodyTA.addEventListener("input", () => {
-  n.body = bodyTA.value;
-  n.tags = extractTagsFromBody(n.body);
   
-  // Update data and local badge only
-  markChangedTyping(n.id);
-});
-
+          // Calculate this node's words locally and pass it to the surgical updater
+          const currentBodyWords = countWords(bodyTA.value);
+          markChangedTyping(n.id, currentBodyWords);
+        });
         
         bodyTA.addEventListener("click", (e) => e.stopPropagation());
         
