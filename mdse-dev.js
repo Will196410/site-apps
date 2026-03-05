@@ -1522,20 +1522,20 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 
 // START WORDCOUNT 
 
-function countWords(text) {
-  if (!text) return 0;
-
-  const cleaned = text
-    .split("\n")
-    .filter(line => !line.trim().startsWith("%% tag"))
-    .join(" ");
-
-  return cleaned
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .length;
+  function countWords(text) {
+  if (!text || typeof text !== 'string') return 0;
+  
+  // Remove tag lines and trim whitespace
+  const lines = text.split('\n');
+  const filtered = lines.filter(line => !line.trim().startsWith('%% tag'));
+  const cleanText = filtered.join(' ').trim();
+  
+  if (!cleanText) return 0;
+  
+  // Split by any whitespace and count the resulting array length
+  return cleanText.split(/\s+/).filter(Boolean).length;
 }
+  
     
 function subtreeWordCount(idx) {
   const fam = familyIndices(idx);
