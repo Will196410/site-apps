@@ -1172,25 +1172,15 @@ function countSubtree(idx) {
     }
 
     // ---- Clipboard paste as sibling ----
-    
-/* safer version */
-async function readClipboardText() {
-  // 1. Try the modern API first
-  if (navigator.clipboard && navigator.clipboard.readText) {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) return text;
-    } catch (err) {
-      console.warn("Clipboard API failed, trying fallback...", err);
-    }
+async function readClipboardTextFallback() {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    // iPad Safari can be picky; fallback lets you paste manually.
+    return prompt("Clipboard read blocked. Paste the markdown here:","") || "";
   }
-
-  // 2. Fallback: Directly prompt the user. 
-  // This works on iPad because prompt() is a fresh user interaction.
-  return prompt("Paste your Markdown here:", "") || "";
 }
 
-    
 function normalizeClipboardToLevel(clip, targetLevel) {
   const text = (clip || "").replace(/\r\n?/g, "\n").trim();
   if (!text) return "";
@@ -1226,37 +1216,30 @@ function normalizeClipboardToLevel(clip, targetLevel) {
   return adjusted.join("\n").trimEnd();
 }
 
-    /* safer version */
 async function pasteClipboardAsSiblingAfter(nodeId) {
-  // Get the data IMMEDIATELY
-  const clip = await readClipboardText();
-  
-  if (!clip || !clip.trim()) {
-    return; // User cancelled or clipboard was empty
-  }
-
   pushUndo("paste");
   const idx = indexById(nodeId);
   if (idx < 0) return;
 
+  const clip = await readClipboardTextFallback();
+  if (!clip.trim()) return;
+
   const targetLevel = nodes[idx].level;
-  
-  // Normalize the levels (H1 becomes H2 if the target is H2, etc.)
   const adjusted = normalizeClipboardToLevel(clip, targetLevel);
-  
+  if (!adjusted.trim()) return;
+
   const newNodes = parseMarkdown(adjusted);
   if (!newNodes.length) return;
 
-  // Find the end of the current branch to insert after it
+  // Insert AFTER this node’s whole branch
   const fam = familyIndices(idx);
   const insertAt = fam[fam.length - 1] + 1;
 
   nodes.splice(insertAt, 0, ...newNodes);
 
-  lastCreatedId = newNodes[0].id; 
+  lastCreatedId = newNodes[0].id; // focus it after render
   markChangedFull();
 }
-
 
     // ---- Matches ----
     function updateCount() {
@@ -1882,10 +1865,6 @@ miniBody.className = "miniBtn" + (miniHasBody ? " primary" : "");
 miniBody.title = miniHasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text";
 miniBody.textContent = "📝";
 // miniBody.addEventListener("click", () => toggleBody(n.id));
-miniBody.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleBody(n.id);
-});
 
 // Mini: add sibling
 const miniAdd = document.createElement("button");
@@ -1894,6 +1873,11 @@ miniAdd.className = "miniBtn";
 miniAdd.title = "Add a new sibling after this branch";
 miniAdd.textContent = "＋";
 // miniAdd.addEventListener("click", () => addNewAfter(n.id));
+
+miniBody.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleBody(n.id);
+});
 
 miniAdd.addEventListener("click", (e) => {
   e.stopPropagation();
