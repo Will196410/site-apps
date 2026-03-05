@@ -1537,23 +1537,43 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
     */ 
 
-    function updateNodeStatsUI(id) {
+function updateNodeStatsUI(id) {
   const idx = indexById(id);
   if (idx < 0) return;
   const nodeEl = canvas.querySelector(`[data-node-id="${id}"]`);
   if (!nodeEl) return;
+  
   const metaEl = nodeEl.querySelector(".nodeMeta");
   if (!metaEl) return;
 
+  // KEY FIX: If we are currently typing in THIS node, 
+  // use the live textarea value for the word count
+  const activeTA = nodeEl.querySelector('.body textarea');
+  let wordCount;
+  
+  if (activeTA && document.activeElement === activeTA) {
+      // Calculate subtree count normally, but swap the current node's 
+      // body for the live text so the count ticks up instantly.
+      const fam = familyIndices(idx);
+      wordCount = 0;
+      for (const i of fam) {
+        const n = nodes[i];
+        wordCount += countWords(n.title);
+        wordCount += (i === idx) ? countWords(activeTA.value) : countWords(n.body);
+      }
+  } else {
+      wordCount = subtreeWordCount(idx);
+  }
+
   const childCount = countDirectChildren(idx);
   const subtreeCount = countSubtree(idx);
-  const wordCount = subtreeWordCount(idx);
 
   metaEl.textContent = subtreeCount > 0
     ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
     : `(${childCount},0 • ${wordCount}w)`;
 }
 
+    
 function markChangedTyping(id) {
   setCopiedFlag(false);
 
