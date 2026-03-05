@@ -7,7 +7,7 @@
   window.SiteApps.register =
     window.SiteApps.register ||
     function (name, initFn) {
-      window.SitefApps.registry[name] = initFn;
+      window.SiteApps.registry[name] = initFn;
     };
 
   const STYLE_ID = "siteapps-mdse-style";
@@ -212,7 +212,7 @@
   justify-content: flex-start;
 }
 
-// PASTE START
+/* PASTE START */
 
 [data-app="mdse"] .miniTools{
   display:flex;
@@ -246,7 +246,7 @@
   color:#fff;
 }
 
-// PASTE STOP
+/* PASTE STOP */
 
 
 /* Optional: subtle highlight for the active node */
@@ -295,7 +295,7 @@
   text-align: center;
 }
 
-// REDUCE TOOLBAR IMPACT
+/* REDUCE TOOLBAR IMPACT */
 
 /* Make structural row compact */
 [data-app="mdse"] .hdr{
@@ -330,7 +330,7 @@
   line-height: 1.2;
 }
 
-// REDUCE TOOLBAR IMPACT
+/* REDUCE TOOLBAR IMPACT */
 
 [data-app="mdse"] .title{
   width: 100% !important;
@@ -351,7 +351,7 @@
   grid-column: 1 / -1;   /* full width */
 }
 
-// START TITLE ENLARFGE
+/* START TITLE ENLARFGE */
 
 [data-app="mdse"] .title{
   font-size: 17px;
@@ -364,7 +364,7 @@
   letter-spacing: .2px;
 }
 
-// STOP TITLE ENLARGE 
+/* STOP TITLE ENLARGE */
 
 [data-app="mdse"] .tools{
   display:flex;
@@ -521,7 +521,7 @@
   text-align:right;
 }
 
-// NODE COUNTS START
+/* NODE COUNTS START */
 
 [data-app="mdse"] .nodeMeta{
   font-size: 11px;
@@ -531,12 +531,9 @@
   white-space: nowrap;
 }
 
-// NODE COUTNS STOP
+/* NODE COUTNS STOP */
 
 /* Hide tools until node is active */
-// [data-app="mdse"] .tools{ display:none; }
-// [data-app="mdse"] .node.activeNode .tools{ display:flex; }
-/* Hide tools until node is active (MUST be last) */
 [data-app="mdse"] .node .tools{ display:none !important; }
 [data-app="mdse"] .node.activeNode .tools{ display:flex !important; }
 
