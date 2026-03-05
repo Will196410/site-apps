@@ -1528,12 +1528,51 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
       saveDebounced();
     }
 
+    /* 
     function markChangedTyping() {
       setCopiedFlag(false);
       if (searchQuery.trim()) rebuildMatchesDebounced();
       rebuildTagUIDebounced();
       saveDebounced();
     }
+    */ 
+
+    function updateNodeStatsUI(id) {
+  const idx = indexById(id);
+  if (idx < 0) return;
+  const nodeEl = canvas.querySelector(`[data-node-id="${id}"]`);
+  if (!nodeEl) return;
+  const metaEl = nodeEl.querySelector(".nodeMeta");
+  if (!metaEl) return;
+
+  const childCount = countDirectChildren(idx);
+  const subtreeCount = countSubtree(idx);
+  const wordCount = subtreeWordCount(idx);
+
+  metaEl.textContent = subtreeCount > 0
+    ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
+    : `(${childCount},0 • ${wordCount}w)`;
+}
+
+function markChangedTyping(id) {
+  setCopiedFlag(false);
+
+  // 1. Surgical update: Update only the text of the count badge
+  if (id) updateNodeStatsUI(id);
+
+  // 2. Heavy Lifting (Debounced): Search & Tags
+  if (tagTimer) clearTimeout(tagTimer);
+  tagTimer = setTimeout(() => {
+    tagTimer = null;
+    if (searchQuery.trim()) rebuildMatchesNoRender(); 
+    if (activeTab === "tags") rebuildTagUI();
+    if (activeTab === "search") renderSearchResults();
+  }, 450);
+
+  // 3. Persistence (Debounced)
+  saveDebounced();
+}
+
 
     function toggleBranchCollapse(id) {
       pushUndo("collapse");
@@ -1922,12 +1961,23 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
         });
+        /*
         title.addEventListener("input", () => {
           n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
           if (title.value !== n.title) title.value = n.title;
           autoResizeTA(title);
           markChangedTyping();
         });
+        */
+        title.addEventListener("input", () => {
+          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
+          if (title.value !== n.title) title.value = n.title;
+          autoResizeTA(title);
+  
+          // Update data and local badge only
+          markChangedTyping(n.id); 
+        });
+
 
         const tools = document.createElement("div");
         tools.className = "tools";
@@ -2057,13 +2107,22 @@ else tools.append(dup, paste, del);
         bodyTA.addEventListener("keydown", stop);
         bodyTA.addEventListener("keypress", stop);
         bodyTA.addEventListener("keyup", stop);
-
+/*
         bodyTA.addEventListener("input", () => {
           n.body = bodyTA.value;
           n.tags = extractTagsFromBody(n.body);
           markChangedTyping();
         });
+*/
+bodyTA.addEventListener("input", () => {
+  n.body = bodyTA.value;
+  n.tags = extractTagsFromBody(n.body);
+  
+  // Update data and local badge only
+  markChangedTyping(n.id);
+});
 
+        
         bodyTA.addEventListener("click", (e) => e.stopPropagation());
         
         // bodyWrap.appendChild(bodyTA);
