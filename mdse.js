@@ -1552,7 +1552,7 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
 
     // 2. Save to localStorage after a 1000ms pause
     saveDebounced();
-  §}
+  }
 
 
     function markChangedTyping() {
