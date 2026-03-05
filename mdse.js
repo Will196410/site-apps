@@ -1172,15 +1172,25 @@ function countSubtree(idx) {
     }
 
     // ---- Clipboard paste as sibling ----
-async function readClipboardTextFallback() {
-  try {
-    return await navigator.clipboard.readText();
-  } catch {
-    // iPad Safari can be picky; fallback lets you paste manually.
-    return prompt("Clipboard read blocked. Paste the markdown here:","") || "";
+    
+/* safer version */
+async function readClipboardText() {
+  // 1. Try the modern API first
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) return text;
+    } catch (err) {
+      console.warn("Clipboard API failed, trying fallback...", err);
+    }
   }
+
+  // 2. Fallback: Directly prompt the user. 
+  // This works on iPad because prompt() is a fresh user interaction.
+  return prompt("Paste your Markdown here:", "") || "";
 }
 
+    
 function normalizeClipboardToLevel(clip, targetLevel) {
   const text = (clip || "").replace(/\r\n?/g, "\n").trim();
   if (!text) return "";
@@ -1216,30 +1226,38 @@ function normalizeClipboardToLevel(clip, targetLevel) {
   return adjusted.join("\n").trimEnd();
 }
 
+    /* safer version */
 async function pasteClipboardAsSiblingAfter(nodeId) {
+  // Get the data IMMEDIATELY
+  const clip = await readClipboardText();
+  pushUndo("paste") ;
+  
+  if (!clip || !clip.trim()) {
+    return; // User cancelled or clipboard was empty
+  }
+
   pushUndo("paste");
   const idx = indexById(nodeId);
   if (idx < 0) return;
 
-  const clip = await readClipboardTextFallback();
-  if (!clip.trim()) return;
-
   const targetLevel = nodes[idx].level;
+  
+  // Normalize the levels (H1 becomes H2 if the target is H2, etc.)
   const adjusted = normalizeClipboardToLevel(clip, targetLevel);
-  if (!adjusted.trim()) return;
-
+  
   const newNodes = parseMarkdown(adjusted);
   if (!newNodes.length) return;
 
-  // Insert AFTER this node’s whole branch
+  // Find the end of the current branch to insert after it
   const fam = familyIndices(idx);
   const insertAt = fam[fam.length - 1] + 1;
 
   nodes.splice(insertAt, 0, ...newNodes);
 
-  lastCreatedId = newNodes[0].id; // focus it after render
+  lastCreatedId = newNodes[0].id; 
   markChangedFull();
 }
+
 
     // ---- Matches ----
     function updateCount() {
