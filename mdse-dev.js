@@ -1520,6 +1520,39 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
       }
     }
 
+// START WORDCOUNT 
+
+function countWords(text) {
+  if (!text) return 0;
+
+  const cleaned = text
+    .split("\n")
+    .filter(line => !line.trim().startsWith("%% tag"))
+    .join(" ");
+
+  return cleaned
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+    
+function subtreeWordCount(idx) {
+  const fam = familyIndices(idx);
+  let total = 0;
+
+  for (const i of fam) {
+    const n = nodes[i];
+    total += countWords(n.title);
+    total += countWords(n.body);
+  }
+
+  return total;
+}
+    
+// STOP WORDCOUNT
+
+    
     // ---- Actions ----
     function markChangedFull() {
       setCopiedFlag(false);
@@ -1536,12 +1569,15 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
       saveDebounced();
     }
     */
-    
+
 function updateNodeStatsUI(id, liveBodyCount = null) {
   const idx = indexById(id);
   if (idx < 0) return;
+  
+  // Find the specific node element in the DOM
   const nodeEl = canvas.querySelector(`[data-node-id="${id}"]`);
   if (!nodeEl) return;
+  
   const metaEl = nodeEl.querySelector(".nodeMeta");
   if (!metaEl) return;
 
@@ -1550,9 +1586,10 @@ function updateNodeStatsUI(id, liveBodyCount = null) {
 
   for (const i of fam) {
     const node = nodes[i];
+    // TITLE: Always use the current data
     totalWords += countWords(node.title);
-    // If this is the active node and we have a live count, use it. 
-    // Otherwise, use the stored body.
+    
+    // BODY: Use live count for the node being edited, otherwise use stored data
     if (i === idx && liveBodyCount !== null) {
       totalWords += liveBodyCount;
     } else {
@@ -1563,10 +1600,12 @@ function updateNodeStatsUI(id, liveBodyCount = null) {
   const childCount = countDirectChildren(idx);
   const subtreeCount = countSubtree(idx);
 
+  // Update only the text content
   metaEl.textContent = subtreeCount > 0
     ? `(${childCount},${subtreeCount} • ${totalWords.toLocaleString()}w)`
     : `(${childCount},0 • ${totalWords}w)`;
 }
+
 
 function markChangedTyping(id, liveBodyCount = null) {
   setCopiedFlag(false);
@@ -1775,38 +1814,6 @@ function deleteAndPromoteChildren(id) {
 
       saveDebounced();
     }
-
-// START WORDCOUNT 
-
-function countWords(text) {
-  if (!text) return 0;
-
-  const cleaned = text
-    .split("\n")
-    .filter(line => !line.trim().startsWith("%% tag"))
-    .join(" ");
-
-  return cleaned
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .length;
-}
-    
-function subtreeWordCount(idx) {
-  const fam = familyIndices(idx);
-  let total = 0;
-
-  for (const i of fam) {
-    const n = nodes[i];
-    total += countWords(n.title);
-    total += countWords(n.body);
-  }
-
-  return total;
-}
-    
-// STOP WORDCOUNT
 
     
     // ---- Render (Structure tab) ----
