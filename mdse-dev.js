@@ -1561,15 +1561,6 @@ function subtreeWordCount(idx) {
       saveDebounced();
     }
 
-    /* 
-    function markChangedTyping() {
-      setCopiedFlag(false);
-      if (searchQuery.trim()) rebuildMatchesDebounced();
-      rebuildTagUIDebounced();
-      saveDebounced();
-    }
-    */
-
 function updateNodeStatsUI(id, liveBodyCount = null) {
   const idx = indexById(id);
   if (idx < 0) return;
@@ -1606,12 +1597,8 @@ function updateNodeStatsUI(id, liveBodyCount = null) {
     : `(${childCount},0 • ${totalWords}w)`;
 }
 
-
-function markChangedTyping(id, liveBodyCount = null) {
+function markChangedTyping() {
   setCopiedFlag(false);
-
-  // Pass the live count to the surgical update
-  if (id) updateNodeStatsUI(id, liveBodyCount);
 
   if (tagTimer) clearTimeout(tagTimer);
   tagTimer = setTimeout(() => {
@@ -1979,22 +1966,18 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
         });
-        /*
-        title.addEventListener("input", () => {
-          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
-          if (title.value !== n.title) title.value = n.title;
-          autoResizeTA(title);
-          markChangedTyping();
-        });
-        */
-        title.addEventListener("input", () => {
-          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
-          if (title.value !== n.title) title.value = n.title;
-          autoResizeTA(title);
-  
-          // Update data and local badge only
-          markChangedTyping(n.id); 
-        });
+bodyTA.addEventListener("input", () => {
+  n.body = bodyTA.value;
+  n.tags = extractTagsFromBody(n.body);
+  // We don't trigger a render here, keeping the typing smooth
+  setCopiedFlag(false);
+  saveDebounced();
+});
+
+// When you click away, refresh the UI to update the word counts
+bodyTA.addEventListener("blur", () => {
+  scheduleRenderStructure();
+});
 
 
         const tools = document.createElement("div");
@@ -2125,14 +2108,19 @@ else tools.append(dup, paste, del);
         bodyTA.addEventListener("keydown", stop);
         bodyTA.addEventListener("keypress", stop);
         bodyTA.addEventListener("keyup", stop);
-        bodyTA.addEventListener("input", () => {
-          n.body = bodyTA.value;
-          n.tags = extractTagsFromBody(n.body);
-  
-          // Calculate this node's words locally and pass it to the surgical updater
-          const currentBodyWords = countWords(bodyTA.value);
-          markChangedTyping(n.id, currentBodyWords);
-        });
+bodyTA.addEventListener("input", () => {
+  n.body = bodyTA.value;
+  n.tags = extractTagsFromBody(n.body);
+  // We don't trigger a render here, keeping the typing smooth
+  setCopiedFlag(false);
+  saveDebounced();
+});
+
+// When you click away, refresh the UI to update the word counts
+bodyTA.addEventListener("blur", () => {
+  scheduleRenderStructure();
+});
+
         
         bodyTA.addEventListener("click", (e) => e.stopPropagation());
         
