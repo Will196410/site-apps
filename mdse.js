@@ -1538,22 +1538,12 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
     }
 
     // ---- Actions ----
-    /* faster version */
-    function markChangedTyping() {
+    function markChangedFull() {
       setCopiedFlag(false);
-  
-    // 1. Re-calculate search & tags ONLY after a 400ms pause
-    if (tagTimer) clearTimeout(tagTimer);
-      tagTimer = setTimeout(() => {
-      tagTimer = null;
-      if (searchQuery.trim()) rebuildMatches(); 
-      if (activeTab === "tags") rebuildTagUI();
-    }, 400);
-
-    // 2. Save to localStorage after a 1000ms pause
-    saveDebounced();
+      rebuildMatches();   // renders structure + counts
+      rebuildTagUI();
+      saveDebounced();
     }
-
 
     function markChangedTyping() {
       setCopiedFlag(false);
@@ -1948,18 +1938,12 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
         });
-        /* faster inupt handler */
         title.addEventListener("input", () => {
-  // Update the data object silently
-  n.title = title.value.replace(/\n/g, " ");
-  
-  // Resize the box so it feels responsive
-  autoResizeTA(title);
-  
-  // Trigger background updates (save/search), but NOT a full render
-  markChangedTyping(); 
-});
-
+          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
+          if (title.value !== n.title) title.value = n.title;
+          autoResizeTA(title);
+          markChangedTyping();
+        });
 
         const tools = document.createElement("div");
         tools.className = "tools";
@@ -2089,26 +2073,13 @@ else tools.append(dup, paste, del);
         bodyTA.addEventListener("keydown", stop);
         bodyTA.addEventListener("keypress", stop);
         bodyTA.addEventListener("keyup", stop);
-/*
+
         bodyTA.addEventListener("input", () => {
           n.body = bodyTA.value;
           n.tags = extractTagsFromBody(n.body);
           markChangedTyping();
         });
-*/
-        /* faster version */
-bodyTA.addEventListener("input", () => {
-  // Update the data object silently
-  n.body = bodyTA.value;
-  
-  // Important: We update the tags in the object so search stays accurate,
-  // but we don't redraw the whole UI yet.
-  n.tags = extractTagsFromBody(n.body);
-  
-  markChangedTyping();
-});
 
-        
         bodyTA.addEventListener("click", (e) => e.stopPropagation());
         
         // bodyWrap.appendChild(bodyTA);
