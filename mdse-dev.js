@@ -2139,17 +2139,21 @@ canvas.appendChild(node);
         lastCreatedId = null;
       }
     }
-   
-// PATCH: add directly under
-let scheduleRenderStructure = function(){};
-scheduleRenderStructure = makeRafScheduler(renderStructure);
-// New version: adds a tiny 10ms delay so 'blur' and 'input' finish their job first
-scheduleRenderStructure = () => {
-  setTimeout(() => {
-    renderStructure();
-  }, 10); 
-};
 
+// START
+
+// Replace the end of your script with this:
+let renderPending = false;
+const scheduleRenderStructure = () => {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderStructure();
+    renderPending = false;
+  });
+};
+ 
+    // STOP
 
     // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
