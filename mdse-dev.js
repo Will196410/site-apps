@@ -16,7 +16,7 @@
     let style = document.getElementById(STYLE_ID);
     if (!style) {
       style = document.createElement("style");
-      style.fid = STYLE_ID;
+      style.id = STYLE_ID;
       document.head.appendChild(style);
     }
 
@@ -545,14 +545,11 @@
   const uid = () =>
     `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
-function autoResizeTA(ta) {
-  // Only resize if the content actually exceeds current height or shrinks significantly
-  if (ta.scrollHeight !== ta.clientHeight) {
+  function autoResizeTA(ta) {
     ta.style.height = "auto";
     ta.style.height = Math.max(44, ta.scrollHeight) + "px";
   }
-}
-  
+
   function safeJsonParse(s) {
     try { return JSON.parse(s); } catch { return null; }
   }
@@ -688,7 +685,7 @@ function autoResizeTA(ta) {
 // START UNDO STATE
 
     // ---- Undo (structural) ----
-const UNDO_LIMIT = 10;
+const UNDO_LIMIT = 60;
 let undoStack = [];
 
 function snapshotNodes() {
@@ -1807,221 +1804,346 @@ function deleteAndPromoteChildren(id) {
 
     
     // ---- Render (Structure tab) ----
-    
-function renderStructure() {
-  // 1. Determine which nodes SHOULD be visible
-  const hiddenByCollapse = new Set();
-  nodes.forEach((n, idx) => {
-    if (n.isCollapsed) {
-      familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
-    }
-  });
+    function renderStructure() {
+      const scrollPos = window.scrollY;
 
-  const revealSet = computeRevealSet();
-  const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
-  const matchSet = new Set(matchIds);
+      selMax.value = String(maxVisibleLevel);
 
-  // Filter the array down to what needs to be in the DOM
-  const visibleNodes = nodes.filter((n, idx) => {
-    if (n.level > maxVisibleLevel) return false;
-    if (hiddenByCollapse.has(idx) && !revealSet.has(n.id)) return false;
-    return true;
-  });
+      canvas.innerHTML = "";
 
-  // 2. Sync the DOM
-  const currentEls = Array.from(canvas.children);
-  const visibleIds = new Set(visibleNodes.map(n => n.id));
+      const hiddenByCollapse = new Set();
+      nodes.forEach((n, idx) => {
+        if (n.isCollapsed) familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
+      });
 
-  // Remove elements that are no longer visible
-  currentEls.forEach(el => {
-    if (!visibleIds.has(el.getAttribute('data-node-id'))) {
-      el.remove();
-    }
-  });
+      const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
+      const revealSet = computeRevealSet();
+      const matchSet = new Set(matchIds);
 
-  // 3. Iterate visible nodes and Update or Create
-  visibleNodes.forEach((n, index) => {
-    let nodeEl = canvas.querySelector(`[data-node-id="${n.id}"]`);
-    const isNew = !nodeEl;
+      nodes.forEach((n, idx) => {
+        if (n.level > maxVisibleLevel) return;
+        if (hiddenByCollapse.has(idx) && !revealSet.has(n.id)) return;
 
-    if (isNew) {
-      nodeEl = createNodeElement(n); // Helper to build the initial shell
-    }
+        const isSource = sourceId === n.id;
+        const isValidTarget = !!sourceId && !movingSet.has(n.id);
+        const isMatch = searchQuery.trim() && matchSet.has(n.id);
+        const isActive = isMatch && matchPos >= 0 && matchIds[matchPos] === n.id;
 
-    // Update dynamic properties (classes and content)
-    updateNodeElement(nodeEl, n, {
-      index,
-      isSource: sourceId === n.id,
-      isValidTarget: !!sourceId && !movingSet.has(n.id),
-      isMatch: searchQuery.trim() && matchSet.has(n.id),
-      isActiveMatch: matchPos >= 0 && matchIds[matchPos] === n.id,
-      revealSet,
-      searchQuery
-    });
+        const node = document.createElement("div");
+        node.setAttribute("data-node-id", n.id);
+        node.className =
+          `node level-${n.level}` +
+          (activeNodeId === n.id ? " activeNode" : "") +
+          (isSource ? " movingSource" : "") +
+          (isValidTarget ? " moveTarget" : "") +
+          (n.isCollapsed ? " collapsed" : "") +
+          (isMatch ? " match" : "") +
+          (isActive ? " activeMatch" : "");
 
-    // Ensure correct order in the DOM without flickering
-    if (canvas.children[index] !== nodeEl) {
-      canvas.insertBefore(nodeEl, canvas.children[index] || null);
-    }
-  });
-
-  // 4. Final Focus Handling for newly created nodes
-  if (lastCreatedId) {
-    const el = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
-    if (el) el.querySelector(".title")?.focus();
-    lastCreatedId = null;
+        node.addEventListener("click", (e) => {
+  // If this node is a valid move target, clicking it should MOVE, not select.
+  if (isValidTarget) {
+    toggleMove(n.id);
+    return;
   }
-}
 
-/**
- * Creates the heavy DOM structure only once.
- */
-function createNodeElement(n) {
-  const node = document.createElement("div");
-  node.setAttribute("data-node-id", n.id);
-  
-  // Attach the "Select Node" listener once
-  node.addEventListener("click", (e) => {
-    const isValidTarget = node.classList.contains("moveTarget");
-    if (isValidTarget) {
-      toggleMove(n.id);
-      return;
-    }
-    activeNodeId = (activeNodeId === n.id) ? "" : n.id;
+  // Otherwise, toggle "active" state to show/hide controls.
+  activeNodeId = (activeNodeId === n.id) ? "" : n.id;
+  scheduleRenderStructure();
+});
+
+        const hdr = document.createElement("div");
+        hdr.className = "hdr";
+
+        const pin = document.createElement("div");
+        pin.className = "pill gray";
+        pin.textContent = isSource ? "📍 PIN" : "⠿";
+        pin.title = "Pin branch to move";
+        pin.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleMove(n.id);
+        });
+
+        const col = document.createElement("div");
+        col.className = "pill gray";
+        col.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "•";
+        col.title = hasChildren(idx) ? "Fold/unfold branch" : "No children";
+        col.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (hasChildren(idx)) toggleBranchCollapse(n.id);
+        });
+
+        const lvl = document.createElement("div");
+        lvl.className = "pill";
+        lvl.textContent = `H${n.level}`;
+
+// START COUNTER BADGE
+
+        const childCount = countDirectChildren(idx);
+        const subtreeCount = countSubtree(idx);
+        const wordCount = subtreeWordCount(idx);
+
+const meta = document.createElement("div");
+// meta.className = "pill gray";
+// meta.style.fontSize = "11px";
+meta.className = "nodeMeta";
+meta.textContent =
+  subtreeCount > 0
+    ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
+    : `(${childCount},0 • ${wordCount}w)`;
+
+meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
+
+// --- MINI tools (always visible) ---
+const miniTools = document.createElement("div");
+miniTools.className = "miniTools";
+// miniTools.addEventListener("click", (e) => e.stopPropagation());
+
+// Use a different variable name to avoid collisions
+const miniHasBody = !!(n.body && n.body.trim());
+
+// Mini: toggle body
+const miniBody = document.createElement("button");
+miniBody.type = "button";
+miniBody.className = "miniBtn" + (miniHasBody ? " primary" : "");
+miniBody.title = miniHasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text";
+miniBody.textContent = "📝";
+// miniBody.addEventListener("click", () => toggleBody(n.id));
+
+// Mini: add sibling
+const miniAdd = document.createElement("button");
+miniAdd.type = "button";
+miniAdd.className = "miniBtn";
+miniAdd.title = "Add a new sibling after this branch";
+miniAdd.textContent = "＋";
+// miniAdd.addEventListener("click", () => addNewAfter(n.id));
+
+miniBody.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleBody(n.id);
+});
+
+miniAdd.addEventListener("click", (e) => {
+  e.stopPropagation();
+  addNewAfter(n.id);
+});
+
+const miniPromote = document.createElement("button");
+miniPromote.type = "button";
+miniPromote.className = "miniBtn";
+miniPromote.title = "Promote branch (H-1)";
+miniPromote.textContent = "←";
+miniPromote.disabled = n.level <= 1;
+miniPromote.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (n.level > 1) changeLevel(n.id, -1);
+});
+
+const miniDemote = document.createElement("button");
+miniDemote.type = "button";
+miniDemote.className = "miniBtn";
+miniDemote.title = "Demote branch (H+1)";
+miniDemote.textContent = "→";
+miniDemote.disabled = n.level >= 6;
+miniDemote.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (n.level < 6) changeLevel(n.id, +1);
+});
+        
+// APPEND
+// miniTools.append(miniBody, miniAdd);
+miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
+        
+// PASTE STOP MINITOOLS
+        
+        // --- TITLE: renderStructure
+        const title = document.createElement("textarea");
+        title.className = "title";
+        title.rows = 1;
+        title.value = (n.title || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
+        title.addEventListener("click", (e) => e.stopPropagation());
+        title.addEventListener("keydown", (e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") e.preventDefault();
+        });
+
+        const tools = document.createElement("div");
+        tools.className = "tools";
+        tools.addEventListener("click", (e) => e.stopPropagation());
+
+        // const hasBody = !!(n.body && n.body.trim());
+        // const bodyBtn = document.createElement("button");
+        // bodyBtn.type = "button";
+        // bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
+        // bodyBtn.className = hasBody ? "primary" : "";
+        // bodyBtn.addEventListener("click", () => toggleBody(n.id));
+
+        const dup = document.createElement("button");
+        dup.type = "button";
+        dup.textContent = "⧉ Duplicate";
+        dup.addEventListener("click", () => duplicateBranch(n.id));
+
+        // const add = document.createElement("button");
+        // add.type = "button";
+        // add.textContent = "+ Add";
+        // add.addEventListener("click", () => addNewAfter(n.id));
+
+        const paste = document.createElement("button");
+paste.type = "button";
+paste.textContent = "📋 Paste";
+paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
+// paste.addEventListener("click", () => pasteClipboardAsSiblingAfter(n.id));
+        paste.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  pasteClipboardAsSiblingAfter(n.id);
+});
+
+        const left = document.createElement("button");
+        left.type = "button";
+        left.textContent = "←";
+        left.title = "Promote (H-1) for this branch";
+        left.addEventListener("click", () => changeLevel(n.id, -1));
+
+        const right = document.createElement("button");
+        right.type = "button";
+        right.textContent = "→";
+        right.title = "Demote (H+1) for this branch";
+        right.addEventListener("click", () => changeLevel(n.id, +1));
+
+        const tagKids = document.createElement("button");
+        tagKids.type = "button";
+        tagKids.textContent = `🏷 Tag H${n.level + 1}`;
+        tagKids.title = `Add a %% tag line to every direct H${n.level + 1} under this heading`;
+        tagKids.addEventListener("click", () => {
+          const payload = prompt(
+            `Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`,
+            "arc holiday"
+          );
+          if (!payload) return;
+          bulkTagDirectChildren(n.id, payload, "add");
+        });
+
+        const untagKids = document.createElement("button");
+        untagKids.type = "button";
+        untagKids.textContent = `🧽 Untag H${n.level + 1}`;
+        untagKids.title = `Remove that exact %% tag line from every direct H${n.level + 1} under this heading`;
+        untagKids.addEventListener("click", () => {
+          const payload = prompt(
+            `Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`,
+            "arc holiday"
+          );
+          if (!payload) return;
+          bulkTagDirectChildren(n.id, payload, "remove");
+        });
+
+        const del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "✕";
+        del.className = "warn";
+        del.title = "Delete branch";
+        del.addEventListener("click", () => deleteBranch(n.id));
+
+// START DELETE AND PROMOTE 
+
+const unwrap = document.createElement("button");
+unwrap.type = "button";
+unwrap.textContent = "⇪ Unwrap";
+unwrap.title = "Delete this heading and promote its children";
+unwrap.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!confirm("Delete this heading and promote its children?")) return;
+  deleteAndPromoteChildren(n.id);
+});
+        
+// STOP DELETE AND PROMOTE 
+
+        
+        // if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
+        // else tools.append(bodyBtn, dup, add, paste, left, right, del);
+
+        // if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
+        // else tools.append(dup, paste, left, right, del);
+
+if (n.level < 6) tools.append(dup, paste, tagKids, untagKids, unwrap, del);
+else tools.append(dup, paste, del);
+        
+
+        // hdr.append(pin, col, lvl, title, tools);
+        // hdr.append(pin, col, lvl, tools, title);
+        // hdr.append(pin, col, lvl, title);
+        // hdr.append(pin, col, lvl, miniTools, title);
+        // hdr.append(pin, col, lvl, meta, miniTools, title);
+        // hdr.append(pin, col, lvl, meta, miniTools, title);
+        hdr.append(lvl, pin, col, meta, miniTools, title);
+        node.appendChild(hdr);
+
+        // Body area: show if toggled, OR reveal+body-match-only while searching
+        const bodyShouldShow =
+          n.showBody ||
+          (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
+
+const bodyTA = document.createElement("textarea");
+bodyTA.rows = 6;
+bodyTA.wrap = "soft";
+bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+
+// 1. Stop bubbles (Prevent typing/clicks from triggering node-level actions)
+['keydown', 'keypress', 'keyup', 'click'].forEach(evt => 
+  bodyTA.addEventListener(evt, (e) => e.stopPropagation())
+);
+
+// 2. Immediate data save (Updates memory & localStorage as you type)
+bodyTA.addEventListener("input", () => {
+  n.body = bodyTA.value;
+  n.tags = extractTagsFromBody(n.body);
+  setCopiedFlag(false);
+  saveDebounced();
+});
+
+// 3. UI Refresh (Updates word counts when you finish editing)
+['blur', 'change'].forEach(evt => {
+  bodyTA.addEventListener(evt, () => {
     scheduleRenderStructure();
   });
-
-  node.innerHTML = `
-    <div class="hdr">
-      <div class="pill lvl"></div>
-      <div class="pill gray pin"></div>
-      <div class="pill gray col"></div>
-      <div class="nodeMeta"></div>
-      <div class="miniTools"></div>
-      <textarea class="title" rows="1" spellcheck="false"></textarea>
-    </div>
-    <div class="body"><textarea wrap="soft"></textarea></div>
-    <div class="tools"></div>
-  `;
-
-  // Internal listener setup for textareas (so they don't need re-binding)
-  const titleTA = node.querySelector(".title");
-  const bodyTA = node.querySelector(".body textarea");
-
-  // start
-  
-titleTA.addEventListener("input", (e) => {
-  // 1. Update the data instantly (fast, no lag)
-  n.title = e.target.value.replace(/\n/g, " ");
-  
-  // 2. Mark the UI as "Dirty" (Unsaved)
-  badgeSave.className = "badge warn badgeSave";
-  badgeSave.textContent = "Unsaved...";
-
-  // 3. DO NOT save here. 
-  // Just resize the box so the typing feels good.
-  autoResizeTA(e.target);
 });
 
-// 4. THE SAFETY NETS: Save only when the user stops or leaves
-titleTA.addEventListener("blur", () => {
-  saveNow(); // Save the moment they click away
-});
+        const bodyWrap = document.createElement("div");
+        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");        
+        // bodyWrap.appendChild(bodyTA);
+        // node.appendChild(bodyWrap);
 
-// A "Debounced" save: if they type for 5 seconds straight, save anyway
-let typingTimer;
-titleTA.addEventListener("keyup", () => {
-  clearTimeout(typingTimer);
-  typingTimer = setTimeout(saveNow, 5000); // 5-second "patience" window
-});
+        // canvas.appendChild(node);
 
-  
-  // stop
+bodyWrap.appendChild(bodyTA);
+node.appendChild(bodyWrap);
 
-  bodyTA.addEventListener("input", (e) => {
-    n.body = e.target.value;
-    n.tags = extractTagsFromBody(n.body);
-    markChangedTyping();
-  });
+// NEW: controls under title + body
+node.appendChild(tools);
 
-  // Stop propagation to prevent node selection when clicking inputs
-  [titleTA, bodyTA].forEach(ta => {
-    ta.addEventListener("click", e => e.stopPropagation());
-    ta.addEventListener("keydown", e => e.stopPropagation());
-  });
+canvas.appendChild(node);
+        
+        autoResizeTA(title);
+      });
 
-  return node;
-}
+      window.scrollTo(0, scrollPos);
 
-/**
- * Fast-syncs properties of an existing DOM node.
- */
-function updateNodeElement(el, n, state) {
-  const { index, isSource, isValidTarget, isMatch, isActiveMatch, searchQuery } = state;
-
-  // 1. Update Classes
-  el.className = `node level-${n.level} ` +
-    (activeNodeId === n.id ? " activeNode" : "") +
-    (isSource ? " movingSource" : "") +
-    (isValidTarget ? " moveTarget" : "") +
-    (n.isCollapsed ? " collapsed" : "") +
-    (isMatch ? " match" : "") +
-    (isActiveMatch ? " activeMatch" : "");
-
-  // 2. Update Header Text/Pills
-  el.querySelector(".lvl").textContent = `H${n.level}`;
-  el.querySelector(".pin").textContent = isSource ? "📍 PIN" : "⠿";
-  
-  const colBtn = el.querySelector(".col");
-  const hasChildrenNode = hasChildren(indexById(n.id)); // Note: careful with index changes
-  colBtn.textContent = hasChildrenNode ? (n.isCollapsed ? "▶" : "▼") : "•";
-
-  // 3. Update Meta (Word Counts)
-  const idx = indexById(n.id);
-  const childCount = countDirectChildren(idx);
-  const subtreeCount = countSubtree(idx);
-  const words = subtreeWordCount(idx);
-  el.querySelector(".nodeMeta").textContent = `(${childCount},${subtreeCount} • ${words.toLocaleString()}w)`;
-
-  // 4. Sync Content (Only if not currently focused to avoid cursor jumping)
-  const titleTA = el.querySelector(".title");
-  if (document.activeElement !== titleTA) {
-    titleTA.value = n.title;
-    autoResizeTA(titleTA);
-  }
-
-  const bodyTA = el.querySelector(".body textarea");
-  if (document.activeElement !== bodyTA) {
-    bodyTA.value = n.body;
-  }
-
-  // 5. Visibility of Body and Tools
-  const bodyShouldShow = n.showBody || (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
-  el.querySelector(".body").classList.toggle("show", bodyShouldShow);
-  
-  // Re-render miniTools & tools logic here (or keep as simple toggle)
-  const toolsEl = el.querySelector(".tools");
-  if (activeNodeId === n.id && toolsEl.innerHTML === "") {
-     // Lazy-load tools only when active to save DOM weight
-     renderToolsInto(toolsEl, n); 
-  }
-}
-
+      if (lastCreatedId) {
+        const el = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
+        if (el) {
+          const t = el.querySelector(".title");
+          if (t) t.focus();
+        }
+        lastCreatedId = null;
+      }
+    }
+   
+// PATCH: add directly under
+// const scheduleRenderStructure = makeRafScheduler(renderStructure);
     
-// START
+let scheduleRenderStructure = function(){};
+scheduleRenderStructure = makeRafScheduler(renderStructure);
 
-// Replace the end of your script with this:
-let renderPending = false;
-const scheduleRenderStructure = () => {
-  if (renderPending) return;
-  renderPending = true;
-  requestAnimationFrame(() => {
-    renderStructure();
-    renderPending = false;
-  });
-};
- 
-    // STOP
 
     // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
@@ -2160,14 +2282,6 @@ const scheduleRenderStructure = () => {
     scheduleRenderStructure();
   }
 });
-
-    // Global Focus Watcher: 
-    // If focus leaves the app entirely (e.g., clicking the browser UI or background), 
-    // trigger one last render to ensure all word counts are final.
-    window.addEventListener("blur", () => {
-      scheduleRenderStructure();
-    }, true); // Use capture to catch events from textareas
-
     
     // ---- Init ----
     loadPref();
