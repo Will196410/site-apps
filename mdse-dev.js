@@ -1909,28 +1909,32 @@ function createNodeElement(n) {
   const bodyTA = node.querySelector(".body textarea");
 
   // start
-
+  
 titleTA.addEventListener("input", (e) => {
-  // 1. Light update: just the data
+  // 1. Update the data instantly (fast, no lag)
   n.title = e.target.value.replace(/\n/g, " ");
   
-  // 2. Debounce the resize (don't do it every single frame)
-  if (!titleTA._resizeTimer) {
-    titleTA._resizeTimer = setTimeout(() => {
-      autoResizeTA(titleTA);
-      titleTA._resizeTimer = null;
-    }, 100);
-  }
+  // 2. Mark the UI as "Dirty" (Unsaved)
+  badgeSave.className = "badge warn badgeSave";
+  badgeSave.textContent = "Unsaved...";
 
-  // 3. Flag as changed, but don't recalculate the whole tree yet
-  setCopiedFlag(false);
-  saveDebounced(); 
+  // 3. DO NOT save here. 
+  // Just resize the box so the typing feels good.
+  autoResizeTA(e.target);
 });
 
-// 4. Update the "expensive" stuff only when the user leaves the field
+// 4. THE SAFETY NETS: Save only when the user stops or leaves
 titleTA.addEventListener("blur", () => {
-  scheduleRenderStructure(); // This updates word counts/meta for the branch
+  saveNow(); // Save the moment they click away
 });
+
+// A "Debounced" save: if they type for 5 seconds straight, save anyway
+let typingTimer;
+titleTA.addEventListener("keyup", () => {
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(saveNow, 5000); // 5-second "patience" window
+});
+
   
   // stop
 
