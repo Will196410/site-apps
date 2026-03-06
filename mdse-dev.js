@@ -545,10 +545,14 @@
   const uid = () =>
     `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
-  function autoResizeTA(ta) {
-    ta.style.height = "auto";
-    ta.style.height = Math.max(44, ta.scrollHeight) + "px";
-  }
+// start
+function autoResizeTA(ta) {
+  if (ta.offsetHeight === 0) return; // Skip if hidden
+  ta.style.height = "auto";
+  ta.style.height = Math.max(44, ta.scrollHeight) + "px";
+}
+
+  // stop
 
   function safeJsonParse(s) {
     try { return JSON.parse(s); } catch { return null; }
@@ -1922,12 +1926,26 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
         });
+// start
+
         title.addEventListener("input", () => {
-          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
-          if (title.value !== n.title) title.value = n.title;
-          autoResizeTA(title);
-          markChangedTyping();
-        });
+  const start = title.selectionStart;
+  const end = title.selectionEnd;
+
+  const cleaned = title.value.replace(/[\r\n]/g, " ");
+  n.title = cleaned;
+
+  if (title.value !== cleaned) {
+    title.value = cleaned;
+    title.setSelectionRange(start, end); // Restore cursor
+  }
+  autoResizeTA(title);
+  markChangedTyping();
+});
+
+        
+// stop
+        
 
         const tools = document.createElement("div");
         tools.className = "tools";
