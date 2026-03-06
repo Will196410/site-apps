@@ -685,7 +685,7 @@
 // START UNDO STATE
 
     // ---- Undo (structural) ----
-const UNDO_LIMIT = 60;
+const UNDO_LIMIT = 10;
 let undoStack = [];
 
 function snapshotNodes() {
@@ -2146,7 +2146,7 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
 // New version: adds a tiny 10ms delay so 'blur' and 'input' finish their job first
 scheduleRenderStructure = () => {
   setTimeout(() => {
-    fastRender();
+    renderStructure();
   }, 10); 
 };
 
