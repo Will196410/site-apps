@@ -545,11 +545,14 @@
   const uid = () =>
     `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
-  function autoResizeTA(ta) {
+function autoResizeTA(ta) {
+  // Only resize if the content actually exceeds current height or shrinks significantly
+  if (ta.scrollHeight !== ta.clientHeight) {
     ta.style.height = "auto";
     ta.style.height = Math.max(44, ta.scrollHeight) + "px";
   }
-
+}
+  
   function safeJsonParse(s) {
     try { return JSON.parse(s); } catch { return null; }
   }
@@ -1905,11 +1908,31 @@ function createNodeElement(n) {
   const titleTA = node.querySelector(".title");
   const bodyTA = node.querySelector(".body textarea");
 
-  titleTA.addEventListener("input", (e) => {
-    n.title = e.target.value.replace(/\n/g, " ");
-    markChangedTyping();
-    autoResizeTA(e.target);
-  });
+  // start
+
+titleTA.addEventListener("input", (e) => {
+  // 1. Light update: just the data
+  n.title = e.target.value.replace(/\n/g, " ");
+  
+  // 2. Debounce the resize (don't do it every single frame)
+  if (!titleTA._resizeTimer) {
+    titleTA._resizeTimer = setTimeout(() => {
+      autoResizeTA(titleTA);
+      titleTA._resizeTimer = null;
+    }, 100);
+  }
+
+  // 3. Flag as changed, but don't recalculate the whole tree yet
+  setCopiedFlag(false);
+  saveDebounced(); 
+});
+
+// 4. Update the "expensive" stuff only when the user leaves the field
+titleTA.addEventListener("blur", () => {
+  scheduleRenderStructure(); // This updates word counts/meta for the branch
+});
+  
+  // stop
 
   bodyTA.addEventListener("input", (e) => {
     n.body = e.target.value;
