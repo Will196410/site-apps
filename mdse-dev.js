@@ -1520,39 +1520,6 @@ scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
       }
     }
 
-// START WORDCOUNT 
-
-  function countWords(text) {
-  if (!text || typeof text !== 'string') return 0;
-  
-  // Remove tag lines and trim whitespace
-  const lines = text.split('\n');
-  const filtered = lines.filter(line => !line.trim().startsWith('%% tag'));
-  const cleanText = filtered.join(' ').trim();
-  
-  if (!cleanText) return 0;
-  
-  // Split by any whitespace and count the resulting array length
-  return cleanText.split(/\s+/).filter(Boolean).length;
-}
-  
-    
-function subtreeWordCount(idx) {
-  const fam = familyIndices(idx);
-  let total = 0;
-
-  for (const i of fam) {
-    const n = nodes[i];
-    total += countWords(n.title);
-    total += countWords(n.body);
-  }
-
-  return total;
-}
-    
-// STOP WORDCOUNT
-
-    
     // ---- Actions ----
     function markChangedFull() {
       setCopiedFlag(false);
@@ -1561,56 +1528,13 @@ function subtreeWordCount(idx) {
       saveDebounced();
     }
 
-function updateNodeStatsUI(id, liveBodyCount = null) {
-  const idx = indexById(id);
-  if (idx < 0) return;
-  
-  // Find the specific node element in the DOM
-  const nodeEl = canvas.querySelector(`[data-node-id="${id}"]`);
-  if (!nodeEl) return;
-  
-  const metaEl = nodeEl.querySelector(".nodeMeta");
-  if (!metaEl) return;
-
-  const fam = familyIndices(idx);
-  let totalWords = 0;
-
-  for (const i of fam) {
-    const node = nodes[i];
-    // TITLE: Always use the current data
-    totalWords += countWords(node.title);
-    
-    // BODY: Use live count for the node being edited, otherwise use stored data
-    if (i === idx && liveBodyCount !== null) {
-      totalWords += liveBodyCount;
-    } else {
-      totalWords += countWords(node.body);
+    function markChangedTyping() {
+      setCopiedFlag(false);
+      if (searchQuery.trim()) rebuildMatchesDebounced();
+      rebuildTagUIDebounced();
+      saveDebounced();
     }
-  }
 
-  const childCount = countDirectChildren(idx);
-  const subtreeCount = countSubtree(idx);
-
-  // Update only the text content
-  metaEl.textContent = subtreeCount > 0
-    ? `(${childCount},${subtreeCount} • ${totalWords.toLocaleString()}w)`
-    : `(${childCount},0 • ${totalWords}w)`;
-}
-
-function markChangedTyping() {
-  setCopiedFlag(false);
-
-  if (tagTimer) clearTimeout(tagTimer);
-  tagTimer = setTimeout(() => {
-    tagTimer = null;
-    if (searchQuery.trim()) rebuildMatchesNoRender(); 
-    if (activeTab === "tags") rebuildTagUI();
-    if (activeTab === "search") renderSearchResults();
-  }, 450);
-
-  saveDebounced();
-}
-    
     function toggleBranchCollapse(id) {
       pushUndo("collapse");
       const idx = indexById(id);
@@ -1802,6 +1726,38 @@ function deleteAndPromoteChildren(id) {
       saveDebounced();
     }
 
+// START WORDCOUNT 
+
+function countWords(text) {
+  if (!text) return 0;
+
+  const cleaned = text
+    .split("\n")
+    .filter(line => !line.trim().startsWith("%% tag"))
+    .join(" ");
+
+  return cleaned
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+    
+function subtreeWordCount(idx) {
+  const fam = familyIndices(idx);
+  let total = 0;
+
+  for (const i of fam) {
+    const n = nodes[i];
+    total += countWords(n.title);
+    total += countWords(n.body);
+  }
+
+  return total;
+}
+    
+// STOP WORDCOUNT
+
     
     // ---- Render (Structure tab) ----
     function renderStructure() {
@@ -1956,7 +1912,7 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
         
 // PASTE STOP MINITOOLS
         
-        // --- TITLE: renderStructure
+        // --- TITLE: single-line ---
         const title = document.createElement("textarea");
         title.className = "title";
         title.rows = 1;
@@ -1965,6 +1921,12 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
         title.addEventListener("keydown", (e) => {
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
+        });
+        title.addEventListener("input", () => {
+          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
+          if (title.value !== n.title) title.value = n.title;
+          autoResizeTA(title);
+          markChangedTyping();
         });
 
         const tools = document.createElement("div");
@@ -2083,33 +2045,27 @@ else tools.append(dup, paste, del);
           n.showBody ||
           (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
 
-const bodyTA = document.createElement("textarea");
-bodyTA.rows = 6;
-bodyTA.wrap = "soft";
-bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
-
-// 1. Stop bubbles (Prevent typing/clicks from triggering node-level actions)
-['keydown', 'keypress', 'keyup', 'click'].forEach(evt => 
-  bodyTA.addEventListener(evt, (e) => e.stopPropagation())
-);
-
-// 2. Immediate data save (Updates memory & localStorage as you type)
-bodyTA.addEventListener("input", () => {
-  n.body = bodyTA.value;
-  n.tags = extractTagsFromBody(n.body);
-  setCopiedFlag(false);
-  saveDebounced();
-});
-
-// 3. UI Refresh (Updates word counts when you finish editing)
-['blur', 'change'].forEach(evt => {
-  bodyTA.addEventListener(evt, () => {
-    scheduleRenderStructure();
-  });
-});
-
         const bodyWrap = document.createElement("div");
-        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");        
+        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
+
+        const bodyTA = document.createElement("textarea");
+        bodyTA.rows = 6;
+        bodyTA.wrap = "soft";
+        bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+
+        const stop = (e) => e.stopPropagation();
+        bodyTA.addEventListener("keydown", stop);
+        bodyTA.addEventListener("keypress", stop);
+        bodyTA.addEventListener("keyup", stop);
+
+        bodyTA.addEventListener("input", () => {
+          n.body = bodyTA.value;
+          n.tags = extractTagsFromBody(n.body);
+          markChangedTyping();
+        });
+
+        bodyTA.addEventListener("click", (e) => e.stopPropagation());
+        
         // bodyWrap.appendChild(bodyTA);
         // node.appendChild(bodyWrap);
 
