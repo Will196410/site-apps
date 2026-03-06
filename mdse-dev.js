@@ -2083,20 +2083,17 @@ else tools.append(dup, paste, del);
           n.showBody ||
           (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
 
-        const bodyWrap = document.createElement("div");
-        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
-
 const bodyTA = document.createElement("textarea");
 bodyTA.rows = 6;
 bodyTA.wrap = "soft";
 bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
 
-// 1. Stop all typing/clicking from bubbling up to the node parent
+// 1. Stop bubbles (Prevent typing/clicks from triggering node-level actions)
 ['keydown', 'keypress', 'keyup', 'click'].forEach(evt => 
   bodyTA.addEventListener(evt, (e) => e.stopPropagation())
 );
 
-// 2. Update data in the background as you type
+// 2. Immediate data save (Updates memory & localStorage as you type)
 bodyTA.addEventListener("input", () => {
   n.body = bodyTA.value;
   n.tags = extractTagsFromBody(n.body);
@@ -2104,11 +2101,15 @@ bodyTA.addEventListener("input", () => {
   saveDebounced();
 });
 
-// 3. Trigger UI Refresh (updates word counts) only when you leave the field
-bodyTA.addEventListener("blur", () => {
-  scheduleRenderStructure();
+// 3. UI Refresh (Updates word counts when you finish editing)
+['blur', 'change'].forEach(evt => {
+  bodyTA.addEventListener(evt, () => {
+    scheduleRenderStructure();
+  });
 });
-                
+
+        const bodyWrap = document.createElement("div");
+        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");        
         // bodyWrap.appendChild(bodyTA);
         // node.appendChild(bodyWrap);
 
