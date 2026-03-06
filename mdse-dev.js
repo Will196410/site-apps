@@ -1857,7 +1857,7 @@ meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 // --- MINI tools (always visible) ---
 const miniTools = document.createElement("div");
 miniTools.className = "miniTools";
-// miniTools.addEventListener("click", (e) => e.stopPropagation());
+miniTools.addEventListener("click", (e) => e.stopPropagation());
 
 // Use a different variable name to avoid collisions
 const miniHasBody = !!(n.body && n.body.trim());
