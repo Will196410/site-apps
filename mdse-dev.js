@@ -1956,7 +1956,7 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
         
 // PASTE STOP MINITOOLS
         
-        // --- TITLE: single-line ---
+        // --- TITLE: renderStructure
         const title = document.createElement("textarea");
         title.className = "title";
         title.rows = 1;
@@ -1966,19 +1966,6 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
         });
-bodyTA.addEventListener("input", () => {
-  n.body = bodyTA.value;
-  n.tags = extractTagsFromBody(n.body);
-  // We don't trigger a render here, keeping the typing smooth
-  setCopiedFlag(false);
-  saveDebounced();
-});
-
-// When you click away, refresh the UI to update the word counts
-bodyTA.addEventListener("blur", () => {
-  scheduleRenderStructure();
-});
-
 
         const tools = document.createElement("div");
         tools.className = "tools";
@@ -2099,31 +2086,29 @@ else tools.append(dup, paste, del);
         const bodyWrap = document.createElement("div");
         bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
 
-        const bodyTA = document.createElement("textarea");
-        bodyTA.rows = 6;
-        bodyTA.wrap = "soft";
-        bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+const bodyTA = document.createElement("textarea");
+bodyTA.rows = 6;
+bodyTA.wrap = "soft";
+bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
 
-        const stop = (e) => e.stopPropagation();
-        bodyTA.addEventListener("keydown", stop);
-        bodyTA.addEventListener("keypress", stop);
-        bodyTA.addEventListener("keyup", stop);
+// 1. Stop all typing/clicking from bubbling up to the node parent
+['keydown', 'keypress', 'keyup', 'click'].forEach(evt => 
+  bodyTA.addEventListener(evt, (e) => e.stopPropagation())
+);
+
+// 2. Update data in the background as you type
 bodyTA.addEventListener("input", () => {
   n.body = bodyTA.value;
   n.tags = extractTagsFromBody(n.body);
-  // We don't trigger a render here, keeping the typing smooth
   setCopiedFlag(false);
   saveDebounced();
 });
 
-// When you click away, refresh the UI to update the word counts
+// 3. Trigger UI Refresh (updates word counts) only when you leave the field
 bodyTA.addEventListener("blur", () => {
   scheduleRenderStructure();
 });
-
-        
-        bodyTA.addEventListener("click", (e) => e.stopPropagation());
-        
+                
         // bodyWrap.appendChild(bodyTA);
         // node.appendChild(bodyWrap);
 
