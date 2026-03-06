@@ -16,7 +16,7 @@
     let style = document.getElementById(STYLE_ID);
     if (!style) {
       style = document.createElement("style");
-      style.id = STYLE_ID;
+      style.fid = STYLE_ID;
       document.head.appendChild(style);
     }
 
@@ -1841,16 +1841,16 @@ function deleteAndPromoteChildren(id) {
           (isActive ? " activeMatch" : "");
 
         node.addEventListener("click", (e) => {
-  // If this node is a valid move target, clicking it should MOVE, not select.
-  if (isValidTarget) {
-    toggleMove(n.id);
-    return;
-  }
+          // If this node is a valid move target, clicking it should MOVE, not select.
+          if (isValidTarget) {
+          toggleMove(n.id);
+          return;
+        }
 
-  // Otherwise, toggle "active" state to show/hide controls.
-  activeNodeId = (activeNodeId === n.id) ? "" : n.id;
-  scheduleRenderStructure();
-});
+        // Otherwise, toggle "active" state to show/hide controls.
+        activeNodeId = (activeNodeId === n.id) ? "" : n.id;
+        scheduleRenderStructure();
+    });
 
         const hdr = document.createElement("div");
         hdr.className = "hdr";
@@ -1960,11 +1960,27 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
         const title = document.createElement("textarea");
         title.className = "title";
         title.rows = 1;
-        title.value = (n.title || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
-        title.addEventListener("click", (e) => e.stopPropagation());
+        title.value = (n.title || "").replace(/\n/g, " ");
+        
+        // Stop bubbles and handle behavior
+        ['keydown', 'click'].forEach(evt => 
+          title.addEventListener(evt, e => e.stopPropagation())
+        );
+
         title.addEventListener("keydown", (e) => {
-          e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
+        });
+
+        title.addEventListener("input", () => {
+          n.title = title.value.replace(/\n/g, " ");
+          setCopiedFlag(false);
+          saveDebounced();
+          autoResizeTA(title);
+        });
+
+        // REFRESH COUNTS ON BLUR
+        title.addEventListener("blur", () => {
+          scheduleRenderStructure();
         });
 
         const tools = document.createElement("div");
@@ -2058,23 +2074,9 @@ unwrap.addEventListener("click", (e) => {
         
 // STOP DELETE AND PROMOTE 
 
-        
-        // if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
-        // else tools.append(bodyBtn, dup, add, paste, left, right, del);
-
-        // if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
-        // else tools.append(dup, paste, left, right, del);
-
 if (n.level < 6) tools.append(dup, paste, tagKids, untagKids, unwrap, del);
 else tools.append(dup, paste, del);
         
-
-        // hdr.append(pin, col, lvl, title, tools);
-        // hdr.append(pin, col, lvl, tools, title);
-        // hdr.append(pin, col, lvl, title);
-        // hdr.append(pin, col, lvl, miniTools, title);
-        // hdr.append(pin, col, lvl, meta, miniTools, title);
-        // hdr.append(pin, col, lvl, meta, miniTools, title);
         hdr.append(lvl, pin, col, meta, miniTools, title);
         node.appendChild(hdr);
 
@@ -2139,8 +2141,6 @@ canvas.appendChild(node);
     }
    
 // PATCH: add directly under
-// const scheduleRenderStructure = makeRafScheduler(renderStructure);
-    
 let scheduleRenderStructure = function(){};
 scheduleRenderStructure = makeRafScheduler(renderStructure);
 
@@ -2282,6 +2282,14 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
     scheduleRenderStructure();
   }
 });
+
+    // Global Focus Watcher: 
+    // If focus leaves the app entirely (e.g., clicking the browser UI or background), 
+    // trigger one last render to ensure all word counts are final.
+    window.addEventListener("blur", () => {
+      scheduleRenderStructure();
+    }, true); // Use capture to catch events from textareas
+
     
     // ---- Init ----
     loadPref();
