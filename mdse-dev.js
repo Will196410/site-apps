@@ -4,7 +4,7 @@
   // ---- SiteApps registry (works with your loader.js) ----
   window.SiteApps = window.SiteApps || {};
   window.SiteApps.registry = window.SiteApps.registry || {};
-  window.SiteApps.register =
+  window.SiteAppfs.register =
     window.SiteApps.register ||
     function (name, initFn) {
       window.SiteApps.registry[name] = initFn;
@@ -689,7 +689,7 @@ function autoResizeTA(ta) {
 // START UNDO STATE
 
     // ---- Undo (structural) ----
-const UNDO_LIMIT = 60;
+const UNDO_LIMIT = 10;
 let undoStack = [];
 
 function snapshotNodes() {
