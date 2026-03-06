@@ -2143,6 +2143,12 @@ canvas.appendChild(node);
 // PATCH: add directly under
 let scheduleRenderStructure = function(){};
 scheduleRenderStructure = makeRafScheduler(renderStructure);
+// New version: adds a tiny 10ms delay so 'blur' and 'input' finish their job first
+scheduleRenderStructure = () => {
+  setTimeout(() => {
+    fastRender();
+  }, 10); 
+};
 
 
     // ---- Buttons / events ----
