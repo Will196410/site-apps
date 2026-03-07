@@ -193,16 +193,36 @@
 [data-app="mdse"] .node.level-5{ border-left: 10px solid #bbb; margin-left:72px; }
 [data-app="mdse"] .node.level-6{ border-left: 10px solid #ddd; margin-left:90px; }
 
-/* iPad/Safari flex squeeze fix: grid header */
-[data-app="mdse"] .hdr{
+/* 1. Main Styles (Desktop / Default) */
+[data-app="mdse"] .hdr {
   display: grid !important;
   grid-template-columns: auto auto auto auto auto; /* pin, col, Hx, (2,5), miniTools */
   column-gap: 10px;
   row-gap: 8px;
-  align-items: start;
+  align-items: center; /* Merged the 'center' value here */
   min-width: 0;
 }
-[data-app="mdse"] .hdr > *{ min-width: 0; }
+
+[data-app="mdse"] .hdr > * { 
+  min-width: 0; 
+}
+
+/* 2. Responsive Overrides (Tablet/Mobile) */
+@media (max-width: 900px) {
+  [data-app="mdse"] .hdr {
+    grid-template-columns: auto auto auto 1fr;
+    grid-auto-rows: auto;
+    row-gap: 10px;
+  }
+  [data-app="mdse"] .tools {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  [data-app="mdse"] .title {
+    grid-column: 1 / -1;
+    min-width: 0 !important;
+  }
+}
 
 [data-app="mdse"] .tools{
   display:flex;
@@ -271,15 +291,7 @@
   border-radius: 10px;
 }
 [data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
-[data-app="mdse"] .hdr .pill.gray{
-  border: 1px solid rgba(0,0,0,.15);
-  padding: 4px 6px;
-  font-size: 11px;
-}
-[data-app="mdse"] .hdr .pill:not(.gray){
-  padding: 4px 10px;
-  font-size: 12px;
-}
+
 [data-app="mdse"] .hdr .pill:not(.gray){
   padding: 4px 12px;
   font-size: 13px;
@@ -302,32 +314,14 @@
   align-items: center;
 }
 
-[data-app="mdse"] .hdr .pill{
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
 /* Make structural row compact */
 [data-app="mdse"] .hdr{
   align-items: center;
 }
 
-[data-app="mdse"] .hdr .pill{
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
 /* Make structural row compact */
 [data-app="mdse"] .hdr{
   align-items: center;
-}
-
-[data-app="mdse"] .hdr .pill{
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
 }
 
 /* REDUCE TOOLBAR IMPACT */
