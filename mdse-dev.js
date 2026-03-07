@@ -158,10 +158,18 @@
     `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
 // start
-function autoResizeTA(ta) {
-  if (ta.offsetHeight === 0) return; // Skip if hidden
-  ta.style.height = "auto";
-  ta.style.height = Math.max(44, ta.scrollHeight) + "px";
+function autoResizeTA(el) {
+  if (!el) return;
+  
+  // 1. Reset height to 'auto' so the scrollHeight is 
+  // calculated based on content only (allows shrinking).
+  el.style.height = 'auto';
+  
+  // 2. Set the height to the scrollHeight plus a small 
+  // buffer for the border (usually 2px).
+  if (el.scrollHeight > 0) {
+    el.style.height = (el.scrollHeight + 2) + 'px';
+  }
 }
 
   // stop
@@ -1336,6 +1344,10 @@ function deleteAndPromoteChildren(id) {
       panelSearch.classList.toggle("active", activeTab === "search");
       panelTags.classList.toggle("active", activeTab === "tags");
 
+      const activePanel = document.querySelector('.tabPanel.active');
+      const textareas = activePanel?.querySelectorAll('textarea');
+      if (textareas) textareas.forEach(ta => autoResizeTA(ta));
+      
       if (activeTab === "tags") rebuildTagUI();
       if (activeTab === "search") scheduleRenderSearchResults();
 
