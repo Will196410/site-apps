@@ -1344,10 +1344,15 @@ function deleteAndPromoteChildren(id) {
       panelSearch.classList.toggle("active", activeTab === "search");
       panelTags.classList.toggle("active", activeTab === "tags");
 
-      const activePanel = document.querySelector('.tabPanel.active');
-      const textareas = activePanel?.querySelectorAll('textarea');
-      if (textareas) textareas.forEach(ta => autoResizeTA(ta));
-      
+      // Ensure the browser has painted the tab before measuring textarea heights
+      requestAnimationFrame(() => {
+        const activePanel = document.querySelector('.tabPanel.active');
+        const textareas = activePanel?.querySelectorAll('textarea');
+        if (textareas) {
+          textareas.forEach(ta => autoResizeTA(ta));
+        }
+      });
+            
       if (activeTab === "tags") rebuildTagUI();
       if (activeTab === "search") scheduleRenderSearchResults();
 
