@@ -597,7 +597,7 @@ function countSubtree(idx) {
         <button class="primary btnLoad" type="button">Load Markdown</button>
         <button class="btnUpdate" type="button">Update Input Area</button>
         <button class="btnUndo" type="button">↺ Undo</button>
-        <button class="primary btnCopy" type="button">Copy Result</button>
+        <button class="primary btnCopy" type="button">Copy the Result</button>
         <button class="warn btnReset" type="button">Reset Everything!</button>
         <button class="btnAddTop" type="button">+ Add H1</button>
       </div>
