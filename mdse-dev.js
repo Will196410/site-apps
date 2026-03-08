@@ -4,7 +4,7 @@
   // ---- SiteApps registry (works with your loader.js) ----
   window.SiteApps = window.SiteApps || {};
   window.SiteApps.registry = window.SiteApps.registry || {};
-  window.SiteAppfs.register =
+  window.SiteApps.register =
     window.SiteApps.register ||
     function (name, initFn) {
       window.SiteApps.registry[name] = initFn;
@@ -581,7 +581,7 @@ function countSubtree(idx) {
     container.innerHTML = `
 <div class="topbar">
   <div class="left">
-    <h3>Markdown Outline Utility & Structure Editor this is</h3>
+    <h3>Markdown Outline Utility & Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
 
     <div class="tabs" role="tablist" aria-label="Views">
@@ -591,14 +591,14 @@ function countSubtree(idx) {
     </div>
 
     <div class="tabPanel panelStructure" role="tabpanel">
-      <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
+      <textarea class="mdInput" placeholder="Paste Markdown right here..."></textarea>
 
       <div class="btnrow">
         <button class="primary btnLoad" type="button">Load Markdown</button>
         <button class="btnUpdate" type="button">Update Input Area</button>
         <button class="btnUndo" type="button">↺ Undo</button>
-        <button class="primary btnCopy" type="button">Copy the Result</button>
-        <button class="warn btnReset" type="button">Reset Everything!</button>
+        <button class="primary btnCopy" type="button">Copy Result</button>
+        <button class="warn btnReset" type="button">Reset Everything</button>
         <button class="btnAddTop" type="button">+ Add H1</button>
       </div>
 
@@ -1617,40 +1617,24 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
 });
 
         
-// stop
-        
-
         const tools = document.createElement("div");
         tools.className = "tools";
         tools.addEventListener("click", (e) => e.stopPropagation());
-
-        // const hasBody = !!(n.body && n.body.trim());
-        // const bodyBtn = document.createElement("button");
-        // bodyBtn.type = "button";
-        // bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
-        // bodyBtn.className = hasBody ? "primary" : "";
-        // bodyBtn.addEventListener("click", () => toggleBody(n.id));
 
         const dup = document.createElement("button");
         dup.type = "button";
         dup.textContent = "⧉ Duplicate";
         dup.addEventListener("click", () => duplicateBranch(n.id));
 
-        // const add = document.createElement("button");
-        // add.type = "button";
-        // add.textContent = "+ Add";
-        // add.addEventListener("click", () => addNewAfter(n.id));
-
         const paste = document.createElement("button");
-paste.type = "button";
-paste.textContent = "📋 Paste";
-paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
-// paste.addEventListener("click", () => pasteClipboardAsSiblingAfter(n.id));
+        paste.type = "button";
+        paste.textContent = "📋 Paste";
+        paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
         paste.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  pasteClipboardAsSiblingAfter(n.id);
-});
+        e.preventDefault();
+        e.stopPropagation();
+        pasteClipboardAsSiblingAfter(n.id);
+  });
 
         const left = document.createElement("button");
         left.type = "button";
