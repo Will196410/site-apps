@@ -312,6 +312,16 @@ function autoResizeTA(el) {
 const UNDO_LIMIT = 10;
 let undoStack = [];
 
+// --- Global Schedulers ---
+// (makeRafScheduler is hoisted, so this works even if the 
+// function definition is at the bottom of the file!)
+
+const scheduleRenderTagCloud      = makeRafScheduler(renderTagCloud);
+const scheduleRenderTagResults    = makeRafScheduler(renderTagResults);
+const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
+const scheduleRenderStructure      = makeRafScheduler(renderStructure);
+
+    
 function snapshotNodes() {
   // JSON clone is simplest and iPad-safe
   return JSON.stringify(nodes);
@@ -986,13 +996,6 @@ function makeRafScheduler(renderFn) {
   };
 }
     
-// PATCH: add directly under
-// const scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
-    
-let scheduleRenderTagCloud = function(){};
-scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
-
-
     function renderTagResults() {
       tagResults.innerHTML = "";
 
@@ -1045,14 +1048,6 @@ scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
         tagResults.appendChild(card);
       });
     }
-
-    
-// PATCH: add directly under
-// const scheduleRenderTagResults = makeRafScheduler(renderTagResults);
-
-let scheduleRenderTagResults = function(){};
-scheduleRenderTagResults = makeRafScheduler(renderTagResults);
-
 
     function rebuildTagUI() {
       tagAllBtn.classList.toggle("active", !activeTag);
@@ -1117,14 +1112,7 @@ scheduleRenderTagResults = makeRafScheduler(renderTagResults);
         searchResults.appendChild(card);
       });
     }
-    
-// PATCH: add directly under
-// const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
-
-let scheduleRenderSearchResults = function(){};
-scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
-
-
+  
     function jumpToNode(id) {
       setTab("structure");
 
@@ -1741,13 +1729,6 @@ canvas.appendChild(node);
       }
     }
    
-// PATCH: add directly under
-// const scheduleRenderStructure = makeRafScheduler(renderStructure);
-    
-let scheduleRenderStructure = function(){};
-scheduleRenderStructure = makeRafScheduler(renderStructure);
-
-
     // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
     btnTabSearch.addEventListener("click", () => setTab("search"));
