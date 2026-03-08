@@ -48,7 +48,7 @@
 [data-app="mdse"] textarea:not(.title) { width: 100%; }
 [data-app="mdse"] textarea:focus, [data-app="mdse"] button:focus, [data-app="mdse"] select:focus, [data-app="mdse"] input:focus {
   outline: 3px solid rgba(11,95,255,.35);
-  outline-offset: 2px;
+  outline-offset: 5px;
 }
 
 /* Header & Grid Layout */
