@@ -45,10 +45,59 @@
   background: #fbfbfb;
   color: #111;
 }
+
+/* Gemini button definition */
+
+/* 1. The Base Button (The "Standard" Look) */
+[data-app="mdse"] button {
+  border: 2px solid #111;
+  border-radius: 999px; /* Consistent Pill Shape */
+  padding: 8px 14px;
+  font-weight: 800;
+  font-size: 13px;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  transition: transform 0.1s active;
+}
+
+/* 2. Primary Action (Black background - Draws the eye) */
+[data-app="mdse"] button.primary {
+  background: #111;
+  color: #fff;
+}
+
+/* 3. Warning Action (Red/White - Looks "Dangerous") */
+[data-app="mdse"] button.warn {
+  border-color: #a00;
+  color: #a00;
+  background: #fffafa;
+}
+
+/* 4. Hover/Active States (Makes it feel like an app) */
+[data-app="mdse"] button:hover {
+  opacity: 0.85;
+}
+[data-app="mdse"] button:active {
+  transform: scale(0.96); /* Subtle "click" feel */
+}
+
+/* 5. Tidying the Rows */
+[data-app="mdse"] .btnrow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0;
+}
+
+
+/* end Gemini */
+
 [data-app="mdse"] textarea:not(.title) { width: 100%; }
 [data-app="mdse"] textarea:focus, [data-app="mdse"] button:focus, [data-app="mdse"] select:focus, [data-app="mdse"] input:focus {
   outline: 3px solid rgba(11,95,255,.35);
-  outline-offset: 5px;
+  outline-offset: 2px;
 }
 
 /* Header & Grid Layout */
