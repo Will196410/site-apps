@@ -201,13 +201,19 @@
 [data-app="mdse"] .node .tools { display: none !important; }
 
 /* level indents. */
-/* Creating the nested outline look */
-[data-app="mdse"] .node.level-1 { margin-left: 0; }
-[data-app="mdse"] .node.level-2 { margin-left: 20px; border-left: 3px solid #eee; }
-[data-app="mdse"] .node.level-3 { margin-left: 40px; border-left: 3px solid #ddd; }
-[data-app="mdse"] .node.level-4 { margin-left: 60px; border-left: 3px solid #ccc; }
-[data-app="mdse"] .node.level-5 { margin-left: 80px; border-left: 3px solid #bbb; }
-[data-app="mdse"] .node.level-6 { margin-left: 100px; border-left: 3px solid #aaa; }
+/* Indent the content, but keep the background/border full width */
+[data-app="mdse"] .node.level-1 { padding-left: 12px; }
+[data-app="mdse"] .node.level-2 { padding-left: 32px; border-left: 4px solid #eee; }
+[data-app="mdse"] .node.level-3 { padding-left: 52px; border-left: 4px solid #ddd; }
+[data-app="mdse"] .node.level-4 { padding-left: 72px; border-left: 4px solid #ccc; }
+[data-app="mdse"] .node.level-5 { padding-left: 92px; border-left: 4px solid #bbb; }
+[data-app="mdse"] .node.level-6 { padding-left: 112px; border-left: 4px solid #aaa; }
+
+/* Ensure textareas within the node still stretch to the new edge */
+[data-app="mdse"] .node textarea {
+  width: 100%;
+  display: block;
+}
 
 /* Optional: Make the border highlight when the node is active */
 [data-app="mdse"] .node.activeNode {
