@@ -836,7 +836,7 @@ function countSubtree(idx) {
             title: typeof n.title === "string" ? n.title : "",
             body,
             isCollapsed: !!n.isCollapsed,
-            showBody: !!n.showBody,
+            showBody: false,
             tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
           };
         });
