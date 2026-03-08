@@ -195,7 +195,7 @@
 }
 
 /* Nodes */
-[data-app="mdse"] .node { background: #fff; border: 2px solid rgba(0,0,0,.15); border-radius: 14px; padding: 12px; margin: 10px 0; }
+[data-app="mdse"] .node { width: 100%; display: block; background: #fff; border: 2px solid rgba(0,0,0,.15); border-radius: 14px; padding: 12px; margin: 10px 0; }
 [data-app="mdse"] .node.activeNode { border-color: rgba(11,95,255,.45); box-shadow: 0 8px 22px rgba(11,95,255,.08); }
 [data-app="mdse"] .node.activeNode .tools { display: flex !important; }
 [data-app="mdse"] .node .tools { display: none !important; }
@@ -211,6 +211,7 @@
 
 [data-app="mdse"] .node .body {
   display: none; /* Hidden by default */
+  width: 100%;
   margin-top: 10px;
 }
 
