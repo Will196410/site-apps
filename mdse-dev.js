@@ -209,6 +209,16 @@
 [data-app="mdse"] .node.level-5 { padding-left: 92px; border-left: 4px solid #bbb; }
 [data-app="mdse"] .node.level-6 { padding-left: 112px; border-left: 4px solid #aaa; }
 
+[data-app="mdse"] .node .body {
+  display: none; /* Hidden by default */
+  margin-top: 10px;
+}
+
+[data-app="mdse"] .node .body.show {
+  display: block; /* Shown only when 'show' class is added */
+}
+
+
 /* Ensure textareas within the node still stretch to the new edge */
 [data-app="mdse"] .node textarea {
   width: 100%;
@@ -1796,6 +1806,12 @@ else tools.append(dup, paste, del);
 bodyWrap.appendChild(bodyTA);
 node.appendChild(bodyWrap);
 
+if (bodyShouldShow) {
+  // Use setTimeout to ensure the DOM element is painted before measuring
+  setTimeout(() => autoResizeTA(bodyTA), 0);
+}
+
+        
 // NEW: controls under title + body
 node.appendChild(tools);
 
