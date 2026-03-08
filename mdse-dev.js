@@ -1823,6 +1823,9 @@ canvas.appendChild(node);
 
       window.scrollTo(0, scrollPos);
 
+    setCopiedFlag(copiedSinceChange); 
+    badgeSave.textContent = saveTimer ? "Unsaved..." : "Saved ✓";
+      
       if (lastCreatedId) {
         const el = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
         if (el) {
@@ -1831,7 +1834,7 @@ canvas.appendChild(node);
         }
         lastCreatedId = null;
       }
-    }
+    } // end function renderStructure 
    
     // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
