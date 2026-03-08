@@ -581,7 +581,7 @@ function countSubtree(idx) {
     container.innerHTML = `
 <div class="topbar">
   <div class="left">
-    <h3>Markdown Outline Utility & Structure Editor</h3>
+    <h3>Markdown Outline Utility & Structure Editor this is</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
 
     <div class="tabs" role="tablist" aria-label="Views">
