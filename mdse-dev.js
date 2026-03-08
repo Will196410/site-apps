@@ -668,28 +668,35 @@ function countSubtree(idx) {
     }
 
     function saveNow() {
-      try {
-        const state = {
-          v: 6,
-          nodes,
-          input: taInput.value,
-          sourceId,
-          maxVisibleLevel,
-          copiedSinceChange,
-          lastCopyAt,
-          searchQuery,
-          searchInBody,
-          revealMatches,
-          activeTab,
-          activeTag,
-        };
-        localStorage.setItem(KEY, JSON.stringify(state));
-        badgeSave.className = "badge good badgeSave";
-        badgeSave.textContent = "Saved ✓";
-      } catch {
-        badgeSave.className = "badge warn badgeSave";
-        badgeSave.textContent = "Not saved";
-      }
+      // Pushing the save to the end of the execution queue 
+      // prevents the UI from "hiccuping" during heavy writes.
+      setTimeout(() => {
+        try {
+          const state = {
+            v: 6,
+            nodes,
+            input: taInput.value,
+            sourceId,
+            maxVisibleLevel,
+            copiedSinceChange,
+            lastCopyAt,
+            searchQuery,
+            searchInBody,
+            revealMatches,
+            activeTab,
+            activeTag,
+          };
+          
+          localStorage.setItem(KEY, JSON.stringify(state));
+          
+          badgeSave.className = "badge good badgeSave";
+          badgeSave.textContent = "Saved ✓";
+        } catch (err) {
+          console.error("Storage failed:", err);
+          badgeSave.className = "badge warn badgeSave";
+          badgeSave.textContent = "Not saved";
+        }
+      }, 0);
     }
 
     function saveDebounced() {
@@ -1344,7 +1351,7 @@ function deleteAndPromoteChildren(id) {
       if (activeTab === "tags") rebuildTagUI();
       if (activeTab === "search") scheduleRenderSearchResults();
 
-      saveDebounced();
+      // saveDebounced();
     }
 
 // START WORDCOUNT 
