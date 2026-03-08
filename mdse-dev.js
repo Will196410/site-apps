@@ -47,8 +47,12 @@
 }
 
 [data-app="mdse"] .mdInput {
-  max-height: 400px; /* Adjust this number to your liking */
-  overflow-y: auto;  /* Shows a scrollbar only when needed */
+  display: block;
+  width: 100%;
+  max-height: 400px; 
+  overflow-y: auto;
+  margin-bottom: 12px;
+  resize: vertical; /* This lets YOU manually pull it taller if you need to! */
 }
 
 /* Gemini button definition */
