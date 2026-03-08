@@ -46,6 +46,11 @@
   color: #111;
 }
 
+[data-app="mdse"] .mdInput {
+  max-height: 400px; /* Adjust this number to your liking */
+  overflow-y: auto;  /* Shows a scrollbar only when needed */
+}
+
 /* Gemini button definition */
 
 /* 1. The Base Button (The "Standard" Look) */
@@ -591,7 +596,7 @@ function countSubtree(idx) {
     </div>
 
     <div class="tabPanel panelStructure" role="tabpanel">
-      <textarea class="mdInput" placeholder="Paste Markdown right here..."></textarea>
+      <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
 
       <div class="btnrow">
         <button class="primary btnLoad" type="button">Load Markdown</button>
