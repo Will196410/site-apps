@@ -200,6 +200,38 @@
 [data-app="mdse"] .node.activeNode .tools { display: flex !important; }
 [data-app="mdse"] .node .tools { display: none !important; }
 
+/* level indents. */
+/* Creating the nested outline look */
+[data-app="mdse"] .node.level-1 { margin-left: 0; }
+[data-app="mdse"] .node.level-2 { margin-left: 20px; border-left: 3px solid #eee; }
+[data-app="mdse"] .node.level-3 { margin-left: 40px; border-left: 3px solid #ddd; }
+[data-app="mdse"] .node.level-4 { margin-left: 60px; border-left: 3px solid #ccc; }
+[data-app="mdse"] .node.level-5 { margin-left: 80px; border-left: 3px solid #bbb; }
+[data-app="mdse"] .node.level-6 { margin-left: 100px; border-left: 3px solid #aaa; }
+
+/* Optional: Make the border highlight when the node is active */
+[data-app="mdse"] .node.activeNode {
+  border-left-color: #0b5fff !important;
+}
+
+/* The node you are currently moving */
+[data-app="mdse"] .node.movingSource {
+  background: #fff9c4; /* Light yellow */
+  border: 2px dashed #fbc02d;
+  opacity: 0.8;
+}
+
+/* Valid places to drop the node */
+[data-app="mdse"] .node.moveTarget {
+  border: 2px dashed #4caf50; /* Green dashed border */
+  cursor: alias;
+}
+
+[data-app="mdse"] .node.moveTarget:hover {
+  background: #e8f5e9;
+}
+
+
 /* Responsive */
 @media (max-width: 900px) {
   [data-app="mdse"] .hdr { grid-template-columns: auto auto auto 1fr; row-gap: 10px; }
