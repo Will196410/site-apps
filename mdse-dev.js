@@ -672,33 +672,9 @@ function countSubtree(idx) {
     container.innerHTML = `
 <div class="topbar">
 
-/* Add/Update these rules */
-[data-app="mdse"] .status-header {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-
-[data-app="mdse"] .badges {
-  display: flex;
-  gap: 8px;
-}
-
-[data-app="mdse"] .badge {
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-[data-app="mdse"] .badge.good { background: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
-[data-app="mdse"] .badge.warn { background: #fff3e0; color: #ef6c00; border: 1px solid #ef6c00; }
-[data-app="mdse"] .badge.dim { background: #f5f5f5; color: #9e9e9e; border: 1px solid #9e9e9e; }
-
-  <div class="right">
+  <div class="status-header">
     <div class="badges">
-      <span class="badge dim badgeSave">Unsaved…</span>
+      <span class="badge dim badgeSave">Saved ✓</span>
       <span class="badge warn badgeCopy">Not copied</span>
     </div>
   </div>
