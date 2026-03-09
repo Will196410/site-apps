@@ -255,6 +255,19 @@
   [data-app="mdse"] .tools { grid-column: 1 / -1; justify-content: flex-start; }
   [data-app="mdse"] .title { grid-column: 1 / -1; min-width: 0 !important; }
 }
+@media (max-width: 768px) {
+  [data-app="mdse"] {
+    width: 95vw; /* 95% of the viewport width */
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px; /* Slimmer padding for smaller screens */
+  }
+  
+  [data-app="mdse"] .node {
+    width: 100% !important;
+  }
+}
+
 `;
 
   }
