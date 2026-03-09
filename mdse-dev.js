@@ -151,6 +151,18 @@
 [data-app="mdse"] .tabPanel { display: none; }
 [data-app="mdse"] .tabPanel.active { display: block; }
 
+/* Add this near your Search/TabPanel CSS */
+[data-app="mdse"] .tabSearch .node {
+  border-left: none !important; /* Remove level indents in search */
+  padding-left: 12px !important;
+}
+
+[data-app="mdse"] .tabSearch .hdr {
+  display: flex !important; /* Use flex instead of grid for search results */
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Pills & Badges */
 [data-app="mdse"] .pill {
   border: 2px solid #111;
@@ -1261,26 +1273,33 @@ function makeRafScheduler(renderFn) {
         searchResults.appendChild(card);
       });
     }
-  
-    function jumpToNode(id) {
-      setTab("structure");
 
-      const idx = indexById(id);
-      if (idx >= 0 && nodes[idx].level > maxVisibleLevel) {
-        maxVisibleLevel = 6;
-        selMax.value = "6";
-      }
+function jumpToNode(id) {
+  // 1. Switch to Structure tab immediately
+  setTab("structure"); 
 
-      scheduleRenderStructure();
-
-      const el = canvas.querySelector(`[data-node-id="${id}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const t = el.querySelector(".title");
-        if (t) t.focus();
-      }
+  // 2. Give the browser a tiny moment to "show" the structure tab
+  setTimeout(() => {
+    // 3. Find the element in the DOM
+    const el = canvas.querySelector(`[data-node-id="${id}"]`);
+    
+    if (el) {
+      // 4. Scroll it into view
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      
+      // 5. Visual feedback: Flash the node so the user sees it
+      el.style.transition = "background 0.5s";
+      el.style.background = "#fff9c4"; 
+      setTimeout(() => el.style.background = "", 1000);
+      
+      // 6. Focus the title for immediate editing
+      const t = el.querySelector(".title");
+      if (t) t.focus();
     }
+  }, 50); // 50ms is usually enough for the DOM to update visibility
+}
 
+    
     // ---- Actions ----
     function markChangedFull() {
       setCopiedFlag(false);
