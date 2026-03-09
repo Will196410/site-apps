@@ -151,6 +151,39 @@
 [data-app="mdse"] .tabPanel { display: none; }
 [data-app="mdse"] .tabPanel.active { display: block; }
 
+/* --- NEW STATUS HEADER SECTION --- */
+[data-app="mdse"] .status-header {
+display: flex;
+justify-content: flex-end;
+margin-bottom: 12px;
+padding-bottom: 8px;
+border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+[data-app="mdse"] .badges {
+display: flex;
+gap: 8px;
+}
+
+/* Specific Badge Colors */
+[data-app="mdse"] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
+[data-app="mdse"] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
+[data-app="mdse"] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
+/* --- END NEW SECTION --- */
+
+/* Fix for Search Result Formatting */
+[data-app="mdse"] .tabSearch .node {
+  border-left: none !important; 
+  padding-left: 12px !important;
+}
+
+[data-app="mdse"] .tabSearch .hdr {
+  display: flex !important; 
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+
 /* Pills & Badges */
 [data-app="mdse"] .pill {
   border: 2px solid #111;
