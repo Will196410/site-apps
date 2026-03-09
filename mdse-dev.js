@@ -655,13 +655,6 @@ function countSubtree(idx) {
     <h3>Markdown Outline Utility & Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
 
-  <div class="right">
-    <div class="badges">
-      <span class="badge dim badgeSave">Unsaved…</span>
-      <span class="badge warn badgeCopy">Not copied</span>
-    </div>
-  </div>
-
     <div class="tabs" role="tablist" aria-label="Views">
       <button type="button" class="tabbtn tabStructure" role="tab">Structure</button>
       <button type="button" class="tabbtn tabSearch" role="tab">Search</button>
@@ -727,6 +720,12 @@ function countSubtree(idx) {
     </div>
   </div>
 
+  <div class="right">
+    <div class="badges">
+      <span class="badge dim badgeSave">Unsaved…</span>
+      <span class="badge warn badgeCopy">Not copied</span>
+    </div>
+  </div>
 </div>
 
 <div class="footer">v5.6 — Search tab + Tags tab + Bulk tag direct children</div>
