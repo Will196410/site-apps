@@ -172,6 +172,26 @@
   text-align: center;
 }
 
+/* Status Header Layout */
+[data-app="mdse"] .status-header {
+  display: flex;
+  justify-content: flex-end; /* Pushes badges to the right */
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.05); /* Optional subtle divider */
+}
+
+[data-app="mdse"] .badges {
+  display: flex;
+  gap: 8px;
+}
+
+/* Specific Badge Colors */
+[data-app="mdse"] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
+[data-app="mdse"] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
+[data-app="mdse"] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
+
+
 /* Tools & Buttons */
 [data-app="mdse"] .tools {
   display: flex;
@@ -651,6 +671,38 @@ function countSubtree(idx) {
 
     container.innerHTML = `
 <div class="topbar">
+
+/* Add/Update these rules */
+[data-app="mdse"] .status-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+[data-app="mdse"] .badges {
+  display: flex;
+  gap: 8px;
+}
+
+[data-app="mdse"] .badge {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+[data-app="mdse"] .badge.good { background: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
+[data-app="mdse"] .badge.warn { background: #fff3e0; color: #ef6c00; border: 1px solid #ef6c00; }
+[data-app="mdse"] .badge.dim { background: #f5f5f5; color: #9e9e9e; border: 1px solid #9e9e9e; }
+
+  <div class="right">
+    <div class="badges">
+      <span class="badge dim badgeSave">Unsaved…</span>
+      <span class="badge warn badgeCopy">Not copied</span>
+    </div>
+  </div>
+
   <div class="left">
     <h3>Markdown Outline Utility & Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
@@ -720,12 +772,6 @@ function countSubtree(idx) {
     </div>
   </div>
 
-  <div class="right">
-    <div class="badges">
-      <span class="badge dim badgeSave">Unsaved…</span>
-      <span class="badge warn badgeCopy">Not copied</span>
-    </div>
-  </div>
 </div>
 
 <div class="footer">v5.6 — Search tab + Tags tab + Bulk tag direct children</div>
