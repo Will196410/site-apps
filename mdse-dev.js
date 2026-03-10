@@ -172,48 +172,83 @@ gap: 8px;
 /* --- END NEW SECTION --- */
 
 /* Fix for Search Result Formatting */
-[data-app="mdse"] .tabSearch .node {
-  border-left: none !important; 
-  padding-left: 12px !important;
-}
+/* --- Corrected Search & Tag Result Card Styles --- */
 
-[data-app="mdse"] .tabSearch .hdr {
-  display: flex !important; 
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Styling for Search & Tag results to make them look like cards again */
-[data-app="mdse"] .tabSearch .node, 
-[data-app="mdse"] .tabTags .node {
+/* 1. The main card container */
+[data-app="mdse"] .tagcard {
   display: block !important;
   width: 100%;
-  border: 2px solid #111; /* Matches your main app theme */
+  border: 2px solid #111;
   border-radius: 12px;
   padding: 14px;
   margin-bottom: 12px;
   background: #fdfdfd;
   cursor: pointer;
-  transition: transform 0.1s ease;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
-[data-app="mdse"] .tabSearch .node:hover, 
-[data-app="mdse"] .tabTags .node:hover {
+[data-app="mdse"] .tagcard:hover {
   background: #f0f7ff;
   transform: translateY(-2px);
   border-color: #0b5fff;
+  box-shadow: 0 4px 12px rgba(11, 95, 255, 0.1);
 }
 
-/* Ensure the text inside the results is readable */
-[data-app="mdse"] .tabSearch .hdr, 
-[data-app="mdse"] .tabTags .hdr {
-  display: flex !important;
-  flex-direction: row;
+/* 2. The header row (Level Badge + Title) */
+[data-app="mdse"] .tagcard .toph {
+  display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 700;
+  margin-bottom: 8px;
 }
 
+/* 3. The "H1/H2" badge */
+[data-app="mdse"] .tagcard .lvl {
+  background: #111;
+  color: #fff;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+/* 4. The section title text */
+[data-app="mdse"] .tagcard .titleline {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111;
+}
+
+/* 5. The preview text (first sentence) */
+[data-app="mdse"] .tagcard .preview {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.4;
+  /* Truncate text after 2 lines if it's too long */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 6. Tag pills in the Tags tab */
+[data-app="mdse"] .tagcard .subtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+[data-app="mdse"] .tagcard .tagpill {
+  font-size: 10px;
+  font-weight: 700;
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  color: #444;
+}
 
 /* Pills & Badges */
 [data-app="mdse"] .pill {
