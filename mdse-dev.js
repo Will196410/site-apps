@@ -284,6 +284,20 @@ gap: 8px;
   text-align: center;
 }
 
+[data-app="mdse"],
+[data-app="mdse"] * {
+  box-sizing: border-box;
+}
+
+[data-app="mdse"] .topbar,
+[data-app="mdse"] .left,
+[data-app="mdse"] .tabPanel,
+[data-app="mdse"] .canvas {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+}
+
 /* Status Header Layout */
 [data-app="mdse"] .status-header {
   display: flex;
