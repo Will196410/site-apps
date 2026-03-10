@@ -284,11 +284,6 @@ gap: 8px;
   text-align: center;
 }
 
-[data-app="mdse"],
-[data-app="mdse"] * {
-  box-sizing: border-box;
-}
-
 /* Status Header Layout */
 [data-app="mdse"] .status-header {
   display: flex;
