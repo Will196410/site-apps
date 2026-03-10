@@ -110,34 +110,50 @@
 }
 
 /* Header & Grid Layout */
-/* Header & Grid Layout - Forced Full Width */
-[data-app="mdse"] .hdr {
-  display: grid !important;
-  /* Defined columns for the pills/badges */
-  grid-template-columns: auto auto auto auto auto; 
-  column-gap: 10px;
-  row-gap: 8px;
-  align-items: center;
-  width: 100% !important; /* THE FIX: Force the grid to fill the parent node */
-  min-width: 0;
+/* 1. Force the main container to take all available width up to its max */
+[data-app="mdse"] {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  width: 100% !important; 
+  max-width: 980px;
+  margin: 14px auto;
+  border: 2px solid #111;
+  border-radius: 16px;
+  padding: 18px;
+  background: #fff;
+  color: #111;
+  display: block; /* Ensure it's not being treated as an inline-block */
 }
 
+/* 2. Switch Header from Grid to Flexbox */
+[data-app="mdse"] .hdr {
+  display: flex !important;
+  flex-wrap: wrap;      /* Allows the title to drop to its own line */
+  align-items: center;
+  gap: 10px;
+  width: 100% !important;
+  margin-bottom: 8px;
+}
+
+/* 3. Make the title force a "new line" and fill 100% */
 [data-app="mdse"] .title {
-  grid-column: 1 / -1;    /* Spans the full width of all 5 columns */
-  width: 100% !important; /* THE FIX: Force the textarea to fill the grid row */
+  flex: 1 1 100%;       /* This tells the title: "Take 100% width and grow" */
+  width: 100% !important;
   display: block;
   box-sizing: border-box;
-  min-width: 0 !important; /* Removing the 240px prevents it from pushing the grid weirdly */
   border: 2px solid rgba(0,0,0,.15);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 17px;
   font-weight: 1000;
-  letter-spacing: .2px;
   resize: none;
   overflow: hidden;
-  min-height: 44px;
   background: #fbfbfb;
+  margin-top: 5px;      /* Spacing between buttons and title */
+}
+
+/* 4. Ensure the panels fill the width */
+[data-app="mdse"] .tabPanel {
+  width: 100%;
 }
 
 /* Tabs & Navigation */
@@ -1990,11 +2006,11 @@ btnLoad.addEventListener("click", () => {
   nodes = parseMarkdown(text);
   sourceId = null;
   
-  // Wrap in a timeout to ensure the browser has "accepted" 
-  // the new data before the first render pass starts.
   setTimeout(() => {
     markChangedFull();
-  }, 0);
+    // THE NUDGE: Force a layout recalculation
+    window.dispatchEvent(new Event('resize'));
+  }, 10); // 10ms is usually enough for the DOM to "settle"
 });
 
     btnUpdate.addEventListener("click", () => {
