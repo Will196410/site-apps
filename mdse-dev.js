@@ -162,7 +162,7 @@
 }
 [data-app="mdse"] .tabbtn.active { background: #111; color: #fff; }
 [data-app="mdse"] .tabPanel { display: none; }
-[data-app="mdse"] .tabPanel.active { width: 100%; display: block; }
+[data-app="mdse"] .tabPanel.active { display: block; }
 
 /* --- NEW STATUS HEADER SECTION --- */
 [data-app="mdse"] .status-header {
