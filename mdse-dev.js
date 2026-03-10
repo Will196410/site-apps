@@ -23,14 +23,17 @@
       style.textContent = `
 [data-app="mdse"] {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  max-width: 980px;
-  margin: 14px auto;
+  width: 100%;
+  max-width: none;
+  margin: 14px 0;
   border: 2px solid #111;
   border-radius: 16px;
   padding: 18px;
   background: #fff;
   color: #111;
+  display: block;
 }
+
 [data-app="mdse"] * { box-sizing: border-box; }
 [data-app="mdse"] h3 { margin: 0 0 10px; font-size: 18px; }
 [data-app="mdse"] .muted { color: #444; font-size: 13px; font-weight: 700; }
@@ -110,19 +113,7 @@
 }
 
 /* Header & Grid Layout */
-/* 1. Force the main container to take all available width up to its max */
-[data-app="mdse"] {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  width: 100% !important; 
-  max-width: 980px;
-  margin: 14px auto;
-  border: 2px solid #111;
-  border-radius: 16px;
-  padding: 18px;
-  background: #fff;
-  color: #111;
-  display: block; /* Ensure it's not being treated as an inline-block */
-}
+/* 1. Constainer is defined at the start of the CSS. */
 
 /* 2. Switch Header from Grid to Flexbox */
 [data-app="mdse"] .hdr {
@@ -388,7 +379,7 @@ gap: 8px;
 
 
 /* Responsive */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   [data-app="mdse"] .hdr { grid-template-columns: auto auto auto 1fr; row-gap: 10px; }
   [data-app="mdse"] .tools { grid-column: 1 / -1; justify-content: flex-start; }
   [data-app="mdse"] .title { grid-column: 1 / -1; min-width: 0 !important; }
@@ -1601,7 +1592,8 @@ function deleteAndPromoteChildren(id) {
 
       // Ensure the browser has painted the tab before measuring textarea heights
       requestAnimationFrame(() => {
-        const activePanel = document.querySelector('.tabPanel.active');
+        // const activePanel = document.querySelector('.tabPanel.active');
+        const activePanel = container.querySelector('.tabPanel.active');
         const textareas = activePanel?.querySelectorAll('textarea');
         if (textareas) {
           textareas.forEach(ta => autoResizeTA(ta));
@@ -2000,19 +1992,21 @@ canvas.appendChild(node);
       saveDebounced();
     });
 
+    // ChatGPT
 btnLoad.addEventListener("click", () => {
   const text = taInput.value || "";
   if (!text.trim()) return;
+
   nodes = parseMarkdown(text);
   sourceId = null;
-  
-  setTimeout(() => {
-    markChangedFull();
-    // THE NUDGE: Force a layout recalculation
-    window.dispatchEvent(new Event('resize'));
-  }, 10); // 10ms is usually enough for the DOM to "settle"
-});
 
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      markChangedFull();
+    });
+  });
+});
+    
     btnUpdate.addEventListener("click", () => {
       taInput.value = toMarkdown();
       markChangedFull();
