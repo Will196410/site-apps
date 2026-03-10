@@ -1069,40 +1069,40 @@ async function readClipboardTextFallback() {
 }
 
 function normalizeClipboardToLevel(clip, targetLevel) {
-  const text = (clip || "").replace(/\r\n?/g, "\n").trim();
+  const text = String(clip || "").replace(/\r\n?/g, "\n").trim();
   if (!text) return "";
 
   const lines = text.split("\n");
 
-  // Find first markdown heading
-  let firstHeadingLine = null;
-  for (const ln of lines) {
-    const m = ln.match(/^(#{1,6})\s+(.+)/);
-    if (m) { firstHeadingLine = ln; break; }
+  let firstHeadingIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^(#{1,6})\s+(.+)$/.test(lines[i])) {
+      firstHeadingIndex = i;
+      break;
+    }
   }
 
-  // If no heading, make one from first non-empty line
-  if (!firstHeadingLine) {
-    const firstNonEmpty = lines.find((l) => l.trim().length) || "New node";
-    const rest = lines.slice(lines.indexOf(firstNonEmpty) + 1);
-    return (`${"#".repeat(targetLevel)} ${firstNonEmpty.trim()}\n` + rest.join("\n")).trimEnd();
+  // No headings: leave content completely untouched
+  if (firstHeadingIndex === -1) {
+    return text;
   }
 
-  const m0 = firstHeadingLine.match(/^(#{1,6})\s+/);
+  const m0 = lines[firstHeadingIndex].match(/^(#{1,6})\s+/);
   const clipLevel = m0 ? m0[1].length : 2;
   const delta = targetLevel - clipLevel;
 
-  const adjusted = lines.map((ln) => {
-    const m = ln.match(/^(#{1,6})(\s+.*)$/);
-    if (!m) return ln;
-    let lvl = m[1].length + delta;
-    lvl = Math.max(1, Math.min(6, lvl));
-    return "#".repeat(lvl) + m[2];
-  });
-
-  return adjusted.join("\n").trimEnd();
+  return lines
+    .map((ln) => {
+      const m = ln.match(/^(#{1,6})(\s+.*)$/);
+      if (!m) return ln;
+      let lvl = m[1].length + delta;
+      lvl = Math.max(1, Math.min(6, lvl));
+      return "#".repeat(lvl) + m[2];
+    })
+    .join("\n")
+    .trimEnd();
 }
-
+    
 async function pasteClipboardAsSiblingAfter(nodeId) {
   pushUndo("paste");
   const idx = indexById(nodeId);
