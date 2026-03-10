@@ -34,7 +34,10 @@
   display: block;
 }
 
-[data-app="mdse"] * { box-sizing: border-box; }
+[data-app="mdse"],
+[data-app="mdse"] * {
+  box-sizing: border-box;
+}
 [data-app="mdse"] h3 { margin: 0 0 10px; font-size: 18px; }
 [data-app="mdse"] .muted { color: #444; font-size: 13px; font-weight: 700; }
 
@@ -990,7 +993,7 @@ function countSubtree(idx) {
     }
 
     // ---- Markdown parse / export ----
-/ * Gemini version of parseMarkdown */
+/* Gemini version of parseMarkdown */
     function parseMarkdown(text) {
   const lines = (text || "").split("\n");
   const out = [];
@@ -1992,11 +1995,8 @@ btnLoad.addEventListener("click", () => {
   nodes = parseMarkdown(text);
   sourceId = null;
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      markChangedFull();
-    });
-  });
+  markChangedFull();
+  refreshLayout(); 
 });
     
     btnUpdate.addEventListener("click", () => {
@@ -2131,6 +2131,11 @@ function refreshLayout() {
     });
   });
 }
+
+window.addEventListener("load", refreshLayout);
+window.addEventListener("resize", refreshLayout);
+window.addEventListener("orientationchange", refreshLayout);
+window.addEventListener("pageshow", refreshLayout);
     
     // ---- Init ----
     loadPref();
@@ -2151,10 +2156,6 @@ function refreshLayout() {
     saveDebounced();
     refreshLayout();
     //
-window.addEventListener("load", refreshLayout);
-window.addEventListener("resize", refreshLayout);
-window.addEventListener("orientationchange", refreshLayout);
-window.addEventListener("pageshow", refreshLayout);
     
   });
 })();
