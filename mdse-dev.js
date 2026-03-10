@@ -417,7 +417,32 @@ function autoResizeTA(el) {
 }
 
   // stop
+function downloadFile(filename, content, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
 
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function slugifyFilename(s) {
+  return (s || "outline")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "outline";
+}
+
+
+  
   function safeJsonParse(s) {
     try { return JSON.parse(s); } catch { return null; }
   }
@@ -801,6 +826,7 @@ function countSubtree(idx) {
         <button class="btnUpdate" type="button">Update Input Area</button>
         <button class="btnUndo" type="button">↺ Undo</button>
         <button class="primary btnCopy" type="button">Copy Result</button>
+        <button class="btnExport" type="button">Export .md</button>
         <button class="warn btnReset" type="button">Reset Everything</button>
         <button class="btnAddTop" type="button">+ Add H1</button>
       </div>
@@ -879,6 +905,7 @@ function countSubtree(idx) {
     const btnUpdate = $(".btnUpdate");
     const btnUndo = $(".btnUndo");
     const btnCopy = $(".btnCopy");
+    const btnExport = $(".btnExport");
     const btnReset = $(".btnReset");
     const btnAddTop = $(".btnAddTop");
 
@@ -2031,6 +2058,20 @@ btnLoad.addEventListener("click", () => {
       saveDebounced();
     });
 
+btnExport.addEventListener("click", () => {
+  const md = toMarkdown();
+  taInput.value = md;
+
+  const firstTitle =
+    nodes.find((n) => (n.title || "").trim())?.title || "outline";
+
+  const filename = `${slugifyFilename(firstTitle)}.md`;
+  downloadFile(filename, md, "text/markdown;charset=utf-8");
+
+  setCopiedFlag(false);
+  saveDebounced();
+});
+    
     btnReset.addEventListener("click", () => {
       if (!confirm("Reset everything (including saved state for this app instance)?")) return;
       nodes = [];
