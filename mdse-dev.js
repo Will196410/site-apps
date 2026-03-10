@@ -2120,22 +2120,60 @@ btnLoad.addEventListener("click", () => {
 
 function refreshLayout() {
   requestAnimationFrame(() => {
+    // Force the browser to re-evaluate percentage widths against current parent
+    container.style.width = "";         // clear any stale inline width
+    void container.getBoundingClientRect(); // trigger reflow
+
     requestAnimationFrame(() => {
       scheduleRenderStructure();
-
       const activePanel = container.querySelector(".tabPanel.active");
       const textareas = activePanel?.querySelectorAll("textarea");
-      if (textareas) {
-        textareas.forEach((ta) => autoResizeTA(ta));
-      }
+      if (textareas) textareas.forEach((ta) => autoResizeTA(ta));
     });
   });
 }
-
-window.addEventListener("load", refreshLayout);
+    
 window.addEventListener("resize", refreshLayout);
 window.addEventListener("orientationchange", refreshLayout);
 window.addEventListener("pageshow", refreshLayout);
+
+// Watch for SquareSpace's layout engine finalising the parent's width.
+// This fires when the containing column goes from 0/partial → full width.
+(function watchParentWidth() {
+  const parent = container.parentElement;
+  if (!parent) { refreshLayout(); return; }
+
+  if (window.ResizeObserver) {
+    let settled = false;
+    const ro = new ResizeObserver(() => {
+      if (container.offsetWidth > 100) { // has a real width now
+        if (!settled) {
+          settled = true;
+          refreshLayout();
+        }
+      }
+    });
+    ro.observe(parent);
+
+    // Still fire on load as a fallback
+    window.addEventListener("load", () => {
+      ro.observe(parent); // re-observe in case it was swapped
+      refreshLayout();
+    });
+  } else {
+    // Fallback for older browsers: poll until the parent has width
+    let tries = 0;
+    function poll() {
+      if (container.offsetWidth > 100 || tries++ > 30) {
+        refreshLayout();
+      } else {
+        setTimeout(poll, 100);
+      }
+    }
+    window.addEventListener("load", poll);
+    poll();
+  }
+})();
     
     // ---- Init ----
     loadPref();
