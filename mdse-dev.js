@@ -21,11 +21,11 @@
     }
 
       style.textContent = `
+
 [data-app="mdse"] {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  width: 100%;
-  max-width: none;
-  margin: 14px 0;
+  width: min(100%, 1280px);
+  margin: 14px auto;
   border: 2px solid #111;
   border-radius: 16px;
   padding: 18px;
@@ -379,22 +379,14 @@ gap: 8px;
 
 
 /* Responsive */
+
 @media (max-width: 768px) {
-  [data-app="mdse"] .hdr { grid-template-columns: auto auto auto 1fr; row-gap: 10px; }
-  [data-app="mdse"] .tools { grid-column: 1 / -1; justify-content: flex-start; }
-  [data-app="mdse"] .title { grid-column: 1 / -1; min-width: 0 !important; }
-}
-@media (max-width: 768px) {
+
   [data-app="mdse"] {
-    width: 95vw; /* 95% of the viewport width */
-    margin-left: auto;
-    margin-right: auto;
-    padding: 10px; /* Slimmer padding for smaller screens */
+    width: 100%;
+    padding: 10px;
   }
   
-  [data-app="mdse"] .node {
-    width: 100% !important;
-  }
 }
 
 `;
