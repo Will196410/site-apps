@@ -2117,6 +2117,20 @@ btnLoad.addEventListener("click", () => {
     scheduleRenderStructure();
   }
 });
+
+function refreshLayout() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scheduleRenderStructure();
+
+      const activePanel = container.querySelector(".tabPanel.active");
+      const textareas = activePanel?.querySelectorAll("textarea");
+      if (textareas) {
+        textareas.forEach((ta) => autoResizeTA(ta));
+      }
+    });
+  });
+}
     
     // ---- Init ----
     loadPref();
@@ -2135,5 +2149,12 @@ btnLoad.addEventListener("click", () => {
     rebuildTagUI();
     setTab(activeTab || "structure");
     saveDebounced();
+    refreshLayout();
+    //
+window.addEventListener("load", refreshLayout);
+window.addEventListener("resize", refreshLayout);
+window.addEventListener("orientationchange", refreshLayout);
+window.addEventListener("pageshow", refreshLayout);
+    
   });
 })();
