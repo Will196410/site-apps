@@ -183,6 +183,37 @@ gap: 8px;
   gap: 8px;
 }
 
+/* Styling for Search & Tag results to make them look like cards again */
+[data-app="mdse"] .tabSearch .node, 
+[data-app="mdse"] .tabTags .node {
+  display: block !important;
+  width: 100%;
+  border: 2px solid #111; /* Matches your main app theme */
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fdfdfd;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+[data-app="mdse"] .tabSearch .node:hover, 
+[data-app="mdse"] .tabTags .node:hover {
+  background: #f0f7ff;
+  transform: translateY(-2px);
+  border-color: #0b5fff;
+}
+
+/* Ensure the text inside the results is readable */
+[data-app="mdse"] .tabSearch .hdr, 
+[data-app="mdse"] .tabTags .hdr {
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
 
 /* Pills & Badges */
 [data-app="mdse"] .pill {
