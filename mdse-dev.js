@@ -110,20 +110,24 @@
 }
 
 /* Header & Grid Layout */
+/* Header & Grid Layout - Forced Full Width */
 [data-app="mdse"] .hdr {
   display: grid !important;
-  grid-template-columns: auto auto auto auto auto;
+  /* Defined columns for the pills/badges */
+  grid-template-columns: auto auto auto auto auto; 
   column-gap: 10px;
   row-gap: 8px;
   align-items: center;
+  width: 100% !important; /* THE FIX: Force the grid to fill the parent node */
   min-width: 0;
 }
-[data-app="mdse"] .hdr > * { min-width: 0; }
 
 [data-app="mdse"] .title {
-  grid-column: 1 / -1;
-  width: 100% !important;
-  min-width: 240px !important;
+  grid-column: 1 / -1;    /* Spans the full width of all 5 columns */
+  width: 100% !important; /* THE FIX: Force the textarea to fill the grid row */
+  display: block;
+  box-sizing: border-box;
+  min-width: 0 !important; /* Removing the 240px prevents it from pushing the grid weirdly */
   border: 2px solid rgba(0,0,0,.15);
   border-radius: 12px;
   padding: 12px 14px;
@@ -134,7 +138,6 @@
   overflow: hidden;
   min-height: 44px;
   background: #fbfbfb;
-  display: block;
 }
 
 /* Tabs & Navigation */
@@ -1981,13 +1984,18 @@ canvas.appendChild(node);
       saveDebounced();
     });
 
-    btnLoad.addEventListener("click", () => {
-      const text = taInput.value || "";
-      if (!text.trim()) return;
-      nodes = parseMarkdown(text);
-      sourceId = null;
-      markChangedFull();
-    });
+btnLoad.addEventListener("click", () => {
+  const text = taInput.value || "";
+  if (!text.trim()) return;
+  nodes = parseMarkdown(text);
+  sourceId = null;
+  
+  // Wrap in a timeout to ensure the browser has "accepted" 
+  // the new data before the first render pass starts.
+  setTimeout(() => {
+    markChangedFull();
+  }, 0);
+});
 
     btnUpdate.addEventListener("click", () => {
       taInput.value = toMarkdown();
