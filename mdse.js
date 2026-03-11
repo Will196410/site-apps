@@ -20,273 +20,262 @@
       document.head.appendChild(style);
     }
 
-    style.textContent = `
-[data-app="mdse"]{
+      style.textContent = `
+
+[data-app="mdse"] {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  max-width: 980px;
+  width: min(100%, 1280px);
   margin: 14px auto;
   border: 2px solid #111;
   border-radius: 16px;
   padding: 18px;
   background: #fff;
   color: #111;
+  display: block;
 }
-[data-app="mdse"] *{ box-sizing:border-box; }
-[data-app="mdse"] h3{ margin:0 0 10px; font-size: 18px; }
-[data-app="mdse"] .muted{ color:#444; font-size: 13px; font-weight: 700; }
 
-[data-app="mdse"] textarea:not(.title){ width:100%; }
+[data-app="mdse"],
+[data-app="mdse"] * {
+  box-sizing: border-box;
+}
+[data-app="mdse"] h3 { margin: 0 0 10px; font-size: 18px; }
+[data-app="mdse"] .muted { color: #444; font-size: 13px; font-weight: 700; }
 
-[data-app="mdse"] textarea,
-[data-app="mdse"] input,
-[data-app="mdse"] select{
-  border:2px solid #111;
+/* Inputs & Form Elements */
+[data-app="mdse"] textarea, [data-app="mdse"] input, [data-app="mdse"] select {
+  border: 2px solid #111;
   border-radius: 12px;
   padding: 12px;
   font-size: 16px;
   line-height: 1.35;
   background: #fbfbfb;
-  color:#111;
+  color: #111;
 }
-[data-app="mdse"] textarea:focus,
-[data-app="mdse"] button:focus,
-[data-app="mdse"] select:focus,
-[data-app="mdse"] input:focus{
+
+[data-app="mdse"] .mdInput {
+  display: block;
+  width: 100%;
+  max-height: 400px; 
+  overflow-y: auto;
+  margin-bottom: 12px;
+  resize: vertical; /* This lets YOU manually pull it taller if you need to! */
+}
+
+/* Gemini button definition */
+
+/* 1. The Base Button (The "Standard" Look) */
+[data-app="mdse"] button {
+  border: 2px solid #111;
+  border-radius: 999px; /* Consistent Pill Shape */
+  padding: 8px 14px;
+  font-weight: 800;
+  font-size: 13px;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  transition: transform 0.1s active;
+}
+
+/* 2. Primary Action (Black background - Draws the eye) */
+[data-app="mdse"] button.primary {
+  background: #111;
+  color: #fff;
+}
+
+/* 3. Warning Action (Red/White - Looks "Dangerous") */
+[data-app="mdse"] button.warn {
+  border-color: #a00;
+  color: #a00;
+  background: #fffafa;
+}
+
+/* 4. Hover/Active States (Makes it feel like an app) */
+[data-app="mdse"] button:hover {
+  opacity: 0.85;
+}
+[data-app="mdse"] button:active {
+  transform: scale(0.96); /* Subtle "click" feel */
+}
+
+/* 5. Tidying the Rows */
+[data-app="mdse"] .btnrow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0;
+}
+
+
+/* end Gemini */
+
+[data-app="mdse"] textarea:not(.title) { width: 100%; }
+[data-app="mdse"] textarea:focus, [data-app="mdse"] button:focus, [data-app="mdse"] select:focus, [data-app="mdse"] input:focus {
   outline: 3px solid rgba(11,95,255,.35);
   outline-offset: 2px;
 }
 
-[data-app="mdse"] .topbar{
-  display:flex;
-  gap: 12px;
-  align-items:flex-start;
-  flex-wrap:wrap;
-  margin-bottom: 10px;
-}
-[data-app="mdse"] .topbar .left{ flex: 1 1 520px; min-width: 0; }
-[data-app="mdse"] .topbar .right{ flex: 1 1 220px; display:flex; justify-content:flex-end; min-width: 0; }
+/* Header & Grid Layout */
+/* 1. Constainer is defined at the start of the CSS. */
 
-[data-app="mdse"] .tabs{
-  display:flex;
+/* 2. Switch Header from Grid to Flexbox */
+[data-app="mdse"] .hdr {
+  display: flex !important;
+  flex-wrap: wrap;      /* Allows the title to drop to its own line */
+  align-items: center;
   gap: 10px;
-  flex-wrap:wrap;
-  margin: 6px 0 10px;
+  width: 100% !important;
+  margin-bottom: 8px;
 }
-[data-app="mdse"] .tabbtn{
-  border:2px solid #111;
+
+/* 3. Make the title force a "new line" and fill 100% */
+[data-app="mdse"] .title {
+  flex: 1 1 100%;       /* This tells the title: "Take 100% width and grow" */
+  width: 100% !important;
+  display: block;
+  box-sizing: border-box;
+  border: 2px solid rgba(0,0,0,.15);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 17px;
+  font-weight: 1000;
+  resize: none;
+  overflow: hidden;
+  background: #fbfbfb;
+  margin-top: 5px;      /* Spacing between buttons and title */
+}
+
+/* 4. Ensure the panels fill the width */
+[data-app="mdse"] .tabPanel {
+  width: 100%;
+}
+
+/* Tabs & Navigation */
+[data-app="mdse"] .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
+[data-app="mdse"] .tabbtn {
+  border: 2px solid #111;
   border-radius: 999px;
   padding: 8px 12px;
   font-weight: 1000;
-  background:#fff;
-  cursor:pointer;
-}
-[data-app="mdse"] .tabbtn.active{
-  background:#111;
-  color:#fff;
-}
-[data-app="mdse"] .tabPanel{ display:none; }
-[data-app="mdse"] .tabPanel.active{ display:block; }
-
-[data-app="mdse"] .btnrow{
-  display:flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 10px 0 10px;
-}
-[data-app="mdse"] button{
-  border: 2px solid #111;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 900;
-  font-size: 13px;
   background: #fff;
   cursor: pointer;
 }
-[data-app="mdse"] button.primary{ background:#111; color:#fff; }
-[data-app="mdse"] button.warn{ border-color:#7a0000; color:#7a0000; }
-[data-app="mdse"] button:disabled{ opacity:.55; cursor:not-allowed; }
+[data-app="mdse"] .tabbtn.active { background: #111; color: #fff; }
+[data-app="mdse"] .tabPanel { display: none; }
+[data-app="mdse"] .tabPanel.active { display: block; }
 
-[data-app="mdse"] .badges{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  justify-content:flex-end;
-  flex-wrap:wrap;
-}
-[data-app="mdse"] .badge{
-  border:2px solid #111;
-  border-radius:999px;
-  padding: 6px 10px;
-  font-weight: 900;
-  font-size: 13px;
-  background:#fff;
-}
-[data-app="mdse"] .badge.good{ border-color:#0b3d0b; color:#0b3d0b; }
-[data-app="mdse"] .badge.warn{ border-color:#7a0000; color:#7a0000; }
-[data-app="mdse"] .badge.dim{ border-color:#444; color:#444; }
-
-[data-app="mdse"] .levelFilter{
-  display:flex;
-  gap: 8px;
-  align-items:center;
-  flex-wrap:wrap;
-  margin-top: 10px;
-}
-[data-app="mdse"] .levelFilter label{
-  font-weight: 900;
-  font-size: 13px;
-}
-[data-app="mdse"] select{
-  padding: 8px 10px;
-  font-weight: 900;
-  background:#fff;
+/* --- NEW STATUS HEADER SECTION --- */
+[data-app="mdse"] .status-header {
+display: flex;
+justify-content: flex-end;
+margin-bottom: 12px;
+padding-bottom: 8px;
+border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
-/* Search UI */
-[data-app="mdse"] .searchRow{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  flex-wrap:wrap;
-  margin-top: 10px;
+[data-app="mdse"] .badges {
+display: flex;
+gap: 8px;
 }
-[data-app="mdse"] .searchRow input[type="search"]{
-  flex: 1 1 260px;
-  border:2px solid #111;
+
+/* Specific Badge Colors */
+[data-app="mdse"] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
+[data-app="mdse"] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
+[data-app="mdse"] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
+/* --- END NEW SECTION --- */
+
+/* Fix for Search Result Formatting */
+/* --- Corrected Search & Tag Result Card Styles --- */
+
+/* 1. The main card container */
+[data-app="mdse"] .tagcard {
+  display: block !important;
+  width: 100%;
+  border: 2px solid #111;
   border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 900;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fdfdfd;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+[data-app="mdse"] .tagcard:hover {
+  background: #f0f7ff;
+  transform: translateY(-2px);
+  border-color: #0b5fff;
+  box-shadow: 0 4px 12px rgba(11, 95, 255, 0.1);
+}
+
+/* 2. The header row (Level Badge + Title) */
+[data-app="mdse"] .tagcard .toph {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* 3. The "H1/H2" badge */
+[data-app="mdse"] .tagcard .lvl {
+  background: #111;
+  color: #fff;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+/* 4. The section title text */
+[data-app="mdse"] .tagcard .titleline {
+  font-weight: 700;
   font-size: 15px;
-  background:#fff;
+  color: #111;
 }
-[data-app="mdse"] .searchOpt{
-  display:flex;
-  gap:6px;
-  align-items:center;
-  font-weight: 900;
+
+/* 5. The preview text (first sentence) */
+[data-app="mdse"] .tagcard .preview {
   font-size: 13px;
-  color:#222;
-}
-[data-app="mdse"] .searchCount{
-  font-weight: 900;
-  font-size: 13px;
-  color:#444;
-  padding: 6px 10px;
-  border: 2px solid rgba(0,0,0,.15);
-  border-radius: 999px;
-  background:#fff;
+  color: #555;
+  line-height: 1.4;
+  /* Truncate text after 2 lines if it's too long */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-[data-app="mdse"] .canvas{ margin-top: 14px; }
-
-[data-app="mdse"] .node{
-  background:#fff;
-  border: 2px solid rgba(0,0,0,.15);
-  border-radius: 14px;
-  padding: 12px;
-  margin: 10px 0;
-}
-[data-app="mdse"] .node.level-1{ border-left: 10px solid #111; margin-left:0; }
-[data-app="mdse"] .node.level-2{ border-left: 10px solid #444; margin-left:18px; }
-[data-app="mdse"] .node.level-3{ border-left: 10px solid #777; margin-left:36px; }
-[data-app="mdse"] .node.level-4{ border-left: 10px solid #999; margin-left:54px; }
-[data-app="mdse"] .node.level-5{ border-left: 10px solid #bbb; margin-left:72px; }
-[data-app="mdse"] .node.level-6{ border-left: 10px solid #ddd; margin-left:90px; }
-
-/* iPad/Safari flex squeeze fix: grid header */
-[data-app="mdse"] .hdr{
-  display: grid !important;
-  grid-template-columns: auto auto auto auto auto; /* pin, col, Hx, (2,5), miniTools */
-  column-gap: 10px;
-  row-gap: 8px;
-  align-items: start;
-  min-width: 0;
-}
-[data-app="mdse"] .hdr > *{ min-width: 0; }
-
-[data-app="mdse"] .tools{
-  display:flex;
+/* 6. Tag pills in the Tags tab */
+[data-app="mdse"] .tagcard .subtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
   margin-top: 10px;
-  padding-top: 10px;
-  border-top: 2px solid rgba(0,0,0,.08);
-  justify-content: flex-start;
 }
 
-/* PASTE START */
-
-[data-app="mdse"] .miniTools{
-  display:flex;
-  gap:6px;
-  align-items:center;
-  justify-content:flex-end;
+[data-app="mdse"] .tagcard .tagpill {
+  font-size: 10px;
+  font-weight: 700;
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  color: #444;
 }
 
-[data-app="mdse"] .miniTools{
-  white-space: nowrap;
-}
-
-[data-app="mdse"] .miniBtn{
-  border:2px solid rgba(0,0,0,.15);
-  border-radius:10px;
-  padding:4px 6px;
-  font-weight:1000;
-  font-size:11px;
-  line-height:1;
-  background:#fff;
-}
-
-[data-app="mdse"] .miniBtn:disabled{
-  opacity:0.35;
-  cursor:not-allowed;
-}
-
-[data-app="mdse"] .miniBtn.primary{
-  border-color:#111;
-  background:#111;
-  color:#fff;
-}
-
-/* PASTE STOP */
-
-
-/* Optional: subtle highlight for the active node */
-[data-app="mdse"] .node.activeNode{
-  border-color: rgba(11,95,255,.45);
-  box-shadow: 0 8px 22px rgba(11,95,255,.08);
-}
-
-[data-app="mdse"] .pill{
-  border:2px solid #111;
+/* Pills & Badges */
+[data-app="mdse"] .pill {
+  border: 2px solid #111;
   border-radius: 12px;
   padding: 8px 10px;
   font-weight: 900;
   font-size: 13px;
-  background:#fff;
+  background: #fff;
   user-select: none;
 }
-/* Compact structural controls */
-[data-app="mdse"] .hdr .pill{
-  padding: 4px 8px;
-  font-size: 12px;
-  border-radius: 10px;
-}
-[data-app="mdse"] .pill.gray{ border-color:#444; color:#444; }
-[data-app="mdse"] .hdr .pill.gray{
-  border: 1px solid rgba(0,0,0,.15);
-  padding: 4px 6px;
-  font-size: 11px;
-}
-[data-app="mdse"] .hdr .pill:not(.gray){
-  padding: 4px 10px;
-  font-size: 12px;
-}
-[data-app="mdse"] .hdr .pill:not(.gray){
-  padding: 4px 12px;
-  font-size: 13px;
-  border: 3px solid #111;
-}
-/* Structural controls — compact but crisp */
-[data-app="mdse"] .hdr .pill.gray{
+[data-app="mdse"] .hdr .pill { padding: 4px 8px; font-size: 12px; border-radius: 10px; }
+[data-app="mdse"] .hdr .pill:not(.gray) { padding: 4px 12px; font-size: 13px; border: 3px solid #111; }
+[data-app="mdse"] .hdr .pill.gray {
   padding: 2px 6px;
   font-size: 12px;
   border: 2px solid rgba(0,0,0,.35);
@@ -295,249 +284,116 @@
   text-align: center;
 }
 
-/* REDUCE TOOLBAR IMPACT */
-
-/* Make structural row compact */
-[data-app="mdse"] .hdr{
-  align-items: center;
+/* Status Header Layout */
+[data-app="mdse"] .status-header {
+  display: flex;
+  justify-content: flex-end; /* Pushes badges to the right */
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.05); /* Optional subtle divider */
 }
 
-[data-app="mdse"] .hdr .pill{
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-/* Make structural row compact */
-[data-app="mdse"] .hdr{
-  align-items: center;
-}
-
-[data-app="mdse"] .hdr .pill{
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-/* Make structural row compact */
-[data-app="mdse"] .hdr{
-  align-items: center;
-}
-
-[data-app="mdse"] .hdr .pill{
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-/* REDUCE TOOLBAR IMPACT */
-
-[data-app="mdse"] .title{
-  width: 100% !important;
-  min-width: 240px !important;
-  border:2px solid rgba(0,0,0,.15);
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 16px;
-  font-weight: 900;
-  resize: none;
-  overflow:hidden;
-  min-height: 44px;
-  background: #fbfbfb;
-  display:block;
-}
-
-[data-app="mdse"] .title{
-  grid-column: 1 / -1;   /* full width */
-}
-
-/* START TITLE ENLARFGE */
-
-[data-app="mdse"] .title{
-  font-size: 17px;
-  font-weight: 1000;
-  padding: 12px 14px;
-}
-
-[data-app="mdse"] .title{
-  font-weight: 950;
-  letter-spacing: .2px;
-}
-
-/* STOP TITLE ENLARGE */
-
-[data-app="mdse"] .tools{
-  display:flex;
-  gap: 6px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  align-items:flex-start;
-  margin-left: 0 !important;
-}
-[data-app="mdse"] .tools button{
-  padding: 8px 10px;
-  border-radius: 12px;
-  font-size: 13px;
-}
-
-[data-app="mdse"] .body textarea{ white-space: pre-wrap; }
-[data-app="mdse"] .body{ margin-top: 10px; display:none; }
-[data-app="mdse"] .body.show{ display:block; }
-
-[data-app="mdse"] .hint{
-  margin-top: 10px;
-  font-size: 13px;
-  font-weight: 800;
-  color:#444;
-}
-
-@media (max-width: 900px){
-  [data-app="mdse"] .hdr{
-    grid-template-columns: auto auto auto 1fr;
-    grid-auto-rows: auto;
-    row-gap: 10px;
-  }
-  [data-app="mdse"] .tools{
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-  [data-app="mdse"] .title{
-    grid-column: 1 / -1;
-    min-width: 0 !important;
-  }
-}
-
-[data-app="mdse"] .movingSource{
-  border-color: #0b5fff !important;
-  box-shadow: 0 8px 28px rgba(11,95,255,.18);
-  background: #f6f9ff !important;
-}
-[data-app="mdse"] .moveTarget{
-  cursor:pointer;
-  border-color:#0b3d0b !important;
-  background:#f1fff1 !important;
-}
-[data-app="mdse"] .collapsed{
-  border-color:#9a7b00 !important;
-  background:#fffbe6 !important;
-}
-
-/* Search highlighting (Structure tab) */
-[data-app="mdse"] .match{
-  outline: 4px solid rgba(255, 170, 0, .65);
-  outline-offset: 2px;
-}
-[data-app="mdse"] .activeMatch{
-  outline: 5px solid rgba(255, 120, 0, .85);
-  outline-offset: 3px;
-}
-
-/* Tags + Search cards */
-[data-app="mdse"] .tagbar{
-  display:flex;
-  gap: 10px;
-  flex-wrap:wrap;
-  align-items:center;
-  margin: 10px 0 12px;
-}
-[data-app="mdse"] .tagchip{
-  border:2px solid #111;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-weight: 1000;
-  background:#fff;
-  cursor:pointer;
-}
-[data-app="mdse"] .tagchip.active{
-  background:#111;
-  color:#fff;
-}
-[data-app="mdse"] .tagmeta{
-  font-weight: 900;
-  color:#444;
-  font-size: 13px;
-}
-[data-app="mdse"] .taglist{
-  display:grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-[data-app="mdse"] .tagcard{
-  border:2px solid rgba(0,0,0,.15);
-  border-radius: 14px;
-  padding: 12px;
-  background:#fff;
-  cursor:pointer;
-}
-[data-app="mdse"] .tagcard:hover{
-  box-shadow: 0 6px 18px rgba(0,0,0,.06);
-}
-[data-app="mdse"] .tagcard .toph{
-  display:flex;
-  gap: 10px;
-  align-items:center;
-  flex-wrap:wrap;
-  font-weight: 1000;
-}
-[data-app="mdse"] .tagcard .toph .lvl{
-  border:2px solid #111;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 1000;
-}
-[data-app="mdse"] .tagcard .titleline{
-  font-size: 15px;
-  font-weight: 1000;
-}
-[data-app="mdse"] .tagcard .preview{
-  margin-top: 6px;
-  color:#333;
-  font-weight: 750;
-  font-size: 14px;
-  line-height: 1.35;
-}
-[data-app="mdse"] .tagcard .subtags{
-  margin-top: 8px;
-  display:flex;
+[data-app="mdse"] .badges {
+  display: flex;
   gap: 8px;
-  flex-wrap:wrap;
 }
-[data-app="mdse"] .tagpill{
+
+/* Specific Badge Colors */
+[data-app="mdse"] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
+[data-app="mdse"] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
+[data-app="mdse"] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
+
+
+/* Tools & Buttons */
+[data-app="mdse"] .tools {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid rgba(0,0,0,.08);
+}
+[data-app="mdse"] .miniTools { display: flex; gap: 6px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+[data-app="mdse"] .miniBtn {
   border: 2px solid rgba(0,0,0,.15);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
+  border-radius: 10px;
+  padding: 4px 6px;
   font-weight: 1000;
-  color:#444;
-  background:#fff;
-}
-
-[data-app="mdse"] .footer{
-  margin-top: 14px;
-  font-size: 12px;
-  color:#666;
-  font-weight: 700;
-  text-align:right;
-}
-
-/* NODE COUNTS START */
-
-[data-app="mdse"] .nodeMeta{
   font-size: 11px;
-  font-weight: 700;
-  color: #666;
-  margin-left: 6px;
-  white-space: nowrap;
+  line-height: 1;
+  background: #fff;
 }
 
-/* NODE COUTNS STOP */
+/* Nodes */
+[data-app="mdse"] .node { width: 100%; display: block; background: #fff; border: 2px solid rgba(0,0,0,.15); border-radius: 14px; padding: 12px; margin: 10px 0; }
+[data-app="mdse"] .node.activeNode { border-color: rgba(11,95,255,.45); box-shadow: 0 8px 22px rgba(11,95,255,.08); }
+[data-app="mdse"] .node.activeNode .tools { display: flex !important; }
+[data-app="mdse"] .node .tools { display: none !important; }
 
-/* Hide tools until node is active */
-[data-app="mdse"] .node .tools{ display:none !important; }
-[data-app="mdse"] .node.activeNode .tools{ display:flex !important; }
+/* level indents. */
+/* Indent the content, but keep the background/border full width */
+[data-app="mdse"] .node.level-1 { padding-left: 12px; }
+[data-app="mdse"] .node.level-2 { padding-left: 32px; border-left: 4px solid #eee; }
+[data-app="mdse"] .node.level-3 { padding-left: 52px; border-left: 4px solid #ddd; }
+[data-app="mdse"] .node.level-4 { padding-left: 72px; border-left: 4px solid #ccc; }
+[data-app="mdse"] .node.level-5 { padding-left: 92px; border-left: 4px solid #bbb; }
+[data-app="mdse"] .node.level-6 { padding-left: 112px; border-left: 4px solid #aaa; }
+
+[data-app="mdse"] .node .body {
+  display: none; /* Hidden by default */
+  width: 100%;
+  margin-top: 10px;
+}
+
+[data-app="mdse"] .node .body.show {
+  display: block; /* Shown only when 'show' class is added */
+}
+
+
+/* Ensure textareas within the node still stretch to the new edge */
+[data-app="mdse"] .node textarea {
+  width: 100%;
+  display: block;
+}
+
+/* Optional: Make the border highlight when the node is active */
+[data-app="mdse"] .node.activeNode {
+  border-left-color: #0b5fff !important;
+}
+
+/* The node you are currently moving */
+[data-app="mdse"] .node.movingSource {
+  background: #fff9c4; /* Light yellow */
+  border: 2px dashed #fbc02d;
+  opacity: 0.8;
+}
+
+/* Valid places to drop the node */
+[data-app="mdse"] .node.moveTarget {
+  border: 2px dashed #4caf50; /* Green dashed border */
+  cursor: alias;
+}
+
+[data-app="mdse"] .node.moveTarget:hover {
+  background: #e8f5e9;
+}
+
+
+/* Responsive */
+
+@media (max-width: 768px) {
+
+  [data-app="mdse"] {
+    width: 100%;
+    padding: 10px;
+  }
+  
+}
 
 `;
+
   }
 
   // ---- Utilities ----
@@ -545,11 +401,48 @@
   const uid = () =>
     `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
-  function autoResizeTA(ta) {
-    ta.style.height = "auto";
-    ta.style.height = Math.max(44, ta.scrollHeight) + "px";
+// start
+function autoResizeTA(el) {
+  if (!el) return;
+  
+  // 1. Reset height to 'auto' so the scrollHeight is 
+  // calculated based on content only (allows shrinking).
+  el.style.height = 'auto';
+  
+  // 2. Set the height to the scrollHeight plus a small 
+  // buffer for the border (usually 2px).
+  if (el.scrollHeight > 0) {
+    el.style.height = (el.scrollHeight + 2) + 'px';
   }
+}
 
+  // stop
+function downloadFile(filename, content, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function slugifyFilename(s) {
+  return (s || "outline")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "outline";
+}
+
+
+  
   function safeJsonParse(s) {
     try { return JSON.parse(s); } catch { return null; }
   }
@@ -685,9 +578,19 @@
 // START UNDO STATE
 
     // ---- Undo (structural) ----
-const UNDO_LIMIT = 60;
+const UNDO_LIMIT = 10;
 let undoStack = [];
 
+// --- Global Schedulers ---
+// (makeRafScheduler is hoisted, so this works even if the 
+// function definition is at the bottom of the file!)
+
+const scheduleRenderTagCloud      = makeRafScheduler(renderTagCloud);
+const scheduleRenderTagResults    = makeRafScheduler(renderTagResults);
+const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
+const scheduleRenderStructure      = makeRafScheduler(renderStructure);
+
+    
 function snapshotNodes() {
   // JSON clone is simplest and iPad-safe
   return JSON.stringify(nodes);
@@ -897,6 +800,14 @@ function countSubtree(idx) {
 
     container.innerHTML = `
 <div class="topbar">
+
+  <div class="status-header">
+    <div class="badges">
+      <span class="badge dim badgeSave">Saved ✓</span>
+      <span class="badge warn badgeCopy">Not copied</span>
+    </div>
+  </div>
+
   <div class="left">
     <h3>Markdown Outline Utility & Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
@@ -915,6 +826,7 @@ function countSubtree(idx) {
         <button class="btnUpdate" type="button">Update Input Area</button>
         <button class="btnUndo" type="button">↺ Undo</button>
         <button class="primary btnCopy" type="button">Copy Result</button>
+        <button class="btnExport" type="button">Export .md</button>
         <button class="warn btnReset" type="button">Reset Everything</button>
         <button class="btnAddTop" type="button">+ Add H1</button>
       </div>
@@ -966,12 +878,6 @@ function countSubtree(idx) {
     </div>
   </div>
 
-  <div class="right">
-    <div class="badges">
-      <span class="badge dim badgeSave">Unsaved…</span>
-      <span class="badge warn badgeCopy">Not copied</span>
-    </div>
-  </div>
 </div>
 
 <div class="footer">v5.6 — Search tab + Tags tab + Bulk tag direct children</div>
@@ -999,6 +905,7 @@ function countSubtree(idx) {
     const btnUpdate = $(".btnUpdate");
     const btnUndo = $(".btnUndo");
     const btnCopy = $(".btnCopy");
+    const btnExport = $(".btnExport");
     const btnReset = $(".btnReset");
     const btnAddTop = $(".btnAddTop");
 
@@ -1034,28 +941,35 @@ function countSubtree(idx) {
     }
 
     function saveNow() {
-      try {
-        const state = {
-          v: 6,
-          nodes,
-          input: taInput.value,
-          sourceId,
-          maxVisibleLevel,
-          copiedSinceChange,
-          lastCopyAt,
-          searchQuery,
-          searchInBody,
-          revealMatches,
-          activeTab,
-          activeTag,
-        };
-        localStorage.setItem(KEY, JSON.stringify(state));
-        badgeSave.className = "badge good badgeSave";
-        badgeSave.textContent = "Saved ✓";
-      } catch {
-        badgeSave.className = "badge warn badgeSave";
-        badgeSave.textContent = "Not saved";
-      }
+      // Pushing the save to the end of the execution queue 
+      // prevents the UI from "hiccuping" during heavy writes.
+      setTimeout(() => {
+        try {
+          const state = {
+            v: 6,
+            nodes,
+            input: taInput.value,
+            sourceId,
+            maxVisibleLevel,
+            copiedSinceChange,
+            lastCopyAt,
+            searchQuery,
+            searchInBody,
+            revealMatches,
+            activeTab,
+            activeTag,
+          };
+          
+          localStorage.setItem(KEY, JSON.stringify(state));
+          
+          badgeSave.className = "badge good badgeSave";
+          badgeSave.textContent = "Saved ✓";
+        } catch (err) {
+          console.error("Storage failed:", err);
+          badgeSave.className = "badge warn badgeSave";
+          badgeSave.textContent = "Not saved";
+        }
+      }, 0);
     }
 
     function saveDebounced() {
@@ -1099,14 +1013,14 @@ function countSubtree(idx) {
             title: typeof n.title === "string" ? n.title : "",
             body,
             isCollapsed: !!n.isCollapsed,
-            showBody: !!n.showBody,
+            showBody: false,
             tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
           };
         });
     }
 
     // ---- Markdown parse / export ----
-/ * Gemini version of parseMarkdown */
+/* Gemini version of parseMarkdown */
     function parseMarkdown(text) {
   const lines = (text || "").split("\n");
   const out = [];
@@ -1182,40 +1096,40 @@ async function readClipboardTextFallback() {
 }
 
 function normalizeClipboardToLevel(clip, targetLevel) {
-  const text = (clip || "").replace(/\r\n?/g, "\n").trim();
+  const text = String(clip || "").replace(/\r\n?/g, "\n").trim();
   if (!text) return "";
 
   const lines = text.split("\n");
 
-  // Find first markdown heading
-  let firstHeadingLine = null;
-  for (const ln of lines) {
-    const m = ln.match(/^(#{1,6})\s+(.+)/);
-    if (m) { firstHeadingLine = ln; break; }
+  let firstHeadingIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^(#{1,6})\s+(.+)$/.test(lines[i])) {
+      firstHeadingIndex = i;
+      break;
+    }
   }
 
-  // If no heading, make one from first non-empty line
-  if (!firstHeadingLine) {
-    const firstNonEmpty = lines.find((l) => l.trim().length) || "New node";
-    const rest = lines.slice(lines.indexOf(firstNonEmpty) + 1);
-    return (`${"#".repeat(targetLevel)} ${firstNonEmpty.trim()}\n` + rest.join("\n")).trimEnd();
+  // No headings: leave content completely untouched
+  if (firstHeadingIndex === -1) {
+    return text;
   }
 
-  const m0 = firstHeadingLine.match(/^(#{1,6})\s+/);
+  const m0 = lines[firstHeadingIndex].match(/^(#{1,6})\s+/);
   const clipLevel = m0 ? m0[1].length : 2;
   const delta = targetLevel - clipLevel;
 
-  const adjusted = lines.map((ln) => {
-    const m = ln.match(/^(#{1,6})(\s+.*)$/);
-    if (!m) return ln;
-    let lvl = m[1].length + delta;
-    lvl = Math.max(1, Math.min(6, lvl));
-    return "#".repeat(lvl) + m[2];
-  });
-
-  return adjusted.join("\n").trimEnd();
+  return lines
+    .map((ln) => {
+      const m = ln.match(/^(#{1,6})(\s+.*)$/);
+      if (!m) return ln;
+      let lvl = m[1].length + delta;
+      lvl = Math.max(1, Math.min(6, lvl));
+      return "#".repeat(lvl) + m[2];
+    })
+    .join("\n")
+    .trimEnd();
 }
-
+    
 async function pasteClipboardAsSiblingAfter(nodeId) {
   pushUndo("paste");
   const idx = indexById(nodeId);
@@ -1362,13 +1276,6 @@ function makeRafScheduler(renderFn) {
   };
 }
     
-// PATCH: add directly under
-// const scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
-    
-let scheduleRenderTagCloud = function(){};
-scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
-
-
     function renderTagResults() {
       tagResults.innerHTML = "";
 
@@ -1421,14 +1328,6 @@ scheduleRenderTagCloud = makeRafScheduler(renderTagCloud);
         tagResults.appendChild(card);
       });
     }
-
-    
-// PATCH: add directly under
-// const scheduleRenderTagResults = makeRafScheduler(renderTagResults);
-
-let scheduleRenderTagResults = function(){};
-scheduleRenderTagResults = makeRafScheduler(renderTagResults);
-
 
     function rebuildTagUI() {
       tagAllBtn.classList.toggle("active", !activeTag);
@@ -1493,14 +1392,7 @@ scheduleRenderTagResults = makeRafScheduler(renderTagResults);
         searchResults.appendChild(card);
       });
     }
-    
-// PATCH: add directly under
-// const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
-
-let scheduleRenderSearchResults = function(){};
-scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
-
-
+  
     function jumpToNode(id) {
       setTab("structure");
 
@@ -1720,10 +1612,20 @@ function deleteAndPromoteChildren(id) {
       panelSearch.classList.toggle("active", activeTab === "search");
       panelTags.classList.toggle("active", activeTab === "tags");
 
+      // Ensure the browser has painted the tab before measuring textarea heights
+      requestAnimationFrame(() => {
+        // const activePanel = document.querySelector('.tabPanel.active');
+        const activePanel = container.querySelector('.tabPanel.active');
+        const textareas = activePanel?.querySelectorAll('textarea');
+        if (textareas) {
+          textareas.forEach(ta => autoResizeTA(ta));
+        }
+      });
+            
       if (activeTab === "tags") rebuildTagUI();
       if (activeTab === "search") scheduleRenderSearchResults();
 
-      saveDebounced();
+      // saveDebounced();
     }
 
 // START WORDCOUNT 
@@ -1853,7 +1755,7 @@ meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
 // --- MINI tools (always visible) ---
 const miniTools = document.createElement("div");
 miniTools.className = "miniTools";
-// miniTools.addEventListener("click", (e) => e.stopPropagation());
+miniTools.addEventListener("click", (e) => e.stopPropagation());
 
 // Use a different variable name to avoid collisions
 const miniHasBody = !!(n.body && n.body.trim());
@@ -1922,44 +1824,42 @@ miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
           e.stopPropagation();
           if (e.key === "Enter") e.preventDefault();
         });
-        title.addEventListener("input", () => {
-          n.title = title.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
-          if (title.value !== n.title) title.value = n.title;
-          autoResizeTA(title);
-          markChangedTyping();
-        });
+// start
 
+        title.addEventListener("input", () => {
+  const start = title.selectionStart;
+  const end = title.selectionEnd;
+
+  const cleaned = title.value.replace(/[\r\n]/g, " ");
+  n.title = cleaned;
+
+  if (title.value !== cleaned) {
+    title.value = cleaned;
+    title.setSelectionRange(start, end); // Restore cursor
+  }
+  autoResizeTA(title);
+  markChangedTyping();
+});
+
+        
         const tools = document.createElement("div");
         tools.className = "tools";
         tools.addEventListener("click", (e) => e.stopPropagation());
-
-        // const hasBody = !!(n.body && n.body.trim());
-        // const bodyBtn = document.createElement("button");
-        // bodyBtn.type = "button";
-        // bodyBtn.textContent = n.showBody ? "📝 Hide text" : (hasBody ? "📝 Show text" : "➕ Add text");
-        // bodyBtn.className = hasBody ? "primary" : "";
-        // bodyBtn.addEventListener("click", () => toggleBody(n.id));
 
         const dup = document.createElement("button");
         dup.type = "button";
         dup.textContent = "⧉ Duplicate";
         dup.addEventListener("click", () => duplicateBranch(n.id));
 
-        // const add = document.createElement("button");
-        // add.type = "button";
-        // add.textContent = "+ Add";
-        // add.addEventListener("click", () => addNewAfter(n.id));
-
         const paste = document.createElement("button");
-paste.type = "button";
-paste.textContent = "📋 Paste";
-paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
-// paste.addEventListener("click", () => pasteClipboardAsSiblingAfter(n.id));
+        paste.type = "button";
+        paste.textContent = "📋 Paste";
+        paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
         paste.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  pasteClipboardAsSiblingAfter(n.id);
-});
+        e.preventDefault();
+        e.stopPropagation();
+        pasteClipboardAsSiblingAfter(n.id);
+  });
 
         const left = document.createElement("button");
         left.type = "button";
@@ -2074,6 +1974,12 @@ else tools.append(dup, paste, del);
 bodyWrap.appendChild(bodyTA);
 node.appendChild(bodyWrap);
 
+if (bodyShouldShow) {
+  // Use setTimeout to ensure the DOM element is painted before measuring
+  setTimeout(() => autoResizeTA(bodyTA), 0);
+}
+
+        
 // NEW: controls under title + body
 node.appendChild(tools);
 
@@ -2084,6 +1990,9 @@ canvas.appendChild(node);
 
       window.scrollTo(0, scrollPos);
 
+    setCopiedFlag(copiedSinceChange); 
+    badgeSave.textContent = saveTimer ? "Unsaved..." : "Saved ✓";
+      
       if (lastCreatedId) {
         const el = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
         if (el) {
@@ -2092,15 +2001,8 @@ canvas.appendChild(node);
         }
         lastCreatedId = null;
       }
-    }
+    } // end function renderStructure 
    
-// PATCH: add directly under
-// const scheduleRenderStructure = makeRafScheduler(renderStructure);
-    
-let scheduleRenderStructure = function(){};
-scheduleRenderStructure = makeRafScheduler(renderStructure);
-
-
     // ---- Buttons / events ----
     btnTabStructure.addEventListener("click", () => setTab("structure"));
     btnTabSearch.addEventListener("click", () => setTab("search"));
@@ -2112,14 +2014,18 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
       saveDebounced();
     });
 
-    btnLoad.addEventListener("click", () => {
-      const text = taInput.value || "";
-      if (!text.trim()) return;
-      nodes = parseMarkdown(text);
-      sourceId = null;
-      markChangedFull();
-    });
+    // ChatGPT
+btnLoad.addEventListener("click", () => {
+  const text = taInput.value || "";
+  if (!text.trim()) return;
 
+  nodes = parseMarkdown(text);
+  sourceId = null;
+
+  markChangedFull();
+  refreshLayout(); 
+});
+    
     btnUpdate.addEventListener("click", () => {
       taInput.value = toMarkdown();
       markChangedFull();
@@ -2152,6 +2058,20 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
       saveDebounced();
     });
 
+btnExport.addEventListener("click", () => {
+  const md = toMarkdown();
+  taInput.value = md;
+
+  const firstTitle =
+    nodes.find((n) => (n.title || "").trim())?.title || "outline";
+
+  const filename = `${slugifyFilename(firstTitle)}.md`;
+  downloadFile(filename, md, "text/markdown;charset=utf-8");
+
+  setCopiedFlag(false);
+  saveDebounced();
+});
+    
     btnReset.addEventListener("click", () => {
       if (!confirm("Reset everything (including saved state for this app instance)?")) return;
       nodes = [];
@@ -2238,6 +2158,63 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
     scheduleRenderStructure();
   }
 });
+
+function refreshLayout() {
+  requestAnimationFrame(() => {
+    // Force the browser to re-evaluate percentage widths against current parent
+    container.style.width = "";         // clear any stale inline width
+    void container.getBoundingClientRect(); // trigger reflow
+
+    requestAnimationFrame(() => {
+      scheduleRenderStructure();
+      const activePanel = container.querySelector(".tabPanel.active");
+      const textareas = activePanel?.querySelectorAll("textarea");
+      if (textareas) textareas.forEach((ta) => autoResizeTA(ta));
+    });
+  });
+}
+    
+window.addEventListener("resize", refreshLayout);
+window.addEventListener("orientationchange", refreshLayout);
+window.addEventListener("pageshow", refreshLayout);
+
+// Watch for SquareSpace's layout engine finalising the parent's width.
+// This fires when the containing column goes from 0/partial → full width.
+(function watchParentWidth() {
+  const parent = container.parentElement;
+  if (!parent) { refreshLayout(); return; }
+
+  if (window.ResizeObserver) {
+    let settled = false;
+    const ro = new ResizeObserver(() => {
+      if (container.offsetWidth > 100) { // has a real width now
+        if (!settled) {
+          settled = true;
+          refreshLayout();
+        }
+      }
+    });
+    ro.observe(parent);
+
+    // Still fire on load as a fallback
+    window.addEventListener("load", () => {
+      ro.observe(parent); // re-observe in case it was swapped
+      refreshLayout();
+    });
+  } else {
+    // Fallback for older browsers: poll until the parent has width
+    let tries = 0;
+    function poll() {
+      if (container.offsetWidth > 100 || tries++ > 30) {
+        refreshLayout();
+      } else {
+        setTimeout(poll, 100);
+      }
+    }
+    window.addEventListener("load", poll);
+    poll();
+  }
+})();
     
     // ---- Init ----
     loadPref();
@@ -2256,5 +2233,8 @@ scheduleRenderStructure = makeRafScheduler(renderStructure);
     rebuildTagUI();
     setTab(activeTab || "structure");
     saveDebounced();
+    refreshLayout();
+    //
+    
   });
 })();
