@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-fragment-compare-style-v2";
+  const STYLE_ID = "siteapps-fragment-compare-style-v3";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -224,6 +224,10 @@
     return String(s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
+  function normalizeSpaces(s) {
+    return String(s || "").replace(/\s+/g, " ").trim();
+  }
+
   function splitLines(s, ignoreEmpty) {
     const lines = normalizeLineEndings(s).split("\n");
     return ignoreEmpty ? lines.filter(line => line.trim() !== "") : lines;
@@ -235,12 +239,22 @@
     return text.split(/\s+/).filter(Boolean);
   }
 
+  function splitSentences(s) {
+    const text = normalizeLineEndings(s).replace(/\n+/g, " ").trim();
+    if (!text) return [];
+
+    const matches = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+    return matches
+      .map(part => normalizeSpaces(part))
+      .filter(Boolean);
+  }
+
   function buildPositions(items) {
     const map = new Map();
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (!map.has(item)) map.set(item, []);
-      map.get(item).push(i + 1); // user-facing positions
+      map.get(item).push(i + 1);
     }
     return map;
   }
@@ -297,14 +311,15 @@
     return { same, moved, onlyA, onlyB };
   }
 
-  function compareFragments(aText, bText, mode, ignoreEmpty) {
-    const aItems = mode === "words"
-      ? splitWords(aText)
-      : splitLines(aText, ignoreEmpty);
+  function getItemsForMode(text, mode, ignoreEmpty) {
+    if (mode === "words") return splitWords(text);
+    if (mode === "sentences") return splitSentences(text);
+    return splitLines(text, ignoreEmpty);
+  }
 
-    const bItems = mode === "words"
-      ? splitWords(bText)
-      : splitLines(bText, ignoreEmpty);
+  function compareFragments(aText, bText, mode, ignoreEmpty) {
+    const aItems = getItemsForMode(aText, mode, ignoreEmpty);
+    const bItems = getItemsForMode(bText, mode, ignoreEmpty);
 
     const compared = compareItems(aItems, bItems);
 
@@ -320,16 +335,34 @@
     };
   }
 
+  function modeLabel(mode) {
+    if (mode === "words") return "Words";
+    if (mode === "sentences") return "Sentences";
+    return "Lines";
+  }
+
+  function unitPlural(mode) {
+    if (mode === "words") return "words";
+    if (mode === "sentences") return "sentences";
+    return "lines";
+  }
+
+  function unitSingular(mode) {
+    if (mode === "words") return "word";
+    if (mode === "sentences") return "sentence";
+    return "line";
+  }
+
   function formatReport(data) {
-    const unit = data.mode === "words" ? "words" : "lines";
-    const unitSingular = data.mode === "words" ? "word" : "line";
+    const unit = unitPlural(data.mode);
+    const unitOne = unitSingular(data.mode);
 
     const out = [];
 
     out.push("FRAGMENT COMPARISON");
     out.push("===================");
     out.push("");
-    out.push(`Mode: ${data.mode === "words" ? "Words" : "Lines"}`);
+    out.push(`Mode: ${modeLabel(data.mode)}`);
     out.push(`Fragment A ${unit}: ${data.aCount}`);
     out.push(`Fragment B ${unit}: ${data.bCount}`);
     if (data.mode === "lines") {
@@ -345,7 +378,7 @@
     out.push("");
 
     out.push(`SAME ${unit.toUpperCase()}`);
-    out.push("-".repeat(5 + unit.length));
+    out.push("-".repeat(`SAME ${unit.toUpperCase()}`.length));
     if (!data.same.length) {
       out.push("(none)");
     } else {
@@ -356,7 +389,7 @@
     out.push("");
 
     out.push(`MOVED ${unit.toUpperCase()} IN B`);
-    out.push("-".repeat(12 + unit.length));
+    out.push("-".repeat(`MOVED ${unit.toUpperCase()} IN B`.length));
     if (!data.moved.length) {
       out.push("(none)");
     } else {
@@ -366,8 +399,8 @@
     }
     out.push("");
 
-    out.push(`IN A BUT NOT B (${unitSingular.toUpperCase()} POSITIONS)`);
-    out.push("--------------------------------");
+    out.push(`IN A BUT NOT B (${unitOne.toUpperCase()} POSITIONS)`);
+    out.push("-".repeat(`IN A BUT NOT B (${unitOne.toUpperCase()} POSITIONS)`.length));
     if (!data.onlyA.length) {
       out.push("(none)");
     } else {
@@ -377,8 +410,8 @@
     }
     out.push("");
 
-    out.push(`IN B BUT NOT A (${unitSingular.toUpperCase()} POSITIONS)`);
-    out.push("--------------------------------");
+    out.push(`IN B BUT NOT A (${unitOne.toUpperCase()} POSITIONS)`);
+    out.push("-".repeat(`IN B BUT NOT A (${unitOne.toUpperCase()} POSITIONS)`.length));
     if (!data.onlyB.length) {
       out.push("(none)");
     } else {
@@ -424,15 +457,21 @@
       saveStateDebounced();
     }
 
+    function currentMode() {
+      if (modeWordsRB.checked) return "words";
+      if (modeSentencesRB.checked) return "sentences";
+      return "lines";
+    }
+
     function saveState() {
       try {
         const state = {
-          v: 2,
+          v: 3,
           aText: aTA.value,
           bText: bTA.value,
           resultText: resultTA.value,
           ignoreEmpty: ignoreEmptyCB.checked,
-          mode: modeWordsRB.checked ? "words" : "lines",
+          mode: currentMode(),
           copiedSinceChange,
           lastCopyAt
         };
@@ -469,6 +508,8 @@
 
         if (s.mode === "words") {
           modeWordsRB.checked = true;
+        } else if (s.mode === "sentences") {
+          modeSentencesRB.checked = true;
         } else {
           modeLinesRB.checked = true;
         }
@@ -533,7 +574,7 @@
 
     const modeLinesLbl = document.createElement("label");
     modeLinesLbl.setAttribute("for", modeLinesRB.id);
-    modeLinesLbl.textContent = "Compare by lines";
+    modeLinesLbl.textContent = "Lines";
 
     const modeWordsRB = document.createElement("input");
     modeWordsRB.type = "radio";
@@ -542,11 +583,21 @@
 
     const modeWordsLbl = document.createElement("label");
     modeWordsLbl.setAttribute("for", modeWordsRB.id);
-    modeWordsLbl.textContent = "Compare by words";
+    modeWordsLbl.textContent = "Words";
+
+    const modeSentencesRB = document.createElement("input");
+    modeSentencesRB.type = "radio";
+    modeSentencesRB.name = modeName;
+    modeSentencesRB.id = `${modeName}-sentences`;
+
+    const modeSentencesLbl = document.createElement("label");
+    modeSentencesLbl.setAttribute("for", modeSentencesRB.id);
+    modeSentencesLbl.textContent = "Sentences";
 
     modeWrap.append(
       modeLinesRB, modeLinesLbl,
-      modeWordsRB, modeWordsLbl
+      modeWordsRB, modeWordsLbl,
+      modeSentencesRB, modeSentencesLbl
     );
 
     const ignoreEmptyWrap = document.createElement("div");
@@ -592,7 +643,7 @@
     }
 
     function syncUiForMode() {
-      ignoreEmptyWrap.style.display = modeWordsRB.checked ? "none" : "flex";
+      ignoreEmptyWrap.style.display = modeLinesRB.checked ? "flex" : "none";
     }
 
     function runCompare() {
@@ -604,8 +655,7 @@
         return;
       }
 
-      const mode = modeWordsRB.checked ? "words" : "lines";
-      const result = compareFragments(aText, bText, mode, ignoreEmptyCB.checked);
+      const result = compareFragments(aText, bText, currentMode(), ignoreEmptyCB.checked);
       resultTA.value = formatReport(result);
       markChanged();
     }
@@ -694,6 +744,12 @@
     });
 
     modeWordsRB.addEventListener("change", () => {
+      syncUiForMode();
+      markChanged();
+      saveStateDebounced();
+    });
+
+    modeSentencesRB.addEventListener("change", () => {
       syncUiForMode();
       markChanged();
       saveStateDebounced();
