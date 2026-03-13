@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-fragment-compare-style-v1";
+  const STYLE_ID = "siteapps-fragment-compare-style-v2";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -66,10 +66,6 @@
 [data-app="fragmentcompare"] .badge.good{ border-color:#0b3d0b; color:#0b3d0b; }
 [data-app="fragmentcompare"] .badge.warn{ border-color:#7a0000; color:#7a0000; }
 [data-app="fragmentcompare"] .badge.dim{ border-color:#444; color:#444; }
-
-[data-app="fragmentcompare"] .section{
-  margin-top:12px;
-}
 
 [data-app="fragmentcompare"] label{
   display:block;
@@ -144,19 +140,28 @@
   color:#7a0000;
 }
 
-[data-app="fragmentcompare"] .check{
+[data-app="fragmentcompare"] .check,
+[data-app="fragmentcompare"] .mode-wrap{
   display:flex;
   align-items:center;
   gap:10px;
   padding:8px 10px;
   border:2px solid #111;
   border-radius:10px;
+  background:#fff;
 }
 
-[data-app="fragmentcompare"] input[type="checkbox"]{
+[data-app="fragmentcompare"] input[type="checkbox"],
+[data-app="fragmentcompare"] input[type="radio"]{
   width:20px;
   height:20px;
   margin:0;
+}
+
+[data-app="fragmentcompare"] .mode-wrap label,
+[data-app="fragmentcompare"] .check label{
+  margin:0;
+  font-weight:900;
 }
 
 [data-app="fragmentcompare"] .result-wrap{
@@ -193,6 +198,13 @@
   [data-app="fragmentcompare"] .actions button{
     width:100%;
   }
+
+  [data-app="fragmentcompare"] .mode-wrap,
+  [data-app="fragmentcompare"] .check{
+    width:100%;
+    box-sizing:border-box;
+    flex-wrap:wrap;
+  }
 }
 `;
     document.head.appendChild(style);
@@ -214,30 +226,28 @@
 
   function splitLines(s, ignoreEmpty) {
     const lines = normalizeLineEndings(s).split("\n");
-    if (!ignoreEmpty) return lines;
-    return lines.filter(line => line.trim() !== "");
+    return ignoreEmpty ? lines.filter(line => line.trim() !== "") : lines;
   }
 
-  function buildPositions(lines) {
+  function splitWords(s) {
+    const text = normalizeLineEndings(s).trim();
+    if (!text) return [];
+    return text.split(/\s+/).filter(Boolean);
+  }
+
+  function buildPositions(items) {
     const map = new Map();
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!map.has(line)) map.set(line, []);
-      map.get(line).push(i + 1); // 1-based for user display
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!map.has(item)) map.set(item, []);
+      map.get(item).push(i + 1); // user-facing positions
     }
     return map;
   }
 
-  function plural(n, one, many) {
-    return `${n} ${n === 1 ? one : many}`;
-  }
-
-  function compareFragments(aText, bText, ignoreEmpty) {
-    const aLines = splitLines(aText, ignoreEmpty);
-    const bLines = splitLines(bText, ignoreEmpty);
-
-    const posA = buildPositions(aLines);
-    const posB = buildPositions(bLines);
+  function compareItems(aItems, bItems) {
+    const posA = buildPositions(aItems);
+    const posB = buildPositions(bItems);
 
     const allKeys = new Set([...posA.keys(), ...posB.keys()]);
 
@@ -250,45 +260,31 @@
       x.localeCompare(y, undefined, { sensitivity: "base" })
     );
 
-    for (const line of sortedKeys) {
-      const aPos = posA.get(line) || [];
-      const bPos = posB.get(line) || [];
+    for (const item of sortedKeys) {
+      const aPos = posA.get(item) || [];
+      const bPos = posB.get(item) || [];
       const commonCount = Math.min(aPos.length, bPos.length);
 
       for (let i = 0; i < commonCount; i++) {
-        const aLineNo = aPos[i];
-        const bLineNo = bPos[i];
+        const aPosNo = aPos[i];
+        const bPosNo = bPos[i];
 
-        if (aLineNo === bLineNo) {
-          same.push({
-            text: line,
-            a: aLineNo,
-            b: bLineNo
-          });
+        if (aPosNo === bPosNo) {
+          same.push({ text: item, a: aPosNo, b: bPosNo });
         } else {
-          moved.push({
-            text: line,
-            a: aLineNo,
-            b: bLineNo
-          });
+          moved.push({ text: item, a: aPosNo, b: bPosNo });
         }
       }
 
       if (aPos.length > commonCount) {
         for (let i = commonCount; i < aPos.length; i++) {
-          onlyA.push({
-            text: line,
-            a: aPos[i]
-          });
+          onlyA.push({ text: item, a: aPos[i] });
         }
       }
 
       if (bPos.length > commonCount) {
         for (let i = commonCount; i < bPos.length; i++) {
-          onlyB.push({
-            text: line,
-            b: bPos[i]
-          });
+          onlyB.push({ text: item, b: bPos[i] });
         }
       }
     }
@@ -298,25 +294,47 @@
     onlyA.sort((x, y) => x.a - y.a);
     onlyB.sort((x, y) => x.b - y.b);
 
+    return { same, moved, onlyA, onlyB };
+  }
+
+  function compareFragments(aText, bText, mode, ignoreEmpty) {
+    const aItems = mode === "words"
+      ? splitWords(aText)
+      : splitLines(aText, ignoreEmpty);
+
+    const bItems = mode === "words"
+      ? splitWords(bText)
+      : splitLines(bText, ignoreEmpty);
+
+    const compared = compareItems(aItems, bItems);
+
     return {
-      aCount: aLines.length,
-      bCount: bLines.length,
-      same,
-      moved,
-      onlyA,
-      onlyB
+      mode,
+      ignoreEmpty,
+      aCount: aItems.length,
+      bCount: bItems.length,
+      same: compared.same,
+      moved: compared.moved,
+      onlyA: compared.onlyA,
+      onlyB: compared.onlyB
     };
   }
 
-  function formatReport(data, ignoreEmpty) {
+  function formatReport(data) {
+    const unit = data.mode === "words" ? "words" : "lines";
+    const unitSingular = data.mode === "words" ? "word" : "line";
+
     const out = [];
 
     out.push("FRAGMENT COMPARISON");
     out.push("===================");
     out.push("");
-    out.push(`Fragment A lines: ${data.aCount}`);
-    out.push(`Fragment B lines: ${data.bCount}`);
-    out.push(`Ignore empty lines: ${ignoreEmpty ? "Yes" : "No"}`);
+    out.push(`Mode: ${data.mode === "words" ? "Words" : "Lines"}`);
+    out.push(`Fragment A ${unit}: ${data.aCount}`);
+    out.push(`Fragment B ${unit}: ${data.bCount}`);
+    if (data.mode === "lines") {
+      out.push(`Ignore empty lines: ${data.ignoreEmpty ? "Yes" : "No"}`);
+    }
     out.push("");
     out.push("SUMMARY");
     out.push("-------");
@@ -326,8 +344,8 @@
     out.push(`In B but not A: ${data.onlyB.length}`);
     out.push("");
 
-    out.push("SAME");
-    out.push("----");
+    out.push(`SAME ${unit.toUpperCase()}`);
+    out.push("-".repeat(5 + unit.length));
     if (!data.same.length) {
       out.push("(none)");
     } else {
@@ -337,8 +355,8 @@
     }
     out.push("");
 
-    out.push("MOVED IN B");
-    out.push("----------");
+    out.push(`MOVED ${unit.toUpperCase()} IN B`);
+    out.push("-".repeat(12 + unit.length));
     if (!data.moved.length) {
       out.push("(none)");
     } else {
@@ -348,8 +366,8 @@
     }
     out.push("");
 
-    out.push("IN A BUT NOT B");
-    out.push("--------------");
+    out.push(`IN A BUT NOT B (${unitSingular.toUpperCase()} POSITIONS)`);
+    out.push("--------------------------------");
     if (!data.onlyA.length) {
       out.push("(none)");
     } else {
@@ -359,8 +377,8 @@
     }
     out.push("");
 
-    out.push("IN B BUT NOT A");
-    out.push("--------------");
+    out.push(`IN B BUT NOT A (${unitSingular.toUpperCase()} POSITIONS)`);
+    out.push("--------------------------------");
     if (!data.onlyB.length) {
       out.push("(none)");
     } else {
@@ -409,11 +427,12 @@
     function saveState() {
       try {
         const state = {
-          v: 1,
+          v: 2,
           aText: aTA.value,
           bText: bTA.value,
           resultText: resultTA.value,
           ignoreEmpty: ignoreEmptyCB.checked,
+          mode: modeWordsRB.checked ? "words" : "lines",
           copiedSinceChange,
           lastCopyAt
         };
@@ -447,6 +466,13 @@
         if (typeof s.bText === "string") bTA.value = s.bText;
         if (typeof s.resultText === "string") resultTA.value = s.resultText;
         ignoreEmptyCB.checked = !!s.ignoreEmpty;
+
+        if (s.mode === "words") {
+          modeWordsRB.checked = true;
+        } else {
+          modeLinesRB.checked = true;
+        }
+
         copiedSinceChange = !!s.copiedSinceChange;
         lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
       } catch {}
@@ -489,6 +515,40 @@
     const controls = document.createElement("div");
     controls.className = "controls";
 
+    const compareBtn = document.createElement("button");
+    compareBtn.type = "button";
+    compareBtn.className = "btn-primary";
+    compareBtn.textContent = "Compare fragments";
+
+    const modeWrap = document.createElement("div");
+    modeWrap.className = "mode-wrap";
+
+    const modeName = `fragmentcompare-mode-${Math.random().toString(16).slice(2)}`;
+
+    const modeLinesRB = document.createElement("input");
+    modeLinesRB.type = "radio";
+    modeLinesRB.name = modeName;
+    modeLinesRB.id = `${modeName}-lines`;
+    modeLinesRB.checked = true;
+
+    const modeLinesLbl = document.createElement("label");
+    modeLinesLbl.setAttribute("for", modeLinesRB.id);
+    modeLinesLbl.textContent = "Compare by lines";
+
+    const modeWordsRB = document.createElement("input");
+    modeWordsRB.type = "radio";
+    modeWordsRB.name = modeName;
+    modeWordsRB.id = `${modeName}-words`;
+
+    const modeWordsLbl = document.createElement("label");
+    modeWordsLbl.setAttribute("for", modeWordsRB.id);
+    modeWordsLbl.textContent = "Compare by words";
+
+    modeWrap.append(
+      modeLinesRB, modeLinesLbl,
+      modeWordsRB, modeWordsLbl
+    );
+
     const ignoreEmptyWrap = document.createElement("div");
     ignoreEmptyWrap.className = "check";
 
@@ -498,10 +558,29 @@
 
     const ignoreEmptyLbl = document.createElement("label");
     ignoreEmptyLbl.setAttribute("for", ignoreEmptyCB.id);
-    ignoreEmptyLbl.style.margin = "0";
     ignoreEmptyLbl.textContent = "Ignore empty lines";
 
     ignoreEmptyWrap.append(ignoreEmptyCB, ignoreEmptyLbl);
+
+    const resultWrap = document.createElement("div");
+    resultWrap.className = "result-wrap";
+
+    const resultLabel = document.createElement("label");
+    resultLabel.textContent = "Comparison result";
+
+    const resultTA = document.createElement("textarea");
+    resultTA.className = "results";
+    resultTA.readOnly = true;
+    resultTA.placeholder = "Comparison report will appear here…";
+
+    const feedback = document.createElement("div");
+    feedback.className = "feedback";
+    feedback.textContent = "Copied!";
+
+    resultWrap.append(resultLabel, resultTA, feedback);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
 
     function mkBtn(text, cls, fn) {
       const b = document.createElement("button");
@@ -510,6 +589,10 @@
       b.textContent = text;
       b.addEventListener("click", fn);
       return b;
+    }
+
+    function syncUiForMode() {
+      ignoreEmptyWrap.style.display = modeWordsRB.checked ? "none" : "flex";
     }
 
     function runCompare() {
@@ -521,8 +604,9 @@
         return;
       }
 
-      const result = compareFragments(aText, bText, ignoreEmptyCB.checked);
-      resultTA.value = formatReport(result, ignoreEmptyCB.checked);
+      const mode = modeWordsRB.checked ? "words" : "lines";
+      const result = compareFragments(aText, bText, mode, ignoreEmptyCB.checked);
+      resultTA.value = formatReport(result);
       markChanged();
     }
 
@@ -560,40 +644,22 @@
       bTA.value = "";
       resultTA.value = "";
       ignoreEmptyCB.checked = false;
+      modeLinesRB.checked = true;
       copiedSinceChange = false;
       lastCopyAt = null;
+      syncUiForMode();
       renderBadges();
       saveStateDebounced();
     }
 
-    controls.append(
-      mkBtn("Compare fragments", "btn-primary", runCompare),
-      ignoreEmptyWrap
-    );
+    compareBtn.addEventListener("click", runCompare);
 
-    const resultWrap = document.createElement("div");
-    resultWrap.className = "result-wrap";
-
-    const resultLabel = document.createElement("label");
-    resultLabel.textContent = "Comparison result";
-
-    const resultTA = document.createElement("textarea");
-    resultTA.className = "results";
-    resultTA.readOnly = true;
-    resultTA.placeholder = "Comparison report will appear here…";
-
-    const feedback = document.createElement("div");
-    feedback.className = "feedback";
-    feedback.textContent = "Copied!";
-
-    resultWrap.append(resultLabel, resultTA, feedback);
-
-    const actions = document.createElement("div");
-    actions.className = "actions";
     actions.append(
       mkBtn("📋 Copy result", "btn-copy", copyResult),
       mkBtn("🗑️ Clear all", "btn-clear", clearAll)
     );
+
+    controls.append(compareBtn, modeWrap, ignoreEmptyWrap);
 
     container.append(
       topRow,
@@ -621,7 +687,20 @@
       saveStateDebounced();
     });
 
+    modeLinesRB.addEventListener("change", () => {
+      syncUiForMode();
+      markChanged();
+      saveStateDebounced();
+    });
+
+    modeWordsRB.addEventListener("change", () => {
+      syncUiForMode();
+      markChanged();
+      saveStateDebounced();
+    });
+
     restoreState();
+    syncUiForMode();
     renderBadges();
     saveBadge.className = "badge good";
     saveBadge.textContent = "Saved ✓";
