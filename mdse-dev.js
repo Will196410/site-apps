@@ -2006,19 +2006,29 @@ canvas.appendChild(node);
         }
         lastCreatedId = null;
       }
+      
+if (pendingScrollToId) {
+  const targetId = pendingScrollToId;
+  pendingScrollToId = "";
 
-      if (pendingScrollToId) {
-        const targetId = pendingScrollToId;
-        pendingScrollToId = "";
-        requestAnimationFrame(() => {
-          const el = canvas.querySelector(`[data-node-id="${targetId}"]`);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-            const t = el.querySelector(".title");
-            if (t) t.focus();
-          }
-        });
-      }
+  requestAnimationFrame(() => {
+    const el = canvas.querySelector(`[data-node-id="${targetId}"]`);
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    const t = el.querySelector(".title");
+    if (t) t.focus();
+
+    // Second pass after delayed textarea resizing/layout settles
+    setTimeout(() => {
+      const el2 = canvas.querySelector(`[data-node-id="${targetId}"]`);
+      if (!el2) return;
+      el2.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  });
+}
+      
     } // end function renderStructure 
    
     // ---- Buttons / events ----
