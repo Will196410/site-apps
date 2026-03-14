@@ -559,6 +559,9 @@ function slugifyFilename(s) {
     let lastCreatedId = null;
     let maxVisibleLevel = 6;
 
+    let pendingScrollToId = "";
+    let suppressNextScrollRestore = false;
+
     let copiedSinceChange = false;
     let lastCopyAt = null;
 
@@ -1393,25 +1396,22 @@ function makeRafScheduler(renderFn) {
       });
     }
   
-    function jumpToNode(id) {
-      setTab("structure");
+function jumpToNode(id) {
+  setTab("structure");
 
-      const idx = indexById(id);
-      if (idx >= 0 && nodes[idx].level > maxVisibleLevel) {
-        maxVisibleLevel = 6;
-        selMax.value = "6";
-      }
+  const idx = indexById(id);
+  if (idx >= 0 && nodes[idx].level > maxVisibleLevel) {
+    maxVisibleLevel = 6;
+    selMax.value = "6";
+  }
 
-      scheduleRenderStructure();
+  activeNodeId = id;
+  pendingScrollToId = id;
+  suppressNextScrollRestore = true;
 
-      const el = canvas.querySelector(`[data-node-id="${id}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const t = el.querySelector(".title");
-        if (t) t.focus();
-      }
-    }
-
+  scheduleRenderStructure();
+}
+    
     // ---- Actions ----
     function markChangedFull() {
       setCopiedFlag(false);
@@ -1664,6 +1664,8 @@ function subtreeWordCount(idx) {
     // ---- Render (Structure tab) ----
     function renderStructure() {
       const scrollPos = window.scrollY;
+      const shouldRestoreScroll = !suppressNextScrollRestore;
+      suppressNextScrollRestore = false;
 
       selMax.value = String(maxVisibleLevel);
 
@@ -1988,7 +1990,10 @@ canvas.appendChild(node);
         autoResizeTA(title);
       });
 
-      window.scrollTo(0, scrollPos);
+      // window.scrollTo(0, scrollPos);
+      if (shouldRestoreScroll) {
+        window.scrollTo(0, scrollPos);
+      }
 
     setCopiedFlag(copiedSinceChange); 
     badgeSave.textContent = saveTimer ? "Unsaved..." : "Saved ✓";
@@ -2000,6 +2005,19 @@ canvas.appendChild(node);
           if (t) t.focus();
         }
         lastCreatedId = null;
+      }
+
+      if (pendingScrollToId) {
+        const targetId = pendingScrollToId;
+        pendingScrollToId = "";
+        requestAnimationFrame(() => {
+          const el = canvas.querySelector(`[data-node-id="${targetId}"]`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            const t = el.querySelector(".title");
+            if (t) t.focus();
+          }
+        });
       }
     } // end function renderStructure 
    
