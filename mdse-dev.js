@@ -404,18 +404,14 @@ gap: 8px;
 // start
 function autoResizeTA(el) {
   if (!el) return;
-  
-  // 1. Reset height to 'auto' so the scrollHeight is 
-  // calculated based on content only (allows shrinking).
-  el.style.height = 'auto';
-  
-  // 2. Set the height to the scrollHeight plus a small 
-  // buffer for the border (usually 2px).
+
+  if (el.classList && el.classList.contains("mdInput")) return;
+
+  el.style.height = "auto";
   if (el.scrollHeight > 0) {
-    el.style.height = (el.scrollHeight + 2) + 'px';
+    el.style.height = (el.scrollHeight + 2) + "px";
   }
 }
-
   // stop
 function downloadFile(filename, content, mimeType = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mimeType });
@@ -1614,9 +1610,8 @@ function deleteAndPromoteChildren(id) {
 
       // Ensure the browser has painted the tab before measuring textarea heights
       requestAnimationFrame(() => {
-        // const activePanel = document.querySelector('.tabPanel.active');
         const activePanel = container.querySelector('.tabPanel.active');
-        const textareas = activePanel?.querySelectorAll('textarea');
+        const textareas = activePanel?.querySelectorAll('textarea:not(.mdInput)');
         if (textareas) {
           textareas.forEach(ta => autoResizeTA(ta));
         }
@@ -2195,8 +2190,9 @@ function refreshLayout() {
 
     requestAnimationFrame(() => {
       scheduleRenderStructure();
+      //
       const activePanel = container.querySelector(".tabPanel.active");
-      const textareas = activePanel?.querySelectorAll("textarea");
+      const textareas = activePanel?.querySelectorAll("textarea:not(.mdInput)");
       if (textareas) textareas.forEach((ta) => autoResizeTA(ta));
     });
   });
