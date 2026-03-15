@@ -263,6 +263,20 @@ gap: 8px;
   color: #444;
 }
 
+/* 1) ADD THIS CSS inside ensureStyle()  for copy tags to clipboard */
+
+[data-app="mdse"] .tagbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 8px 0;
+}
+
+[data-app="mdse"] .tagbar .spacer {
+  flex: 1 1 auto;
+}
+
 /* Pills & Badges */
 [data-app="mdse"] .pill {
   border: 2px solid #111;
@@ -866,16 +880,19 @@ function countSubtree(idx) {
       <div class="hint">Search results highlight in Structure view.</div>
     </div>
 
-    <div class="tabPanel panelTags" role="tabpanel">
-      <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
-      <div class="tagbar">
-        <button type="button" class="tagchip tagAll active">All tags</button>
-        <span class="tagmeta tagMeta"></span>
-      </div>
-      <div class="tagbar tagCloud" aria-label="Tag list"></div>
-      <div class="taglist tagResults" aria-live="polite"></div>
-    </div>
+/* 2) REPLACE the opening part of the Tags panel HTML with this */
+
+<div class="tabPanel panelTags" role="tabpanel">
+  <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
+  <div class="tagbar">
+    <button type="button" class="tagchip tagAll active">All tags</button>
+    <span class="tagmeta tagMeta"></span>
+    <span class="spacer"></span>
+    <button type="button" class="btnCopyTags">Copy all tags</button>
   </div>
+  <div class="tagbar tagCloud" aria-label="Tag list"></div>
+  <div class="taglist tagResults" aria-live="polite"></div>
+</div>
 
 </div>
 
@@ -928,6 +945,7 @@ function countSubtree(idx) {
     const tagAllBtn = $(".tagAll");
     const tagCloud = $(".tagCloud");
     const tagResults = $(".tagResults");
+    const btnCopyTags = $(".btnCopyTags");
 
     // ---- Persistence ----
     function setCopiedFlag(flag) {
@@ -2036,6 +2054,30 @@ if (pendingScrollToId) {
       rebuildTagUI();
       saveDebounced();
     });
+
+    /* 4) ADD THIS event listener with the other button/events */
+
+btnCopyTags.addEventListener("click", async () => {
+  const tags = allTags();
+
+  if (!tags.length) {
+    alert("No tags to copy yet.");
+    return;
+  }
+
+  const ok = await copyText(tags.join("\n"));
+  if (!ok) {
+    alert("Copy failed.");
+    return;
+  }
+
+  const oldText = btnCopyTags.textContent;
+  btnCopyTags.textContent = "Copied ✓";
+
+  setTimeout(() => {
+    btnCopyTags.textContent = oldText;
+  }, 1200);
+});
 
     // ChatGPT
 btnLoad.addEventListener("click", () => {
