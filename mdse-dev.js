@@ -1,641 +1,543 @@
 (() => {
-  "use strict";
+“use strict”;
 
-  // ---- SiteApps registry (works with your loader.js) ----
-  window.SiteApps = window.SiteApps || {};
-  window.SiteApps.registry = window.SiteApps.registry || {};
-  window.SiteApps.register =
-    window.SiteApps.register ||
-    function (name, initFn) {
-      window.SiteApps.registry[name] = initFn;
-    };
+// –– SiteApps registry ––
+window.SiteApps = window.SiteApps || {};
+window.SiteApps.registry = window.SiteApps.registry || {};
+window.SiteApps.register =
+window.SiteApps.register ||
+function (name, initFn) {
+window.SiteApps.registry[name] = initFn;
+};
 
-  const STYLE_ID = "siteapps-mdse-style";
+const STYLE_ID = “siteapps-mdse-style”;
 
-  function ensureStyle() {
-    let style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement("style");
-      style.id = STYLE_ID;
-      document.head.appendChild(style);
-    }
-
-      style.textContent = `
-
-[data-app="mdse"] {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  width: min(100%, 1280px);
-  margin: 14px auto;
-  border: 2px solid #111;
-  border-radius: 16px;
-  padding: 18px;
-  background: #fff;
-  color: #111;
-  display: block;
+function ensureStyle() {
+let style = document.getElementById(STYLE_ID);
+if (!style) {
+style = document.createElement(“style”);
+style.id = STYLE_ID;
+document.head.appendChild(style);
 }
 
-[data-app="mdse"],
-[data-app="mdse"] * {
-  box-sizing: border-box;
+```
+style.textContent = `
+```
+
+[data-app=“mdse”] {
+font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+width: min(100%, 1280px);
+margin: 14px auto;
+border: 2px solid #111;
+border-radius: 16px;
+padding: 18px;
+background: #fff;
+color: #111;
+display: block;
 }
-[data-app="mdse"] h3 { margin: 0 0 10px; font-size: 18px; }
-[data-app="mdse"] .muted { color: #444; font-size: 13px; font-weight: 700; }
+[data-app=“mdse”], [data-app=“mdse”] * { box-sizing: border-box; }
+[data-app=“mdse”] h3 { margin: 0 0 10px; font-size: 18px; }
+[data-app=“mdse”] .muted { color: #444; font-size: 13px; font-weight: 700; }
 
 /* Inputs & Form Elements */
-[data-app="mdse"] textarea, [data-app="mdse"] input, [data-app="mdse"] select {
-  border: 2px solid #111;
-  border-radius: 12px;
-  padding: 12px;
-  font-size: 16px;
-  line-height: 1.35;
-  background: #fbfbfb;
-  color: #111;
+[data-app=“mdse”] textarea, [data-app=“mdse”] input, [data-app=“mdse”] select {
+border: 2px solid #111;
+border-radius: 12px;
+padding: 12px;
+font-size: 16px;
+line-height: 1.35;
+background: #fbfbfb;
+color: #111;
 }
-
-[data-app="mdse"] .mdInput {
-  display: block;
-  width: 100%;
-  max-height: 400px; 
-  overflow-y: auto;
-  margin-bottom: 12px;
-  resize: vertical; /* This lets YOU manually pull it taller if you need to! */
-}
-
-/* Gemini button definition */
-
-/* 1. The Base Button (The "Standard" Look) */
-[data-app="mdse"] button {
-  border: 2px solid #111;
-  border-radius: 999px; /* Consistent Pill Shape */
-  padding: 8px 14px;
-  font-weight: 800;
-  font-size: 13px;
-  background: #fff;
-  color: #111;
-  cursor: pointer;
-  transition: transform 0.1s active;
-}
-
-/* 2. Primary Action (Black background - Draws the eye) */
-[data-app="mdse"] button.primary {
-  background: #111;
-  color: #fff;
-}
-
-/* 3. Warning Action (Red/White - Looks "Dangerous") */
-[data-app="mdse"] button.warn {
-  border-color: #a00;
-  color: #a00;
-  background: #fffafa;
-}
-
-/* 4. Hover/Active States (Makes it feel like an app) */
-[data-app="mdse"] button:hover {
-  opacity: 0.85;
-}
-[data-app="mdse"] button:active {
-  transform: scale(0.96); /* Subtle "click" feel */
-}
-
-/* 5. Tidying the Rows */
-[data-app="mdse"] .btnrow {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin: 12px 0;
-}
-
-
-/* end Gemini */
-
-[data-app="mdse"] textarea:not(.title) { width: 100%; }
-[data-app="mdse"] textarea:focus, [data-app="mdse"] button:focus, [data-app="mdse"] select:focus, [data-app="mdse"] input:focus {
-  outline: 3px solid rgba(11,95,255,.35);
-  outline-offset: 2px;
-}
-
-/* Header & Grid Layout */
-/* 1. Constainer is defined at the start of the CSS. */
-
-/* 2. Switch Header from Grid to Flexbox */
-[data-app="mdse"] .hdr {
-  display: flex !important;
-  flex-wrap: wrap;      /* Allows the title to drop to its own line */
-  align-items: center;
-  gap: 10px;
-  width: 100% !important;
-  margin-bottom: 8px;
-}
-
-/* 3. Make the title force a "new line" and fill 100% */
-[data-app="mdse"] .title {
-  flex: 1 1 100%;       /* This tells the title: "Take 100% width and grow" */
-  width: 100% !important;
-  display: block;
-  box-sizing: border-box;
-  border: 2px solid rgba(0,0,0,.15);
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 17px;
-  font-weight: 1000;
-  resize: none;
-  overflow: hidden;
-  background: #fbfbfb;
-  margin-top: 5px;      /* Spacing between buttons and title */
-}
-
-/* 4. Ensure the panels fill the width */
-[data-app="mdse"] .tabPanel {
-  width: 100%;
-}
-
-/* Tabs & Navigation */
-[data-app="mdse"] .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
-[data-app="mdse"] .tabbtn {
-  border: 2px solid #111;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-weight: 1000;
-  background: #fff;
-  cursor: pointer;
-}
-[data-app="mdse"] .tabbtn.active { background: #111; color: #fff; }
-[data-app="mdse"] .tabPanel { display: none; }
-[data-app="mdse"] .tabPanel.active { display: block; }
-
-/* --- NEW STATUS HEADER SECTION --- */
-[data-app="mdse"] .status-header {
-display: flex;
-justify-content: flex-end;
+[data-app=“mdse”] .mdInput {
+display: block;
+width: 100%;
+max-height: 400px;
+overflow-y: auto;
 margin-bottom: 12px;
-padding-bottom: 8px;
-border-bottom: 1px solid rgba(0,0,0,0.05);
+resize: vertical;
 }
 
-[data-app="mdse"] .badges {
-display: flex;
-gap: 8px;
+/* Buttons */
+[data-app=“mdse”] button {
+border: 2px solid #111;
+border-radius: 999px;
+padding: 8px 14px;
+font-weight: 800;
+font-size: 13px;
+background: #fff;
+color: #111;
+cursor: pointer;
+transition: transform 0.1s;
+}
+[data-app=“mdse”] button.primary { background: #111; color: #fff; }
+[data-app=“mdse”] button.warn { border-color: #a00; color: #a00; background: #fffafa; }
+[data-app=“mdse”] button:hover { opacity: 0.85; }
+[data-app=“mdse”] button:active { transform: scale(0.96); }
+[data-app=“mdse”] .btnrow {
+display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0;
 }
 
-/* Specific Badge Colors */
-[data-app="mdse"] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
-[data-app="mdse"] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
-[data-app="mdse"] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
-/* --- END NEW SECTION --- */
-
-/* Fix for Search Result Formatting */
-/* --- Corrected Search & Tag Result Card Styles --- */
-
-/* 1. The main card container */
-[data-app="mdse"] .tagcard {
-  display: block !important;
-  width: 100%;
-  border: 2px solid #111;
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 12px;
-  background: #fdfdfd;
-  cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
+[data-app=“mdse”] textarea:not(.title) { width: 100%; }
+[data-app=“mdse”] textarea:focus, [data-app=“mdse”] button:focus,
+[data-app=“mdse”] select:focus, [data-app=“mdse”] input:focus {
+outline: 3px solid rgba(11,95,255,.35);
+outline-offset: 2px;
 }
 
-[data-app="mdse"] .tagcard:hover {
-  background: #f0f7ff;
-  transform: translateY(-2px);
-  border-color: #0b5fff;
-  box-shadow: 0 4px 12px rgba(11, 95, 255, 0.1);
+/* Header & Layout */
+[data-app=“mdse”] .hdr {
+display: flex !important;
+flex-wrap: wrap;
+align-items: center;
+gap: 10px;
+width: 100% !important;
+margin-bottom: 8px;
+}
+[data-app=“mdse”] .title {
+flex: 1 1 100%;
+width: 100% !important;
+display: block;
+border: 2px solid rgba(0,0,0,.15);
+border-radius: 12px;
+padding: 12px 14px;
+font-size: 17px;
+font-weight: 1000;
+resize: none;
+overflow: hidden;
+background: #fbfbfb;
+margin-top: 5px;
 }
 
-/* 2. The header row (Level Badge + Title) */
-[data-app="mdse"] .tagcard .toph {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+/* Tabs */
+[data-app=“mdse”] .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
+[data-app=“mdse”] .tabbtn {
+border: 2px solid #111; border-radius: 999px; padding: 8px 12px;
+font-weight: 1000; background: #fff; cursor: pointer;
+}
+[data-app=“mdse”] .tabbtn.active { background: #111; color: #fff; }
+[data-app=“mdse”] .tabPanel { display: none; width: 100%; }
+[data-app=“mdse”] .tabPanel.active { display: block; }
+
+/* Status Header & Badges */
+[data-app=“mdse”] .status-header {
+display: flex; justify-content: flex-end; margin-bottom: 12px;
+padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+[data-app=“mdse”] .badges { display: flex; gap: 8px; }
+[data-app=“mdse”] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
+[data-app=“mdse”] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
+[data-app=“mdse”] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
+
+/* Search & Tag Result Cards */
+[data-app=“mdse”] .tagcard {
+display: block !important; width: 100%;
+border: 2px solid #111; border-radius: 12px;
+padding: 14px; margin-bottom: 12px;
+background: #fdfdfd; cursor: pointer;
+transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+[data-app=“mdse”] .tagcard:hover {
+background: #f0f7ff; transform: translateY(-2px);
+border-color: #0b5fff; box-shadow: 0 4px 12px rgba(11, 95, 255, 0.1);
+}
+[data-app=“mdse”] .tagcard .toph {
+display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+[data-app=“mdse”] .tagcard .lvl {
+background: #111; color: #fff; font-weight: 800;
+font-size: 11px; padding: 2px 6px; border-radius: 6px; text-transform: uppercase;
+}
+[data-app=“mdse”] .tagcard .titleline { font-weight: 700; font-size: 15px; color: #111; }
+[data-app=“mdse”] .tagcard .preview {
+font-size: 13px; color: #555; line-height: 1.4;
+display: -webkit-box; -webkit-line-clamp: 2;
+-webkit-box-orient: vertical; overflow: hidden;
+}
+[data-app=“mdse”] .tagcard .subtags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+[data-app=“mdse”] .tagcard .tagpill {
+font-size: 10px; font-weight: 700; background: #eee;
+padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; color: #444;
 }
 
-/* 3. The "H1/H2" badge */
-[data-app="mdse"] .tagcard .lvl {
-  background: #111;
-  color: #fff;
-  font-weight: 800;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  text-transform: uppercase;
+/* Tag bar */
+[data-app=“mdse”] .tagbar {
+display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0;
+}
+[data-app=“mdse”] .tagbar .spacer { flex: 1 1 auto; }
+
+/* Pills */
+[data-app=“mdse”] .pill {
+border: 2px solid #111; border-radius: 12px; padding: 8px 10px;
+font-weight: 900; font-size: 13px; background: #fff; user-select: none;
+}
+[data-app=“mdse”] .hdr .pill { padding: 4px 8px; font-size: 12px; border-radius: 10px; }
+[data-app=“mdse”] .hdr .pill:not(.gray) { padding: 4px 12px; font-size: 13px; border: 3px solid #111; }
+[data-app=“mdse”] .hdr .pill.gray {
+padding: 2px 6px; font-size: 12px; border: 2px solid rgba(0,0,0,.35);
+background: #fff; min-width: 28px; text-align: center;
 }
 
-/* 4. The section title text */
-[data-app="mdse"] .tagcard .titleline {
-  font-weight: 700;
-  font-size: 15px;
-  color: #111;
+/* Tools */
+[data-app=“mdse”] .tools {
+display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+align-items: flex-start; margin-top: 10px; padding-top: 10px;
+border-top: 2px solid rgba(0,0,0,.08);
 }
-
-/* 5. The preview text (first sentence) */
-[data-app="mdse"] .tagcard .preview {
-  font-size: 13px;
-  color: #555;
-  line-height: 1.4;
-  /* Truncate text after 2 lines if it's too long */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+[data-app=“mdse”] .miniTools {
+display: flex; gap: 6px; align-items: center;
+justify-content: flex-end; white-space: nowrap;
 }
-
-/* 6. Tag pills in the Tags tab */
-[data-app="mdse"] .tagcard .subtags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 10px;
-}
-
-[data-app="mdse"] .tagcard .tagpill {
-  font-size: 10px;
-  font-weight: 700;
-  background: #eee;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  color: #444;
-}
-
-/* 1) ADD THIS CSS inside ensureStyle()  for copy tags to clipboard */
-
-[data-app="mdse"] .tagbar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin: 8px 0;
-}
-
-[data-app="mdse"] .tagbar .spacer {
-  flex: 1 1 auto;
-}
-
-/* Pills & Badges */
-[data-app="mdse"] .pill {
-  border: 2px solid #111;
-  border-radius: 12px;
-  padding: 8px 10px;
-  font-weight: 900;
-  font-size: 13px;
-  background: #fff;
-  user-select: none;
-}
-[data-app="mdse"] .hdr .pill { padding: 4px 8px; font-size: 12px; border-radius: 10px; }
-[data-app="mdse"] .hdr .pill:not(.gray) { padding: 4px 12px; font-size: 13px; border: 3px solid #111; }
-[data-app="mdse"] .hdr .pill.gray {
-  padding: 2px 6px;
-  font-size: 12px;
-  border: 2px solid rgba(0,0,0,.35);
-  background: #fff;
-  min-width: 28px;
-  text-align: center;
-}
-
-/* Status Header Layout */
-[data-app="mdse"] .status-header {
-  display: flex;
-  justify-content: flex-end; /* Pushes badges to the right */
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0,0,0,0.05); /* Optional subtle divider */
-}
-
-[data-app="mdse"] .badges {
-  display: flex;
-  gap: 8px;
-}
-
-/* Specific Badge Colors */
-[data-app="mdse"] .badge.good { background: #eefbee; color: #2b7a2e; border: 1px solid #2b7a2e; }
-[data-app="mdse"] .badge.warn { background: #fff5f5; color: #c00; border: 1px solid #c00; }
-[data-app="mdse"] .badge.dim  { background: #f9f9f9; color: #666; border: 1px solid #ccc; }
-
-
-/* Tools & Buttons */
-[data-app="mdse"] .tools {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: flex-start;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 2px solid rgba(0,0,0,.08);
-}
-[data-app="mdse"] .miniTools { display: flex; gap: 6px; align-items: center; justify-content: flex-end; white-space: nowrap; }
-[data-app="mdse"] .miniBtn {
-  border: 2px solid rgba(0,0,0,.15);
-  border-radius: 10px;
-  padding: 4px 6px;
-  font-weight: 1000;
-  font-size: 11px;
-  line-height: 1;
-  background: #fff;
+[data-app=“mdse”] .miniBtn {
+border: 2px solid rgba(0,0,0,.15); border-radius: 10px;
+padding: 4px 6px; font-weight: 1000; font-size: 11px;
+line-height: 1; background: #fff;
 }
 
 /* Nodes */
-[data-app="mdse"] .node { width: 100%; display: block; background: #fff; border: 2px solid rgba(0,0,0,.15); border-radius: 14px; padding: 12px; margin: 10px 0; }
-[data-app="mdse"] .node.activeNode { border-color: rgba(11,95,255,.45); box-shadow: 0 8px 22px rgba(11,95,255,.08); }
-[data-app="mdse"] .node.activeNode .tools { display: flex !important; }
-[data-app="mdse"] .node .tools { display: none !important; }
-
-/* level indents. */
-/* Indent the content, but keep the background/border full width */
-[data-app="mdse"] .node.level-1 { padding-left: 12px; }
-[data-app="mdse"] .node.level-2 { padding-left: 32px; border-left: 4px solid #eee; }
-[data-app="mdse"] .node.level-3 { padding-left: 52px; border-left: 4px solid #ddd; }
-[data-app="mdse"] .node.level-4 { padding-left: 72px; border-left: 4px solid #ccc; }
-[data-app="mdse"] .node.level-5 { padding-left: 92px; border-left: 4px solid #bbb; }
-[data-app="mdse"] .node.level-6 { padding-left: 112px; border-left: 4px solid #aaa; }
-
-[data-app="mdse"] .node .body {
-  display: none; /* Hidden by default */
-  width: 100%;
-  margin-top: 10px;
+[data-app=“mdse”] .node {
+width: 100%; display: block; background: #fff;
+border: 2px solid rgba(0,0,0,.15); border-radius: 14px;
+padding: 12px; margin: 10px 0;
 }
+[data-app=“mdse”] .node.activeNode { border-color: rgba(11,95,255,.45); box-shadow: 0 8px 22px rgba(11,95,255,.08); }
+[data-app=“mdse”] .node.activeNode .tools { display: flex !important; }
+[data-app=“mdse”] .node .tools { display: none !important; }
 
-[data-app="mdse"] .node .body.show {
-  display: block; /* Shown only when 'show' class is added */
-}
+[data-app=“mdse”] .node.level-1 { padding-left: 12px; }
+[data-app=“mdse”] .node.level-2 { padding-left: 32px; border-left: 4px solid #eee; }
+[data-app=“mdse”] .node.level-3 { padding-left: 52px; border-left: 4px solid #ddd; }
+[data-app=“mdse”] .node.level-4 { padding-left: 72px; border-left: 4px solid #ccc; }
+[data-app=“mdse”] .node.level-5 { padding-left: 92px; border-left: 4px solid #bbb; }
+[data-app=“mdse”] .node.level-6 { padding-left: 112px; border-left: 4px solid #aaa; }
 
-
-/* Ensure textareas within the node still stretch to the new edge */
-[data-app="mdse"] .node textarea {
-  width: 100%;
-  display: block;
-}
-
-/* Optional: Make the border highlight when the node is active */
-[data-app="mdse"] .node.activeNode {
-  border-left-color: #0b5fff !important;
-}
-
-/* The node you are currently moving */
-[data-app="mdse"] .node.movingSource {
-  background: #fff9c4; /* Light yellow */
-  border: 2px dashed #fbc02d;
-  opacity: 0.8;
-}
-
-/* Valid places to drop the node */
-[data-app="mdse"] .node.moveTarget {
-  border: 2px dashed #4caf50; /* Green dashed border */
-  cursor: alias;
-}
-
-[data-app="mdse"] .node.moveTarget:hover {
-  background: #e8f5e9;
-}
-
-
-/* Responsive */
+[data-app=“mdse”] .node .body { display: none; width: 100%; margin-top: 10px; }
+[data-app=“mdse”] .node .body.show { display: block; }
+[data-app=“mdse”] .node textarea { width: 100%; display: block; }
+[data-app=“mdse”] .node.activeNode { border-left-color: #0b5fff !important; }
+[data-app=“mdse”] .node.movingSource { background: #fff9c4; border: 2px dashed #fbc02d; opacity: 0.8; }
+[data-app=“mdse”] .node.moveTarget { border: 2px dashed #4caf50; cursor: alias; }
+[data-app=“mdse”] .node.moveTarget:hover { background: #e8f5e9; }
 
 @media (max-width: 768px) {
-
-  [data-app="mdse"] {
-    width: 100%;
-    padding: 10px;
-  }
-  
+[data-app=“mdse”] { width: 100%; padding: 10px; }
 }
-
 `;
-
-  }
-
-  // ---- Utilities ----
-  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-  const uid = () =>
-    `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-
-// start
-function autoResizeTA(el) {
-  if (!el) return;
-
-  if (el.classList && el.classList.contains("mdInput")) return;
-
-  el.style.height = "auto";
-  if (el.scrollHeight > 0) {
-    el.style.height = (el.scrollHeight + 2) + "px";
-  }
 }
-  // stop
-function downloadFile(filename, content, mimeType = "text/plain;charset=utf-8") {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+// –– Utilities ––
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function debounce(fn, ms) {
+let timer = null;
+const wrapper = (…args) => {
+if (timer) clearTimeout(timer);
+timer = setTimeout(() => { timer = null; fn(…args); }, ms);
+};
+wrapper.cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+wrapper.pending = () => timer !== null;
+return wrapper;
+}
+
+function makeRafScheduler(renderFn) {
+let queued = false;
+return () => {
+if (queued) return;
+queued = true;
+requestAnimationFrame(() => { queued = false; renderFn(); });
+};
+}
+
+// DOM helper — drastically reduces createElement boilerplate
+function el(tag, attrs, children) {
+const e = document.createElement(tag);
+if (attrs) {
+for (const [k, v] of Object.entries(attrs)) {
+if (k === “class”) e.className = v;
+else if (k === “text”) e.textContent = v;
+else if (k === “html”) e.innerHTML = v;
+else if (k.startsWith(“on”)) e.addEventListener(k.slice(2), v);
+else if (k === “disabled”) e.disabled = !!v;
+else e.setAttribute(k, v);
+}
+}
+if (children) {
+if (!Array.isArray(children)) children = [children];
+for (const c of children) {
+if (typeof c === “string”) e.appendChild(document.createTextNode(c));
+else if (c) e.appendChild(c);
+}
+}
+return e;
+}
+
+function autoResizeTA(ta) {
+if (!ta || (ta.classList && ta.classList.contains(“mdInput”))) return;
+ta.style.height = “auto”;
+if (ta.scrollHeight > 0) ta.style.height = (ta.scrollHeight + 2) + “px”;
+}
+
+function downloadFile(filename, content, mimeType = “text/plain;charset=utf-8”) {
+const blob = new Blob([content], { type: mimeType });
+const url = URL.createObjectURL(blob);
+const a = el(“a”, { href: url, download: filename });
+document.body.appendChild(a);
+a.click();
+a.remove();
+setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function slugifyFilename(s) {
-  return (s || "outline")
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "outline";
+return (s || “outline”).toLowerCase().trim()
+.replace(/[^\w\s-]/g, “”).replace(/\s+/g, “-”)
+.replace(/-+/g, “-”).replace(/^-|-$/g, “”) || “outline”;
 }
 
+function safeJsonParse(s) {
+try { return JSON.parse(s); } catch { return null; }
+}
 
-  
-  function safeJsonParse(s) {
-    try { return JSON.parse(s); } catch { return null; }
-  }
+function storageKey(container) {
+const k = container.getAttribute(“data-storage-key”);
+return `siteapps:mdse:${(k && k.trim()) || location.pathname || "/"}`;
+}
 
-  function storageKey(container) {
-    const k = container.getAttribute("data-storage-key");
-    if (k && k.trim()) return `siteapps:mdse:${k.trim()}`;
-    return `siteapps:mdse:${location.pathname || "/"}`;
-  }
+async function copyText(text) {
+try {
+await navigator.clipboard.writeText(text);
+return true;
+} catch {
+try {
+const ta = el(“textarea”);
+ta.value = text;
+Object.assign(ta.style, { position: “fixed”, left: “-9999px”, top: “0” });
+document.body.appendChild(ta);
+ta.focus();
+ta.select();
+const ok = document.execCommand(“copy”);
+ta.remove();
+return !!ok;
+} catch { return false; }
+}
+}
 
-  async function copyText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        ta.style.top = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand("copy");
-        ta.remove();
-        return !!ok;
-      } catch {
-        return false;
-      }
-    }
-  }
+// –– Tag parsing ––
+const TAG_LINE_RE = /^\s*\?%%\s*tag\s+(.*)\s*$/i;
 
-  // ---- Tag parsing helpers ----
-  // Only treat lines starting with "%% tag" (or "\%% tag") as tags
-  const TAG_LINE_RE = /^\s*\\?%%\s*tag\s+(.*)\s*$/i;
+function normaliseTag(t) {
+return (t || “”).trim().replace(/\s+/g, “ “).toLowerCase();
+}
 
-  function normaliseTag(t) {
-    return (t || "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .toLowerCase();
-  }
+function extractTagsFromBody(bodyText) {
+const tags = [];
+for (const line of (bodyText || “”).split(”\n”)) {
+const m = line.match(TAG_LINE_RE);
+if (!m) continue;
+let chunk = (m[1] || “”).trim();
+if (!chunk) continue;
+if (chunk.toLowerCase().startsWith(“tags:”)) {
+chunk = chunk.slice(chunk.indexOf(”:”) + 1);
+}
+for (const p of chunk.split(”,”)) {
+const nt = normaliseTag(p);
+if (nt) tags.push(nt);
+}
+}
+return […new Set(tags)];
+}
 
-  function extractTagsFromBody(bodyText) {
-    const tags = [];
-    const lines = (bodyText || "").split("\n");
-    for (const line of lines) {
-      const m = line.match(TAG_LINE_RE);
-      if (!m) continue;
-      const payload = (m[1] || "").trim();
-      if (!payload) continue;
+function bodyWithoutTagLines(bodyText) {
+return (bodyText || “”).split(”\n”)
+.filter((line) => !TAG_LINE_RE.test(line))
+.join(”\n”).trim();
+}
 
-      // Support:
-      // - "arc:escape" (one per line)
-      // - "tags: arc:escape, pov:ember"
-      const lower = payload.toLowerCase();
-      let chunk = payload;
+function firstSentence(text) {
+const s = (text || “”).trim();
+if (!s) return “”;
+const m = s.match(/^[\s\S]*?[.!?](?=\s|$)/);
+if (m && m[0]) return m[0].trim();
+return (s.split(”\n”).find((x) => x.trim()) || “”).trim();
+}
 
-      if (lower.startsWith("tags:")) {
-        chunk = payload.slice(payload.indexOf(":") + 1);
-      }
+// –– Core app ––
+window.SiteApps.register(“mdse”, (container) => {
+ensureStyle();
+const KEY = storageKey(container);
 
-      const parts = chunk
-        .split(",")
-        .map((p) => p.trim())
-        .filter(Boolean);
+```
+// State
+let nodes = [];
+let sourceId = null;
+let lastCreatedId = null;
+let maxVisibleLevel = 6;
+let pendingScrollToId = "";
+let suppressNextScrollRestore = false;
+let copiedSinceChange = false;
+let lastCopyAt = null;
 
-      for (const p of parts) {
-        const nt = normaliseTag(p);
-        if (!nt) continue;
-        tags.push(nt);
-      }
-    }
+// Search state
+let searchQuery = "";
+let searchInBody = false;
+let revealMatches = true;
+let matchIds = [];
+let matchPos = -1;
 
-    const seen = new Set();
-    const out = [];
-    for (const t of tags) {
-      if (seen.has(t)) continue;
-      seen.add(t);
-      out.push(t);
-    }
-    return out;
-  }
+// Tab / Tags
+let activeTab = "structure";
+let activeTag = "";
+let activeNodeId = "";
 
-  function bodyWithoutTagLines(bodyText) {
-    const lines = (bodyText || "").split("\n");
-    const kept = [];
-    for (const line of lines) {
-      if (TAG_LINE_RE.test(line)) continue;
-      kept.push(line);
-    }
-    return kept.join("\n").trim();
-  }
-
-  function firstSentence(text) {
-    const s = (text || "").trim();
-    if (!s) return "";
-    const m = s.match(/^[\s\S]*?[.!?](?=\s|$)/);
-    if (m && m[0]) return m[0].trim();
-    const line = s.split("\n").find((x) => x.trim());
-    return (line || "").trim();
-  }
-
-  // ---- Core app ----
-  window.SiteApps.register("mdse", (container) => {
-    ensureStyle();
-
-    const KEY = storageKey(container);
-
-    // State
-    let nodes = []; // {id, level, title, body, isCollapsed, showBody, tags[]}
-    let sourceId = null;
-    let lastCreatedId = null;
-    let maxVisibleLevel = 6;
-
-    let pendingScrollToId = "";
-    let suppressNextScrollRestore = false;
-
-    let copiedSinceChange = false;
-    let lastCopyAt = null;
-
-    // Search state
-    let searchQuery = "";
-    let searchInBody = false;
-    let revealMatches = true;
-    let matchIds = [];
-    let matchPos = -1;
-
-    // Tabs / Tags view state
-    let activeTab = "structure"; // "structure" | "search" | "tags"
-    let activeTag = ""; // normalised tag or ""
-
-    let activeNodeId = ""; // which node is "selected" for showing controls
-
-// START UNDO STATE
-
-    // ---- Undo (structural) ----
+// Undo
 const UNDO_LIMIT = 10;
 let undoStack = [];
 
-// --- Global Schedulers ---
-// (makeRafScheduler is hoisted, so this works even if the 
-// function definition is at the bottom of the file!)
+// Schedulers
+const scheduleRenderStructure = makeRafScheduler(() => renderStructure());
+const scheduleRenderTagCloud = makeRafScheduler(() => renderTagCloud());
+const scheduleRenderTagResults = makeRafScheduler(() => renderTagResults());
+const scheduleRenderSearchResults = makeRafScheduler(() => renderSearchResults());
 
-const scheduleRenderTagCloud      = makeRafScheduler(renderTagCloud);
-const scheduleRenderTagResults    = makeRafScheduler(renderTagResults);
-const scheduleRenderSearchResults = makeRafScheduler(renderSearchResults);
-const scheduleRenderStructure      = makeRafScheduler(renderStructure);
+// ---- Outline helpers ----
+function indexById(id) { return nodes.findIndex((n) => n.id === id); }
 
-    
-function snapshotNodes() {
-  // JSON clone is simplest and iPad-safe
-  return JSON.stringify(nodes);
+function familyIndices(startIdx) {
+  const fam = [startIdx];
+  if (startIdx < 0 || startIdx >= nodes.length) return fam;
+  const pLevel = nodes[startIdx].level;
+  for (let i = startIdx + 1; i < nodes.length; i++) {
+    if (nodes[i].level > pLevel) fam.push(i);
+    else break;
+  }
+  return fam;
 }
+
+function familyIds(startId) {
+  const idx = indexById(startId);
+  return idx < 0 ? [] : familyIndices(idx).map((i) => nodes[i].id);
+}
+
+// Compute all per-node metrics in a single pass (avoids repeated familyIndices calls)
+function computeNodeMetrics() {
+  const metrics = new Map();
+  for (let i = 0; i < nodes.length; i++) {
+    const fam = familyIndices(i);
+    const pLevel = nodes[i].level;
+    let directChildren = 0;
+    let wordCount = 0;
+    for (const j of fam) {
+      const n = nodes[j];
+      if (j !== i && n.level === pLevel + 1) directChildren++;
+      wordCount += countWords(n.title) + countWords(n.body);
+    }
+    metrics.set(nodes[i].id, {
+      hasChildren: fam.length > 1,
+      directChildren,
+      subtreeCount: fam.length - 1,
+      wordCount,
+      familyEnd: fam[fam.length - 1],
+    });
+  }
+  return metrics;
+}
+
+function directChildIndices(parentIdx) {
+  const out = [];
+  if (parentIdx < 0 || parentIdx >= nodes.length) return out;
+  const pLevel = nodes[parentIdx].level;
+  for (let i = parentIdx + 1; i < nodes.length; i++) {
+    const lvl = nodes[i].level;
+    if (lvl <= pLevel) break;
+    if (lvl === pLevel + 1) out.push(i);
+  }
+  return out;
+}
+
+// ---- Word count ----
+function countWords(text) {
+  if (!text) return 0;
+  return text.split("\n")
+    .filter((line) => !line.trim().startsWith("%% tag"))
+    .join(" ").trim().split(/\s+/).filter(Boolean).length;
+}
+
+// ---- Tag line manipulation ----
+function normaliseNewlines(s) {
+  return (s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function hasExactTagLine(body, payload) {
+  const want = (payload || "").trim().toLowerCase();
+  if (!want) return false;
+  return normaliseNewlines(body).split("\n").some((ln) => {
+    const m = ln.match(TAG_LINE_RE);
+    return m && (m[1] || "").trim().toLowerCase() === want;
+  });
+}
+
+function addTagLineToBody(body, payload) {
+  const want = (payload || "").trim();
+  if (!want) return body || "";
+  const b = normaliseNewlines(body || "").trimEnd();
+  if (hasExactTagLine(b, want)) return b;
+  return (b ? b + "\n" : "") + `%% tag ${want}`;
+}
+
+function removeTagLineFromBody(body, payload) {
+  const want = (payload || "").trim().toLowerCase();
+  if (!want) return body || "";
+  return normaliseNewlines(body || "").split("\n")
+    .filter((ln) => {
+      const m = ln.match(TAG_LINE_RE);
+      return !m || (m[1] || "").trim().toLowerCase() !== want;
+    }).join("\n").trimEnd();
+}
+
+function titleToTag(title) {
+  return (title || "").trim().toLowerCase()
+    .replace(/[^a-z0-9\s:-]/g, "").replace(/\s+/g, "-");
+}
+
+function bulkTagDirectChildren(parentId, payload, mode) {
+  pushUndo("bulk tag");
+  const parentIdx = indexById(parentId);
+  if (parentIdx < 0) return;
+  const childIdxs = directChildIndices(parentIdx);
+  if (!childIdxs.length) { alert("No direct children under this heading."); return; }
+  const fn = mode === "remove" ? removeTagLineFromBody : addTagLineToBody;
+  childIdxs.forEach((i) => {
+    nodes[i].body = fn(nodes[i].body || "", payload);
+    nodes[i].tags = extractTagsFromBody(nodes[i].body);
+    nodes[i].showBody = true;
+  });
+  markChangedFull();
+}
+
+// ---- Undo ----
+function snapshotNodes() { return JSON.stringify(nodes); }
 
 function restoreNodes(snapshot) {
   const arr = safeJsonParse(snapshot);
   if (!Array.isArray(arr)) return false;
-
-  nodes = arr
-    .filter((n) => n && typeof n === "object")
-    .map((n) => {
-      const body = typeof n.body === "string" ? n.body : "";
-      return {
-        id: typeof n.id === "string" ? n.id : uid(),
-        level: clamp(parseInt(n.level, 10) || 1, 1, 6),
-        title: typeof n.title === "string" ? n.title : "",
-        body,
-        isCollapsed: !!n.isCollapsed,
-        showBody: !!n.showBody,
-        tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
-      };
-    });
-
-  // ensure these don't point at missing nodes
+  nodes = arr.filter((n) => n && typeof n === "object").map((n) => {
+    const body = typeof n.body === "string" ? n.body : "";
+    return {
+      id: typeof n.id === "string" ? n.id : uid(),
+      level: clamp(parseInt(n.level, 10) || 1, 1, 6),
+      title: typeof n.title === "string" ? n.title : "",
+      body,
+      isCollapsed: !!n.isCollapsed,
+      showBody: !!n.showBody,
+      tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
+    };
+  });
   if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
   if (activeNodeId && !nodes.some((n) => n.id === activeNodeId)) activeNodeId = "";
   return true;
 }
 
 function pushUndo(label) {
-  // label is optional; handy if you ever want a history viewer
   undoStack.push({ label: label || "", snap: snapshotNodes() });
   if (undoStack.length > UNDO_LIMIT) undoStack.shift();
 }
@@ -644,196 +546,530 @@ function undo() {
   if (!undoStack.length) return;
   const prev = undoStack.pop();
   if (!restoreNodes(prev.snap)) return;
-
   setCopiedFlag(false);
   rebuildMatchesNoRender();
-  // tags/search derived from nodes; rebuild UI
   if (activeTab === "tags") rebuildTagUI();
   if (activeTab === "search") scheduleRenderSearchResults();
   scheduleRenderStructure();
   saveDebounced();
 }
 
-// STOP UNDO STATE
-    
-    let saveTimer = null;
-    let matchTimer = null;
-    let tagTimer = null;
+// ---- Search ----
+const norm = (s) => (s || "").toLowerCase();
 
-    // ---- Outline helpers ----
-    function indexById(id) {
-      return nodes.findIndex((n) => n.id === id);
-    }
+function nodeMatches(n, q) {
+  if (!q) return false;
+  const qq = norm(q);
+  return norm(n.title).includes(qq) || (searchInBody && norm(n.body).includes(qq));
+}
 
-    function familyIndices(startIdx) {
-      const fam = [startIdx];
-      if (startIdx < 0 || startIdx >= nodes.length) return fam;
-      const pLevel = nodes[startIdx].level;
-      for (let i = startIdx + 1; i < nodes.length; i++) {
-        if (nodes[i].level > pLevel) fam.push(i);
-        else break;
+function nodeMatchesBodyOnly(n, q) {
+  if (!q || !searchInBody) return false;
+  const qq = norm(q);
+  return !norm(n.title).includes(qq) && norm(n.body).includes(qq);
+}
+
+function updateCount() {
+  if (!searchQuery.trim()) { countEl.textContent = ""; return; }
+  if (!matchIds.length) { countEl.textContent = "0 matches"; return; }
+  const cur = matchPos >= 0 ? matchPos + 1 : 0;
+  countEl.textContent = cur ? `${cur}/${matchIds.length}` : `${matchIds.length} matches`;
+}
+
+function computeRevealSet() {
+  const reveal = new Set();
+  if (!revealMatches || !searchQuery.trim() || !matchIds.length) return reveal;
+  for (let i = 0; i < nodes.length; i++) {
+    if (!nodeMatches(nodes[i], searchQuery)) continue;
+    reveal.add(nodes[i].id);
+    let childLevel = nodes[i].level;
+    for (let j = i - 1; j >= 0; j--) {
+      if (nodes[j].level < childLevel) {
+        reveal.add(nodes[j].id);
+        childLevel = nodes[j].level;
       }
-      return fam;
+      if (childLevel === 1) break;
     }
+  }
+  return reveal;
+}
 
-    function familyIds(startId) {
-      const idx = indexById(startId);
-      if (idx < 0) return [];
-      return familyIndices(idx).map((i) => nodes[i].id);
+function rebuildMatchesNoRender() {
+  matchIds = [];
+  matchPos = -1;
+  if (searchQuery.trim()) {
+    for (const n of nodes) {
+      if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
     }
+  }
+  updateCount();
+}
 
-    function hasChildren(idx) {
-      return familyIndices(idx).length > 1;
+const rebuildMatchesDebounced = debounce(() => rebuildMatchesNoRender(), 150);
+
+function rebuildMatches() {
+  rebuildMatchesNoRender();
+  scheduleRenderStructure();
+  if (activeTab === "search") scheduleRenderSearchResults();
+}
+
+function jumpMatch(delta) {
+  if (!matchIds.length) return;
+  matchPos = (matchPos + delta + matchIds.length) % matchIds.length;
+  updateCount();
+  scheduleRenderStructure();
+  const id = matchIds[matchPos];
+  const nodeEl = canvas.querySelector(`[data-node-id="${id}"]`);
+  if (nodeEl) {
+    nodeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = nodeEl.querySelector(".title");
+    if (t) t.focus();
+  }
+}
+
+// ---- Tags view ----
+function tagsCountMap() {
+  const m = new Map();
+  nodes.forEach((n) => (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1)));
+  return m;
+}
+
+function allTags() {
+  return [...tagsCountMap().keys()].sort((a, b) => a.localeCompare(b));
+}
+
+// ---- Shared card builder (used by Tags + Search) ----
+function buildCard(n, onClick, showTags) {
+  const cleaned = bodyWithoutTagLines(n.body);
+  const preview = firstSentence(cleaned);
+
+  const card = el("div", {
+    class: "tagcard",
+    title: "Tap to jump to this section in Structure view",
+    onclick: () => onClick(n.id),
+  }, [
+    el("div", { class: "toph" }, [
+      el("span", { class: "lvl", text: `H${n.level}` }),
+      el("span", { class: "titleline", text: n.title || "(untitled)" }),
+    ]),
+    el("div", { class: "preview", text: preview || "(No body text.)" }),
+  ]);
+
+  if (showTags && n.tags && n.tags.length) {
+    const subtags = el("div", { class: "subtags" });
+    n.tags.slice(0, 12).forEach((t) => {
+      subtags.appendChild(el("span", { class: "tagpill", text: t }));
+    });
+    card.appendChild(subtags);
+  }
+  return card;
+}
+
+function renderTagCloud() {
+  const counts = tagsCountMap();
+  const tags = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+  tagCloud.innerHTML = "";
+
+  if (!tags.length) {
+    tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% tag arc:escape</b> inside a section's body.</span>`;
+    return;
+  }
+  tags.forEach((t) => {
+    tagCloud.appendChild(el("button", {
+      type: "button",
+      class: "tagchip" + (activeTag === t ? " active" : ""),
+      text: `${t} (${counts.get(t) || 0})`,
+      onclick: () => { activeTag = activeTag === t ? "" : t; rebuildTagUI(); saveDebounced(); },
+    }));
+  });
+}
+
+function renderTagResults() {
+  tagResults.innerHTML = "";
+  if (!activeTag) {
+    tagMeta.textContent = "Choose a tag to see matching sections (in manuscript order).";
+    return;
+  }
+  const matches = nodes.filter((n) => (n.tags || []).includes(activeTag));
+  tagMeta.textContent = `${activeTag}: ${matches.length} section${matches.length === 1 ? "" : "s"}`;
+  matches.forEach((n) => tagResults.appendChild(buildCard(n, jumpToNode, true)));
+}
+
+function rebuildTagUI() {
+  tagAllBtn.classList.toggle("active", !activeTag);
+  scheduleRenderTagCloud();
+  scheduleRenderTagResults();
+}
+
+const rebuildTagUIDebounced = debounce(() => {
+  if (activeTab === "tags") rebuildTagUI();
+}, 150);
+
+// ---- Search results tab ----
+function renderSearchResults() {
+  searchResults.innerHTML = "";
+  if (!searchQuery.trim()) {
+    searchResults.innerHTML = `<div class="tagmeta">Type to search your outline.</div>`;
+    return;
+  }
+  if (!matchIds.length) {
+    searchResults.innerHTML = `<div class="tagmeta">No matches found.</div>`;
+    return;
+  }
+  const matchSet = new Set(matchIds);
+  nodes.filter((n) => matchSet.has(n.id))
+    .forEach((n) => searchResults.appendChild(buildCard(n, jumpToNode, false)));
+}
+
+function jumpToNode(id) {
+  setTab("structure");
+  const idx = indexById(id);
+  if (idx >= 0 && nodes[idx].level > maxVisibleLevel) {
+    maxVisibleLevel = 6;
+    selMax.value = "6";
+  }
+  activeNodeId = id;
+  pendingScrollToId = id;
+  suppressNextScrollRestore = true;
+  scheduleRenderStructure();
+}
+
+// ---- Persistence ----
+function setCopiedFlag(flag) {
+  copiedSinceChange = !!flag;
+  if (copiedSinceChange) lastCopyAt = new Date().toISOString();
+  badgeCopy.className = "badge " + (copiedSinceChange ? "good" : "warn");
+  badgeCopy.textContent = copiedSinceChange ? "Copied ✓" : "Not copied";
+  badgeCopy.title = copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
+}
+
+function saveNow() {
+  setTimeout(() => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        v: 6, nodes, input: taInput.value, sourceId, maxVisibleLevel,
+        copiedSinceChange, lastCopyAt, searchQuery, searchInBody,
+        revealMatches, activeTab, activeTag,
+      }));
+      badgeSave.className = "badge good badgeSave";
+      badgeSave.textContent = "Saved ✓";
+    } catch (err) {
+      console.error("Storage failed:", err);
+      badgeSave.className = "badge warn badgeSave";
+      badgeSave.textContent = "Not saved";
     }
+  }, 0);
+}
 
-    // START CHILD NODE COUNTS
+const saveDebounced = debounce(() => saveNow(), 500);
+// Override to show unsaved state immediately
+const _saveDebouncedOrig = saveDebounced;
+const saveDebouncedWithBadge = (...args) => {
+  badgeSave.className = "badge dim badgeSave";
+  badgeSave.textContent = "Unsaved…";
+  _saveDebouncedOrig(...args);
+};
+// We'll just inline the badge update in markChanged* instead.
+// Keep saveDebounced as-is; badge logic below.
 
-function countDirectChildren(idx) {
-  if (idx < 0 || idx >= nodes.length) return 0;
-  const parentLevel = nodes[idx].level;
-  let count = 0;
+function loadPref() {
+  const raw = localStorage.getItem(KEY);
+  if (!raw) return;
+  const s = safeJsonParse(raw);
+  if (!s || typeof s !== "object") return;
+
+  if (Array.isArray(s.nodes)) nodes = s.nodes;
+  if (typeof s.input === "string") taInput.value = s.input;
+  if (typeof s.sourceId === "string" || s.sourceId === null) sourceId = s.sourceId;
+  if (typeof s.maxVisibleLevel === "number") maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
+  copiedSinceChange = !!s.copiedSinceChange;
+  lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
+  if (typeof s.searchQuery === "string") searchQuery = s.searchQuery;
+  if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
+  if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
+  if (typeof s.activeTab === "string") activeTab = ["structure","search","tags"].includes(s.activeTab) ? s.activeTab : "structure";
+  if (typeof s.activeTag === "string") activeTag = normaliseTag(s.activeTag);
+
+  nodes = nodes.filter((n) => n && typeof n === "object").map((n) => {
+    const body = typeof n.body === "string" ? n.body : "";
+    return {
+      id: typeof n.id === "string" ? n.id : uid(),
+      level: clamp(parseInt(n.level, 10) || 1, 1, 6),
+      title: typeof n.title === "string" ? n.title : "",
+      body,
+      isCollapsed: !!n.isCollapsed,
+      showBody: false,
+      tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
+    };
+  });
+}
+
+// ---- Markdown parse / export ----
+function parseMarkdown(text) {
+  const lines = (text || "").split("\n");
+  const out = [];
+  let current = null;
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
+    if (headingMatch) {
+      current = {
+        id: uid(), level: headingMatch[1].length,
+        title: headingMatch[2].trim() || "(Untitled)",
+        body: "", isCollapsed: false, showBody: false, tags: [],
+      };
+      out.push(current);
+    } else {
+      if (!current && line.trim().length > 0) {
+        current = {
+          id: uid(), level: 1, title: "(Start / Preamble)",
+          body: "", isCollapsed: false, showBody: true, tags: [],
+        };
+        out.push(current);
+      }
+      if (current) current.body += line + "\n";
+    }
+  }
+  out.forEach((n) => { n.body = n.body.trim(); n.tags = extractTagsFromBody(n.body); });
+  return out;
+}
+
+function toMarkdown() {
+  return nodes.map((n) => {
+    const head = "#".repeat(n.level) + " " + (n.title || "");
+    const body = (n.body || "").trimEnd();
+    return body ? head + "\n" + body : head;
+  }).join("\n\n");
+}
+
+// ---- Clipboard paste as sibling ----
+async function readClipboardTextFallback() {
+  try { return await navigator.clipboard.readText(); }
+  catch { return prompt("Clipboard read blocked. Paste the markdown here:", "") || ""; }
+}
+
+function normalizeClipboardToLevel(clip, targetLevel) {
+  const text = String(clip || "").replace(/\r\n?/g, "\n").trim();
+  if (!text) return "";
+
+  const lines = text.split("\n");
+  // Single pass: find first heading level AND transform
+  let delta = null;
+  return lines.map((ln) => {
+    const m = ln.match(/^(#{1,6})(\s+.*)$/);
+    if (!m) return ln;
+    if (delta === null) delta = targetLevel - m[1].length;
+    const lvl = clamp(m[1].length + delta, 1, 6);
+    return "#".repeat(lvl) + m[2];
+  }).join("\n").trimEnd();
+}
+
+async function pasteClipboardAsSiblingAfter(nodeId) {
+  pushUndo("paste");
+  const idx = indexById(nodeId);
+  if (idx < 0) return;
+
+  const clip = await readClipboardTextFallback();
+  if (!clip.trim()) return;
+
+  const adjusted = normalizeClipboardToLevel(clip, nodes[idx].level);
+  if (!adjusted.trim()) return;
+
+  const newNodes = parseMarkdown(adjusted);
+  if (!newNodes.length) return;
+
+  const fam = familyIndices(idx);
+  nodes.splice(fam[fam.length - 1] + 1, 0, ...newNodes);
+  lastCreatedId = newNodes[0].id;
+  markChangedFull();
+}
+
+// ---- Actions ----
+function showUnsaved() {
+  badgeSave.className = "badge dim badgeSave";
+  badgeSave.textContent = "Unsaved…";
+}
+
+function markChangedFull() {
+  setCopiedFlag(false);
+  showUnsaved();
+  rebuildMatches();
+  rebuildTagUI();
+  saveDebounced();
+}
+
+function markChangedTyping() {
+  setCopiedFlag(false);
+  showUnsaved();
+  if (searchQuery.trim()) rebuildMatchesDebounced();
+  rebuildTagUIDebounced();
+  saveDebounced();
+}
+
+// View-state toggles: no undo push (these aren't structural changes)
+function toggleBranchCollapse(id) {
+  const idx = indexById(id);
+  if (idx < 0) return;
+  nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
+  scheduleRenderStructure();
+  saveDebounced();
+}
+
+function toggleBody(id) {
+  const idx = indexById(id);
+  if (idx < 0) return;
+  nodes[idx].showBody = !nodes[idx].showBody;
+  scheduleRenderStructure();
+  saveDebounced();
+}
+
+function changeLevel(id, delta) {
+  pushUndo("promote/demote");
+  const idx = indexById(id);
+  if (idx < 0) return;
+  familyIndices(idx).forEach((i) => (nodes[i].level = clamp(nodes[i].level + delta, 1, 6)));
+  markChangedFull();
+}
+
+function addNewAfter(idOrNull) {
+  pushUndo("add");
+  if (!nodes.length || !idOrNull) {
+    const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
+    nodes.push(newNode);
+    lastCreatedId = newNode.id;
+    markChangedFull();
+    return;
+  }
+  const idx = indexById(idOrNull);
+  if (idx < 0) return;
+  const fam = familyIndices(idx);
+  const newNode = { id: uid(), level: nodes[idx].level, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
+  nodes.splice(fam[fam.length - 1] + 1, 0, newNode);
+  lastCreatedId = newNode.id;
+  markChangedFull();
+}
+
+function duplicateBranch(id) {
+  pushUndo("duplicate");
+  const idx = indexById(id);
+  if (idx < 0) return;
+  const fam = familyIndices(idx);
+  const clones = fam.map((i) => ({
+    id: uid(), level: nodes[i].level, title: nodes[i].title, body: nodes[i].body,
+    isCollapsed: nodes[i].isCollapsed, showBody: nodes[i].showBody,
+    tags: [...(nodes[i].tags || [])],
+  }));
+  nodes.splice(fam[fam.length - 1] + 1, 0, ...clones);
+  lastCreatedId = clones[0].id;
+  markChangedFull();
+}
+
+function deleteBranch(id) {
+  pushUndo("delete");
+  const idx = indexById(id);
+  if (idx < 0) return;
+  if (!confirm("Delete this heading and its children?")) return;
+  const fam = familyIndices(idx);
+  nodes.splice(idx, fam.length);
+  if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
+  markChangedFull();
+}
+
+function deleteAndPromoteChildren(id) {
+  pushUndo("unwrap");
+  const idx = indexById(id);
+  if (idx < 0) return;
+  const parent = nodes[idx];
+  const L = parent.level;
+  const tagPayload = parent.title.trim() ? "seq:" + titleToTag(parent.title) : "";
 
   for (let i = idx + 1; i < nodes.length; i++) {
-    const lvl = nodes[i].level;
-    if (lvl <= parentLevel) break;
-    if (lvl === parentLevel + 1) count++;
+    if (nodes[i].level <= L) break;
+    if (tagPayload && nodes[i].level === L + 1) {
+      nodes[i].body = addTagLineToBody(nodes[i].body || "", tagPayload);
+      nodes[i].tags = extractTagsFromBody(nodes[i].body);
+    }
+    nodes[i].level = clamp(nodes[i].level - 1, 1, 6);
   }
-
-  return count;
+  nodes.splice(idx, 1);
+  markChangedFull();
 }
 
-function countSubtree(idx) {
-  if (idx < 0 || idx >= nodes.length) return 0;
-  return familyIndices(idx).length - 1; // exclude self
+function toggleMove(id) {
+  pushUndo("move");
+  if (!sourceId) { sourceId = id; scheduleRenderStructure(); return; }
+  if (sourceId === id) { sourceId = null; scheduleRenderStructure(); return; }
+
+  const movingIds = new Set(familyIds(sourceId));
+  if (movingIds.has(id)) { sourceId = null; scheduleRenderStructure(); return; }
+
+  const movingNodes = nodes.filter((n) => movingIds.has(n.id));
+  nodes = nodes.filter((n) => !movingIds.has(n.id));
+
+  const targetIdx = indexById(id);
+  if (targetIdx < 0) {
+    nodes.push(...movingNodes);
+  } else {
+    const targetFam = familyIndices(targetIdx);
+    nodes.splice(targetFam[targetFam.length - 1] + 1, 0, ...movingNodes);
+  }
+  sourceId = null;
+  markChangedFull();
 }
-    
-    // STOP CHILD NODE COUNTS
 
-    // ---- Bulk tag helpers (DIRECT CHILDREN ONLY) ----
-    function normaliseNewlines(s) {
-      return (s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    }
+function setMaxLevel(level) {
+  maxVisibleLevel = clamp(level, 1, 6);
+  selMax.value = String(maxVisibleLevel);
+  markChangedFull();
+}
 
-    function directChildIndices(parentIdx) {
-      const out = [];
-      if (parentIdx < 0 || parentIdx >= nodes.length) return out;
-      const pLevel = nodes[parentIdx].level;
+// ---- Tabs ----
+function setTab(tab) {
+  activeTab = ["structure","search","tags"].includes(tab) ? tab : "structure";
 
-      for (let i = parentIdx + 1; i < nodes.length; i++) {
-        const lvl = nodes[i].level;
-        if (lvl <= pLevel) break;            // end of subtree
-        if (lvl === pLevel + 1) out.push(i); // direct children only
-      }
-      return out;
-    }
+  [btnTabStructure, btnTabSearch, btnTabTags].forEach((btn, i) => {
+    const tabs = ["structure", "search", "tags"];
+    btn.classList.toggle("active", activeTab === tabs[i]);
+    btn.setAttribute("aria-selected", activeTab === tabs[i] ? "true" : "false");
+  });
+  [panelStructure, panelSearch, panelTags].forEach((p, i) => {
+    p.classList.toggle("active", activeTab === ["structure","search","tags"][i]);
+  });
 
-    function hasExactTagLine(body, payload) {
-      const want = (payload || "").trim();
-      if (!want) return false;
-      const lines = normaliseNewlines(body).split("\n");
-      return lines.some((ln) => {
-        const m = ln.match(/^\s*\\?%%\s*tag\s+(.*)\s*$/i);
-        if (!m) return false;
-        return (m[1] || "").trim().toLowerCase() === want.toLowerCase();
-      });
-    }
+  requestAnimationFrame(() => {
+    const activePanel = container.querySelector(".tabPanel.active");
+    const textareas = activePanel?.querySelectorAll("textarea:not(.mdInput)");
+    if (textareas) textareas.forEach((ta) => autoResizeTA(ta));
+  });
 
-    function addTagLineToBody(body, payload) {
-      const want = (payload || "").trim();
-      if (!want) return body || "";
+  if (activeTab === "tags") rebuildTagUI();
+  if (activeTab === "search") scheduleRenderSearchResults();
+}
 
-      const b = normaliseNewlines(body || "").trimEnd();
-      if (hasExactTagLine(b, want)) return b;
+// ---- Build UI ----
+container.innerHTML = "";
+container.setAttribute("data-app", "mdse");
 
-      const prefix = b ? b + "\n" : "";
-      return prefix + `%% tag ${want}`;
-    }
+container.innerHTML = `
+```
 
-    function removeTagLineFromBody(body, payload) {
-      const want = (payload || "").trim();
-      if (!want) return body || "";
-
-      const lines = normaliseNewlines(body || "").split("\n");
-      const kept = lines.filter((ln) => {
-        const m = ln.match(/^\s*\\?%%\s*tag\s+(.*)\s*$/i);
-        if (!m) return true;
-        return (m[1] || "").trim().toLowerCase() !== want.toLowerCase();
-      });
-
-      return kept.join("\n").trimEnd();
-    }
-
-    function bulkTagDirectChildren(parentId, payload, mode /* "add" | "remove" */) {
-      pushUndo("bulk tag");
-      const parentIdx = indexById(parentId);
-      if (parentIdx < 0) return;
-
-      const childIdxs = directChildIndices(parentIdx);
-      if (!childIdxs.length) {
-        alert("No direct children under this heading.");
-        return;
-      }
-
-      childIdxs.forEach((i) => {
-        const n = nodes[i];
-        n.body =
-          mode === "remove"
-            ? removeTagLineFromBody(n.body || "", payload)
-            : addTagLineToBody(n.body || "", payload);
-
-        n.tags = extractTagsFromBody(n.body);
-        n.showBody = true; // show immediately so you can confirm it worked
-      });
-
-      markChangedFull();
-    }
-
-    // ---- Search helpers ----
-    const norm = (s) => (s || "").toLowerCase();
-
-    function nodeMatches(n, q) {
-      if (!q) return false;
-      const qq = norm(q);
-      if (norm(n.title).includes(qq)) return true;
-      if (searchInBody && norm(n.body).includes(qq)) return true;
-      return false;
-    }
-
-    function nodeMatchesBodyOnly(n, q) {
-      if (!q || !searchInBody) return false;
-      const qq = norm(q);
-      const inTitle = norm(n.title).includes(qq);
-      const inBody = norm(n.body).includes(qq);
-      return !inTitle && inBody;
-    }
-
-    // ---- Build UI ----
-    container.innerHTML = "";
-    container.setAttribute("data-app", "mdse");
-
-    container.innerHTML = `
 <div class="topbar">
-
   <div class="status-header">
     <div class="badges">
       <span class="badge dim badgeSave">Saved ✓</span>
       <span class="badge warn badgeCopy">Not copied</span>
     </div>
   </div>
-
   <div class="left">
-    <h3>Markdown Outline Utility & Structure Editor</h3>
+    <h3>Markdown Outline Utility &amp; Structure Editor</h3>
     <div class="muted">Paste Markdown → Load → reorder / tweak headings → Copy Result</div>
-
     <div class="tabs" role="tablist" aria-label="Views">
       <button type="button" class="tabbtn tabStructure" role="tab">Structure</button>
       <button type="button" class="tabbtn tabSearch" role="tab">Search</button>
       <button type="button" class="tabbtn tabTags" role="tab">Tags</button>
     </div>
-
     <div class="tabPanel panelStructure" role="tabpanel">
       <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
-
       <div class="btnrow">
         <button class="primary btnLoad" type="button">Load Markdown</button>
         <button class="btnUpdate" type="button">Update Input Area</button>
@@ -843,29 +1079,21 @@ function countSubtree(idx) {
         <button class="warn btnReset" type="button">Reset Everything</button>
         <button class="btnAddTop" type="button">+ Add H1</button>
       </div>
-
       <div class="levelFilter">
         <label for="mdseMaxLevel">Show up to:</label>
         <select id="mdseMaxLevel">
-          <option value="1">H1</option>
-          <option value="2">H2</option>
-          <option value="3">H3</option>
-          <option value="4">H4</option>
-          <option value="5">H5</option>
-          <option value="6">H6 (All)</option>
+          <option value="1">H1</option><option value="2">H2</option>
+          <option value="3">H3</option><option value="4">H4</option>
+          <option value="5">H5</option><option value="6">H6 (All)</option>
         </select>
-
         <button type="button" class="btnLvl1">H1</button>
         <button type="button" class="btnLvl2">H1–H2</button>
         <button type="button" class="btnLvl3">H1–H3</button>
         <button type="button" class="btnLvlAll">All</button>
       </div>
-
       <div class="hint">Tip: Tap ⠿ PIN on a heading, then tap a green target heading to move the whole branch.</div>
-
       <div class="canvas"></div>
     </div>
-
     <div class="tabPanel panelSearch" role="tabpanel">
       <div class="searchRow" role="search" aria-label="Outline search">
         <input id="mdseSearch" type="search" placeholder="Search…" autocomplete="off" />
@@ -875,1377 +1103,415 @@ function countSubtree(idx) {
         <label class="searchOpt"><input id="mdseReveal" type="checkbox" checked /> Reveal</label>
         <span class="searchCount" id="mdseCount"></span>
       </div>
-
       <div class="taglist searchResults" aria-live="polite"></div>
       <div class="hint">Search results highlight in Structure view.</div>
     </div>
-
-/* 2) REPLACE the opening part of the Tags panel HTML with this */
-
-<div class="tabPanel panelTags" role="tabpanel">
-  <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section’s body.</div>
-  <div class="tagbar">
-    <button type="button" class="tagchip tagAll active">All tags</button>
-    <span class="tagmeta tagMeta"></span>
-    <span class="spacer"></span>
-    <button type="button" class="btnCopyTags">Copy all tags</button>
+    <div class="tabPanel panelTags" role="tabpanel">
+      <div class="muted">Tags are read from lines starting with <b>%% tag</b> or <b>\\%% tag</b> inside each section's body.</div>
+      <div class="tagbar">
+        <button type="button" class="tagchip tagAll active">All tags</button>
+        <span class="tagmeta tagMeta"></span>
+        <span class="spacer"></span>
+        <button type="button" class="btnCopyTags">Copy all tags</button>
+      </div>
+      <div class="tagbar tagCloud" aria-label="Tag list"></div>
+      <div class="taglist tagResults" aria-live="polite"></div>
+    </div>
   </div>
-  <div class="tagbar tagCloud" aria-label="Tag list"></div>
-  <div class="taglist tagResults" aria-live="polite"></div>
-</div>
+  <div class="footer">v6.0 — Optimised build</div>
+</div>`;
 
-</div>
+```
+const $ = (sel) => container.querySelector(sel);
 
-<div class="footer">v5.6 — Search tab + Tags tab + Bulk tag direct children</div>
-`;
+// Tab buttons & panels
+const btnTabStructure = $(".tabStructure");
+const btnTabSearch = $(".tabSearch");
+const btnTabTags = $(".tabTags");
+const panelStructure = $(".panelStructure");
+const panelSearch = $(".panelSearch");
+const panelTags = $(".panelTags");
 
-    const $ = (sel) => container.querySelector(sel);
+// Structure UI
+const taInput = $(".mdInput");
+const canvas = $(".canvas");
+const badgeSave = $(".badgeSave");
+const badgeCopy = $(".badgeCopy");
+const selMax = $("#mdseMaxLevel");
 
-    // Tabs
-    const btnTabStructure = $(".tabStructure");
-    const btnTabSearch = $(".tabSearch");
-    const btnTabTags = $(".tabTags");
+// Search UI
+const inSearch = $("#mdseSearch");
+const cbBody = $("#mdseSearchBody");
+const cbReveal = $("#mdseReveal");
+const countEl = $("#mdseCount");
+const searchResults = $(".searchResults");
 
-    const panelStructure = $(".panelStructure");
-    const panelSearch = $(".panelSearch");
-    const panelTags = $(".panelTags");
+// Tags UI
+const tagMeta = $(".tagMeta");
+const tagAllBtn = $(".tagAll");
+const tagCloud = $(".tagCloud");
+const tagResults = $(".tagResults");
+const btnCopyTags = $(".btnCopyTags");
 
-    // Structure UI
-    const taInput = $(".mdInput");
-    const canvas = $(".canvas");
+// ---- Render (Structure tab) ----
+function renderStructure() {
+  const scrollPos = window.scrollY;
+  const shouldRestoreScroll = !suppressNextScrollRestore;
+  suppressNextScrollRestore = false;
 
-    const badgeSave = $(".badgeSave");
-    const badgeCopy = $(".badgeCopy");
+  selMax.value = String(maxVisibleLevel);
+  canvas.innerHTML = "";
 
-    const btnLoad = $(".btnLoad");
-    const btnUpdate = $(".btnUpdate");
-    const btnUndo = $(".btnUndo");
-    const btnCopy = $(".btnCopy");
-    const btnExport = $(".btnExport");
-    const btnReset = $(".btnReset");
-    const btnAddTop = $(".btnAddTop");
-
-    const selMax = $("#mdseMaxLevel");
-    const btnLvl1 = $(".btnLvl1");
-    const btnLvl2 = $(".btnLvl2");
-    const btnLvl3 = $(".btnLvl3");
-    const btnLvlAll = $(".btnLvlAll");
-
-    // Search UI
-    const inSearch = $("#mdseSearch");
-    const btnPrev = $(".btnPrev");
-    const btnNext = $(".btnNext");
-    const cbBody = $("#mdseSearchBody");
-    const cbReveal = $("#mdseReveal");
-    const countEl = $("#mdseCount");
-    const searchResults = $(".searchResults");
-
-    // Tags UI
-    const tagMeta = $(".tagMeta");
-    const tagAllBtn = $(".tagAll");
-    const tagCloud = $(".tagCloud");
-    const tagResults = $(".tagResults");
-    const btnCopyTags = $(".btnCopyTags");
-
-    // ---- Persistence ----
-    function setCopiedFlag(flag) {
-      copiedSinceChange = !!flag;
-      if (copiedSinceChange) lastCopyAt = new Date().toISOString();
-      badgeCopy.className = "badge " + (copiedSinceChange ? "good" : "warn");
-      badgeCopy.textContent = copiedSinceChange ? "Copied ✓" : "Not copied";
-      badgeCopy.title =
-        copiedSinceChange && lastCopyAt ? `Last copied: ${lastCopyAt}` : "";
-    }
-
-    function saveNow() {
-      // Pushing the save to the end of the execution queue 
-      // prevents the UI from "hiccuping" during heavy writes.
-      setTimeout(() => {
-        try {
-          const state = {
-            v: 6,
-            nodes,
-            input: taInput.value,
-            sourceId,
-            maxVisibleLevel,
-            copiedSinceChange,
-            lastCopyAt,
-            searchQuery,
-            searchInBody,
-            revealMatches,
-            activeTab,
-            activeTag,
-          };
-          
-          localStorage.setItem(KEY, JSON.stringify(state));
-          
-          badgeSave.className = "badge good badgeSave";
-          badgeSave.textContent = "Saved ✓";
-        } catch (err) {
-          console.error("Storage failed:", err);
-          badgeSave.className = "badge warn badgeSave";
-          badgeSave.textContent = "Not saved";
-        }
-      }, 0);
-    }
-
-    function saveDebounced() {
-      badgeSave.className = "badge dim badgeSave";
-      badgeSave.textContent = "Unsaved…";
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        saveTimer = null;
-        saveNow();
-      }, 500);
-    }
-
-    function loadPref() {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return;
-      const s = safeJsonParse(raw);
-      if (!s || typeof s !== "object") return;
-
-      if (Array.isArray(s.nodes)) nodes = s.nodes;
-      if (typeof s.input === "string") taInput.value = s.input;
-      if (typeof s.sourceId === "string" || s.sourceId === null) sourceId = s.sourceId;
-      if (typeof s.maxVisibleLevel === "number") maxVisibleLevel = clamp(s.maxVisibleLevel, 1, 6);
-
-      copiedSinceChange = !!s.copiedSinceChange;
-      lastCopyAt = typeof s.lastCopyAt === "string" ? s.lastCopyAt : null;
-
-      if (typeof s.searchQuery === "string") searchQuery = s.searchQuery;
-      if (typeof s.searchInBody === "boolean") searchInBody = s.searchInBody;
-      if (typeof s.revealMatches === "boolean") revealMatches = s.revealMatches;
-
-      if (typeof s.activeTab === "string") activeTab = ["structure","search","tags"].includes(s.activeTab) ? s.activeTab : "structure";
-      if (typeof s.activeTag === "string") activeTag = normaliseTag(s.activeTag);
-
-      nodes = nodes
-        .filter((n) => n && typeof n === "object")
-        .map((n) => {
-          const body = typeof n.body === "string" ? n.body : "";
-          return {
-            id: typeof n.id === "string" ? n.id : uid(),
-            level: clamp(parseInt(n.level, 10) || 1, 1, 6),
-            title: typeof n.title === "string" ? n.title : "",
-            body,
-            isCollapsed: !!n.isCollapsed,
-            showBody: false,
-            tags: Array.isArray(n.tags) ? n.tags.map(normaliseTag).filter(Boolean) : extractTagsFromBody(body),
-          };
-        });
-    }
-
-    // ---- Markdown parse / export ----
-/* Gemini version of parseMarkdown */
-    function parseMarkdown(text) {
-  const lines = (text || "").split("\n");
-  const out = [];
-  let current = null;
-
-  for (const line of lines) {
-    // Regex to find Markdown headings (H1 - H6)
-    const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
-
-    if (headingMatch) {
-      // 1. Found a heading: Create a new node
-      current = {
-        id: uid(),
-        level: headingMatch[1].length,
-        title: headingMatch[2].trim() || "(Untitled)",
-        body: "",
-        isCollapsed: false,
-        showBody: false,
-        tags: [],
-      };
-      out.push(current);
-    } else {
-      // 2. Found non-heading text:
-      // If we haven't hit a heading yet, create a Preamble node so data isn't lost
-      if (!current && line.trim().length > 0) {
-        current = {
-          id: uid(),
-          level: 1, 
-          title: "(Start / Preamble)",
-          body: "",
-          isCollapsed: false,
-          showBody: true,
-          tags: [],
-        };
-        out.push(current);
-      }
-
-      // 3. Append the line to the current node's body
-      if (current) {
-        current.body += line + "\n";
-      }
-    }
-  }
-
-  // Final cleanup pass
-  out.forEach((n) => {
-    n.body = n.body.trim();
-    n.tags = extractTagsFromBody(n.body);
+  const hiddenByCollapse = new Set();
+  nodes.forEach((n, idx) => {
+    if (n.isCollapsed) familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
   });
 
-  return out;
-}
+  const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
+  const revealSet = computeRevealSet();
+  const matchSet = new Set(matchIds);
+  const metrics = computeNodeMetrics();
 
-    
-    function toMarkdown() {
-      return nodes
-        .map((n) => {
-          const head = "#".repeat(n.level) + " " + (n.title || "");
-          const body = (n.body || "").trimEnd();
-          return body ? head + "\n" + body : head;
-        })
-        .join("\n\n");
-    }
+  nodes.forEach((n, idx) => {
+    if (n.level > maxVisibleLevel) return;
+    if (hiddenByCollapse.has(idx) && !revealSet.has(n.id)) return;
 
-    // ---- Clipboard paste as sibling ----
-async function readClipboardTextFallback() {
-  try {
-    return await navigator.clipboard.readText();
-  } catch {
-    // iPad Safari can be picky; fallback lets you paste manually.
-    return prompt("Clipboard read blocked. Paste the markdown here:","") || "";
-  }
-}
+    const isSource = sourceId === n.id;
+    const isValidTarget = !!sourceId && !movingSet.has(n.id);
+    const isMatch = searchQuery.trim() && matchSet.has(n.id);
+    const isActive = isMatch && matchPos >= 0 && matchIds[matchPos] === n.id;
+    const m = metrics.get(n.id);
 
-function normalizeClipboardToLevel(clip, targetLevel) {
-  const text = String(clip || "").replace(/\r\n?/g, "\n").trim();
-  if (!text) return "";
+    const classes = [
+      "node", `level-${n.level}`,
+      activeNodeId === n.id && "activeNode",
+      isSource && "movingSource",
+      isValidTarget && "moveTarget",
+      n.isCollapsed && "collapsed",
+      isMatch && "match",
+      isActive && "activeMatch",
+    ].filter(Boolean).join(" ");
 
-  const lines = text.split("\n");
+    const stop = (e) => e.stopPropagation();
 
-  let firstHeadingIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^(#{1,6})\s+(.+)$/.test(lines[i])) {
-      firstHeadingIndex = i;
-      break;
-    }
-  }
-
-  // No headings: leave content completely untouched
-  if (firstHeadingIndex === -1) {
-    return text;
-  }
-
-  const m0 = lines[firstHeadingIndex].match(/^(#{1,6})\s+/);
-  const clipLevel = m0 ? m0[1].length : 2;
-  const delta = targetLevel - clipLevel;
-
-  return lines
-    .map((ln) => {
-      const m = ln.match(/^(#{1,6})(\s+.*)$/);
-      if (!m) return ln;
-      let lvl = m[1].length + delta;
-      lvl = Math.max(1, Math.min(6, lvl));
-      return "#".repeat(lvl) + m[2];
-    })
-    .join("\n")
-    .trimEnd();
-}
-    
-async function pasteClipboardAsSiblingAfter(nodeId) {
-  pushUndo("paste");
-  const idx = indexById(nodeId);
-  if (idx < 0) return;
-
-  const clip = await readClipboardTextFallback();
-  if (!clip.trim()) return;
-
-  const targetLevel = nodes[idx].level;
-  const adjusted = normalizeClipboardToLevel(clip, targetLevel);
-  if (!adjusted.trim()) return;
-
-  const newNodes = parseMarkdown(adjusted);
-  if (!newNodes.length) return;
-
-  // Insert AFTER this node’s whole branch
-  const fam = familyIndices(idx);
-  const insertAt = fam[fam.length - 1] + 1;
-
-  nodes.splice(insertAt, 0, ...newNodes);
-
-  lastCreatedId = newNodes[0].id; // focus it after render
-  markChangedFull();
-}
-
-    // ---- Matches ----
-    function updateCount() {
-      if (!searchQuery.trim()) {
-        countEl.textContent = "";
-        return;
+    // Title textarea
+    const title = el("textarea", { class: "title", rows: "1" });
+    title.value = (n.title || "").replace(/[\r\n]/g, " ");
+    title.addEventListener("click", stop);
+    title.addEventListener("keydown", (e) => { stop(e); if (e.key === "Enter") e.preventDefault(); });
+    title.addEventListener("input", () => {
+      const start = title.selectionStart;
+      const end = title.selectionEnd;
+      const cleaned = title.value.replace(/[\r\n]/g, " ");
+      n.title = cleaned;
+      if (title.value !== cleaned) {
+        title.value = cleaned;
+        title.setSelectionRange(start, end);
       }
-      if (!matchIds.length) {
-        countEl.textContent = "0 matches";
-        return;
-      }
-      const cur = matchPos >= 0 ? matchPos + 1 : 0;
-      countEl.textContent = cur ? `${cur}/${matchIds.length}` : `${matchIds.length} matches`;
+      autoResizeTA(title);
+      markChangedTyping();
+    });
+
+    // Mini tools (always visible)
+    const miniHasBody = !!(n.body && n.body.trim());
+    const miniTools = el("div", { class: "miniTools", onclick: stop }, [
+      el("button", {
+        type: "button",
+        class: "miniBtn" + (miniHasBody ? " primary" : ""),
+        title: miniHasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text",
+        text: "📝",
+        onclick: (e) => { stop(e); toggleBody(n.id); },
+      }),
+      el("button", {
+        type: "button", class: "miniBtn", title: "Add sibling after branch", text: "＋",
+        onclick: (e) => { stop(e); addNewAfter(n.id); },
+      }),
+      el("button", {
+        type: "button", class: "miniBtn", title: "Promote (H-1)", text: "←",
+        disabled: n.level <= 1,
+        onclick: (e) => { stop(e); if (n.level > 1) changeLevel(n.id, -1); },
+      }),
+      el("button", {
+        type: "button", class: "miniBtn", title: "Demote (H+1)", text: "→",
+        disabled: n.level >= 6,
+        onclick: (e) => { stop(e); if (n.level < 6) changeLevel(n.id, +1); },
+      }),
+    ]);
+
+    // Meta badge
+    const metaText = m.subtreeCount > 0
+      ? `(${m.directChildren},${m.subtreeCount} • ${m.wordCount.toLocaleString()}w)`
+      : `(${m.directChildren},0 • ${m.wordCount}w)`;
+    const meta = el("div", {
+      class: "nodeMeta",
+      text: metaText,
+      title: `${m.directChildren} direct children, ${m.subtreeCount} total in subtree`,
+    });
+
+    // Header
+    const hdr = el("div", { class: "hdr" }, [
+      el("div", { class: "pill", text: `H${n.level}` }),
+      el("div", {
+        class: "pill gray",
+        text: isSource ? "📍 PIN" : "⠿",
+        title: "Pin branch to move",
+        onclick: (e) => { stop(e); toggleMove(n.id); },
+      }),
+      el("div", {
+        class: "pill gray",
+        text: m.hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•",
+        title: m.hasChildren ? "Fold/unfold branch" : "No children",
+        onclick: (e) => { stop(e); if (m.hasChildren) toggleBranchCollapse(n.id); },
+      }),
+      meta,
+      miniTools,
+      title,
+    ]);
+
+    // Full tools (shown when activeNode)
+    const toolButtons = [
+      el("button", { type: "button", text: "⧉ Duplicate", onclick: () => duplicateBranch(n.id) }),
+      el("button", {
+        type: "button", text: "📋 Paste",
+        title: "Paste clipboard markdown as sibling after this branch",
+        onclick: (e) => { e.preventDefault(); stop(e); pasteClipboardAsSiblingAfter(n.id); },
+      }),
+    ];
+
+    if (n.level < 6) {
+      toolButtons.push(
+        el("button", {
+          type: "button", text: `🏷 Tag H${n.level + 1}`,
+          title: `Add a %% tag line to every direct H${n.level + 1} under this heading`,
+          onclick: () => {
+            const payload = prompt(`Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
+            if (payload) bulkTagDirectChildren(n.id, payload, "add");
+          },
+        }),
+        el("button", {
+          type: "button", text: `🧽 Untag H${n.level + 1}`,
+          title: `Remove that exact %% tag line from every direct H${n.level + 1}`,
+          onclick: () => {
+            const payload = prompt(`Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`, "arc holiday");
+            if (payload) bulkTagDirectChildren(n.id, payload, "remove");
+          },
+        }),
+        el("button", {
+          type: "button", text: "⇪ Unwrap",
+          title: "Delete this heading and promote its children",
+          onclick: (e) => { stop(e); if (confirm("Delete this heading and promote its children?")) deleteAndPromoteChildren(n.id); },
+        }),
+      );
     }
 
-    function computeRevealSet() {
-      const reveal = new Set();
-      if (!revealMatches || !searchQuery.trim() || !matchIds.length) return reveal;
+    toolButtons.push(
+      el("button", {
+        type: "button", text: "✕", class: "warn",
+        title: "Delete branch", onclick: () => deleteBranch(n.id),
+      })
+    );
 
-      for (let i = 0; i < nodes.length; i++) {
-        if (!nodeMatches(nodes[i], searchQuery)) continue;
-        reveal.add(nodes[i].id);
+    const tools = el("div", { class: "tools", onclick: stop }, toolButtons);
 
-        let childLevel = nodes[i].level;
-        for (let j = i - 1; j >= 0; j--) {
-          if (nodes[j].level < childLevel) {
-            reveal.add(nodes[j].id);
-            childLevel = nodes[j].level;
-          }
-          if (childLevel === 1) break;
-        }
-      }
-      return reveal;
-    }
+    // Body area
+    const bodyShouldShow = n.showBody ||
+      (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
 
-    function rebuildMatchesNoRender() {
-      matchIds = [];
-      matchPos = -1;
+    const bodyTA = el("textarea", { rows: "6", wrap: "soft" });
+    bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+    ["keydown", "keypress", "keyup"].forEach((evt) => bodyTA.addEventListener(evt, stop));
+    bodyTA.addEventListener("click", stop);
+    bodyTA.addEventListener("input", () => {
+      n.body = bodyTA.value;
+      n.tags = extractTagsFromBody(n.body);
+      markChangedTyping();
+    });
 
-      if (searchQuery.trim()) {
-        for (const n of nodes) {
-          if (nodeMatches(n, searchQuery)) matchIds.push(n.id);
-        }
-      }
-      updateCount();
-    }
+    const bodyWrap = el("div", { class: "body" + (bodyShouldShow ? " show" : "") }, [bodyTA]);
 
-    function rebuildMatchesDebounced() {
-      if (matchTimer) clearTimeout(matchTimer);
-      matchTimer = setTimeout(() => {
-        matchTimer = null;
-        rebuildMatchesNoRender();
-      }, 150);
-    }
-
-    function rebuildMatches() {
-      rebuildMatchesNoRender();
+    // Node container
+    const node = el("div", { "data-node-id": n.id, class: classes }, [hdr, bodyWrap, tools]);
+    node.addEventListener("click", (e) => {
+      if (isValidTarget) { toggleMove(n.id); return; }
+      activeNodeId = (activeNodeId === n.id) ? "" : n.id;
       scheduleRenderStructure();
-      if (activeTab === "search") scheduleRenderSearchResults();
-    }
+    });
 
-    function jumpMatch(delta) {
-      if (!matchIds.length) return;
-      matchPos = (matchPos + delta + matchIds.length) % matchIds.length;
-      updateCount();
-      scheduleRenderStructure();
+    canvas.appendChild(node);
+    autoResizeTA(title);
+    if (bodyShouldShow) setTimeout(() => autoResizeTA(bodyTA), 0);
+  });
 
-      const id = matchIds[matchPos];
-      const el = canvas.querySelector(`[data-node-id="${id}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const t = el.querySelector(".title");
-        if (t) t.focus();
-      }
-    }
+  if (shouldRestoreScroll) window.scrollTo(0, scrollPos);
 
-    // ---- Tags view ----
-    function allTags() {
-      const set = new Set();
-      nodes.forEach((n) => (n.tags || []).forEach((t) => set.add(t)));
-      return [...set].sort((a, b) => a.localeCompare(b));
-    }
+  setCopiedFlag(copiedSinceChange);
+  badgeSave.textContent = saveDebounced.pending() ? "Unsaved…" : "Saved ✓";
 
-    function tagsCountMap() {
-      const m = new Map();
-      nodes.forEach((n) => (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1)));
-      return m;
-    }
+  if (lastCreatedId) {
+    const nodeEl = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
+    if (nodeEl) { const t = nodeEl.querySelector(".title"); if (t) t.focus(); }
+    lastCreatedId = null;
+  }
 
-    function renderTagCloud(tags, counts) {
-      tagCloud.innerHTML = "";
-      if (!tags.length) {
-        tagCloud.innerHTML = `<span class="tagmeta">No tags found yet. Add lines like <b>%% tag arc:escape</b> inside a section’s body.</span>`;
-        return;
-      }
-
-      tags.forEach((t) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "tagchip" + (activeTag === t ? " active" : "");
-        btn.textContent = `${t} (${counts.get(t) || 0})`;
-        btn.addEventListener("click", () => {
-          activeTag = activeTag === t ? "" : t;
-          rebuildTagUI();
-          saveDebounced();
-        });
-        tagCloud.appendChild(btn);
-      });
-    }
-
-function makeRafScheduler(renderFn) {
-  let queued = false;
-  return function () {
-    if (queued) return;
-    queued = true;
+  if (pendingScrollToId) {
+    const targetId = pendingScrollToId;
+    pendingScrollToId = "";
     requestAnimationFrame(() => {
-      queued = false;
-      renderFn();
+      const nodeEl = canvas.querySelector(`[data-node-id="${targetId}"]`);
+      if (!nodeEl) return;
+      nodeEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      const t = nodeEl.querySelector(".title");
+      if (t) t.focus();
+      setTimeout(() => {
+        const el2 = canvas.querySelector(`[data-node-id="${targetId}"]`);
+        if (el2) el2.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
     });
-  };
-}
-    
-    function renderTagResults() {
-      tagResults.innerHTML = "";
-
-      if (!activeTag) {
-        tagMeta.textContent = `Choose a tag to see matching sections (in manuscript order).`;
-        return;
-      }
-
-      const matches = nodes.filter((n) => (n.tags || []).includes(activeTag));
-      tagMeta.textContent = `${activeTag}: ${matches.length} section${matches.length === 1 ? "" : "s"}`;
-
-      if (!matches.length) return;
-
-      matches.forEach((n) => {
-        const card = document.createElement("div");
-        card.className = "tagcard";
-        card.title = "Tap to jump to this section in Structure view";
-        card.addEventListener("click", () => jumpToNode(n.id));
-
-        const top = document.createElement("div");
-        top.className = "toph";
-
-        const lvl = document.createElement("span");
-        lvl.className = "lvl";
-        lvl.textContent = `H${n.level}`;
-
-        const title = document.createElement("span");
-        title.className = "titleline";
-        title.textContent = n.title || "(untitled)";
-
-        top.append(lvl, title);
-
-        const cleaned = bodyWithoutTagLines(n.body);
-        const preview = firstSentence(cleaned);
-
-        const p = document.createElement("div");
-        p.className = "preview";
-        p.textContent = preview ? preview : "(No body text yet.)";
-
-        const subtags = document.createElement("div");
-        subtags.className = "subtags";
-        (n.tags || []).slice(0, 12).forEach((t) => {
-          const pill = document.createElement("span");
-          pill.className = "tagpill";
-          pill.textContent = t;
-          subtags.appendChild(pill);
-        });
-
-        card.append(top, p, subtags);
-        tagResults.appendChild(card);
-      });
-    }
-
-    function rebuildTagUI() {
-      tagAllBtn.classList.toggle("active", !activeTag);
-      const tags = allTags();
-      const counts = tagsCountMap();
-      renderTagCloud(tags, counts);
-      scheduleRenderTagResults();
-    }
-
-    function rebuildTagUIDebounced() {
-      if (tagTimer) clearTimeout(tagTimer);
-      tagTimer = setTimeout(() => {
-        tagTimer = null;
-        if (activeTab === "tags") rebuildTagUI();
-      }, 150);
-    }
-
-    // ---- Search results tab ----
-    function renderSearchResults() {
-      searchResults.innerHTML = "";
-
-      if (!searchQuery.trim()) {
-        searchResults.innerHTML = `<div class="tagmeta">Type to search your outline.</div>`;
-        return;
-      }
-
-      if (!matchIds.length) {
-        searchResults.innerHTML = `<div class="tagmeta">No matches found.</div>`;
-        return;
-      }
-
-      const matchSet = new Set(matchIds);
-      const matches = nodes.filter((n) => matchSet.has(n.id));
-
-      matches.forEach((n) => {
-        const card = document.createElement("div");
-        card.className = "tagcard";
-        card.title = "Jump to this section in Structure view";
-        card.addEventListener("click", () => jumpToNode(n.id));
-
-        const top = document.createElement("div");
-        top.className = "toph";
-
-        const lvl = document.createElement("span");
-        lvl.className = "lvl";
-        lvl.textContent = `H${n.level}`;
-
-        const title = document.createElement("span");
-        title.className = "titleline";
-        title.textContent = n.title || "(untitled)";
-
-        top.append(lvl, title);
-
-        const cleaned = bodyWithoutTagLines(n.body);
-        const preview = firstSentence(cleaned);
-
-        const p = document.createElement("div");
-        p.className = "preview";
-        p.textContent = preview || "(No body text.)";
-
-        card.append(top, p);
-        searchResults.appendChild(card);
-      });
-    }
-  
-function jumpToNode(id) {
-  setTab("structure");
-
-  const idx = indexById(id);
-  if (idx >= 0 && nodes[idx].level > maxVisibleLevel) {
-    maxVisibleLevel = 6;
-    selMax.value = "6";
   }
-
-  activeNodeId = id;
-  pendingScrollToId = id;
-  suppressNextScrollRestore = true;
-
-  scheduleRenderStructure();
-}
-    
-    // ---- Actions ----
-    function markChangedFull() {
-      setCopiedFlag(false);
-      rebuildMatches();   // renders structure + counts
-      rebuildTagUI();
-      saveDebounced();
-    }
-
-    function markChangedTyping() {
-      setCopiedFlag(false);
-      if (searchQuery.trim()) rebuildMatchesDebounced();
-      rebuildTagUIDebounced();
-      saveDebounced();
-    }
-
-    function toggleBranchCollapse(id) {
-      pushUndo("collapse");
-      const idx = indexById(id);
-      if (idx < 0) return;
-      nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
-      markChangedFull();
-    }
-
-    function toggleBody(id) {
-      pushUndo("toggle body"); 
-      const idx = indexById(id);
-      if (idx < 0) return;
-      nodes[idx].showBody = !nodes[idx].showBody;
-      markChangedFull();
-    }
-
-    function changeLevel(id, delta) {
-      pushUndo("promote/demote");
-      const idx = indexById(id);
-      if (idx < 0) return;
-      const fam = familyIndices(idx);
-      fam.forEach((i) => (nodes[i].level = clamp(nodes[i].level + delta, 1, 6)));
-      markChangedFull();
-    }
-
-    function addNewAfter(idOrNull) {
-       pushUndo("add");
-      if (!nodes.length || !idOrNull) {
-        const newNode = { id: uid(), level: 1, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
-        nodes.push(newNode);
-        lastCreatedId = newNode.id;
-        markChangedFull();
-        return;
-      }
-      const idx = indexById(idOrNull);
-      if (idx < 0) return;
-      const fam = familyIndices(idx);
-      const insertAt = fam[fam.length - 1] + 1;
-      const newNode = { id: uid(), level: nodes[idx].level, title: "", body: "", isCollapsed: false, showBody: false, tags: [] };
-      nodes.splice(insertAt, 0, newNode);
-      lastCreatedId = newNode.id;
-      markChangedFull();
-    }
-
-    function duplicateBranch(id) {
-      pushUndo("duplicate");
-      const idx = indexById(id);
-      if (idx < 0) return;
-      const fam = familyIndices(idx);
-      const block = fam.map((i) => nodes[i]);
-
-      const clones = block.map((n) => ({
-        id: uid(),
-        level: n.level,
-        title: n.title,
-        body: n.body,
-        isCollapsed: n.isCollapsed,
-        showBody: n.showBody,
-        tags: Array.isArray(n.tags) ? [...n.tags] : extractTagsFromBody(n.body),
-      }));
-
-      const insertAt = fam[fam.length - 1] + 1;
-      nodes.splice(insertAt, 0, ...clones);
-      lastCreatedId = clones[0].id;
-      markChangedFull();
-    }
-
-    function deleteBranch(id) {
-      pushUndo("delete");
-      const idx = indexById(id);
-      if (idx < 0) return;
-      if (!confirm("Delete this heading and its children?")) return;
-      const fam = familyIndices(idx);
-      nodes.splice(idx, fam.length);
-      if (sourceId && !nodes.some((n) => n.id === sourceId)) sourceId = null;
-      markChangedFull();
-    }
-
-    // START DELETE AND PROMOTE
-
-function titleToTag(title) {
-  return (title || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s:-]/g, "")
-    .replace(/\s+/g, "-");
-}
-    
-function deleteAndPromoteChildren(id) {
-  pushUndo("unwrap");
-
-  const idx = indexById(id);
-  if (idx < 0) return;
-
-  const parent = nodes[idx];
-  const L = parent.level;
-
-  const parentTitle = (parent.title || "").trim();
-  const tagPayload = parentTitle ? ("seq:" + titleToTag(parentTitle)) : "";
-
-  // Walk subtree until we exit it
-  for (let i = idx + 1; i < nodes.length; i++) {
-    const oldLevel = nodes[i].level;
-    if (oldLevel <= L) break;
-
-    // Tag only direct children of wrapper (before promotion)
-    if (tagPayload && oldLevel === L + 1) {
-      nodes[i].body = addTagLineToBody(nodes[i].body || "", tagPayload);
-      nodes[i].tags = extractTagsFromBody(nodes[i].body);
-    }
-
-    // Promote every descendant by 1 (undo the temporary demotion)
-    nodes[i].level = clamp(oldLevel - 1, 1, 6);
-  }
-
-  // Remove wrapper itself
-  nodes.splice(idx, 1);
-
-  markChangedFull();
-}
-    
-    // END DELETE AND PROMOTE
-
-    function toggleMove(id) {
-      pushUndo("move");
-      if (!sourceId) {
-        sourceId = id;
-        scheduleRenderStructure();
-        return;
-      }
-
-      if (sourceId === id) {
-        sourceId = null;
-        scheduleRenderStructure();
-        return;
-      }
-
-      const movingIds = new Set(familyIds(sourceId));
-      if (movingIds.has(id)) {
-        sourceId = null;
-        scheduleRenderStructure();
-        return;
-      }
-
-      const movingNodes = nodes.filter((n) => movingIds.has(n.id));
-      nodes = nodes.filter((n) => !movingIds.has(n.id));
-
-      const targetIdx = indexById(id);
-      if (targetIdx < 0) {
-        nodes.push(...movingNodes);
-        sourceId = null;
-        markChangedFull();
-        return;
-      }
-
-      const targetFam = familyIndices(targetIdx);
-      const insertAt = targetFam[targetFam.length - 1] + 1;
-      nodes.splice(insertAt, 0, ...movingNodes);
-
-      sourceId = null;
-      markChangedFull();
-    }
-
-    function setMaxLevel(level) {
-      maxVisibleLevel = clamp(level, 1, 6);
-      selMax.value = String(maxVisibleLevel);
-      markChangedFull();
-    }
-
-    // ---- Tabs ----
-    function setTab(tab) {
-      activeTab = ["structure","search","tags"].includes(tab) ? tab : "structure";
-
-      btnTabStructure.classList.toggle("active", activeTab === "structure");
-      btnTabSearch.classList.toggle("active", activeTab === "search");
-      btnTabTags.classList.toggle("active", activeTab === "tags");
-
-      btnTabStructure.setAttribute("aria-selected", activeTab === "structure" ? "true" : "false");
-      btnTabSearch.setAttribute("aria-selected", activeTab === "search" ? "true" : "false");
-      btnTabTags.setAttribute("aria-selected", activeTab === "tags" ? "true" : "false");
-
-      panelStructure.classList.toggle("active", activeTab === "structure");
-      panelSearch.classList.toggle("active", activeTab === "search");
-      panelTags.classList.toggle("active", activeTab === "tags");
-
-      // Ensure the browser has painted the tab before measuring textarea heights
-      requestAnimationFrame(() => {
-        const activePanel = container.querySelector('.tabPanel.active');
-        const textareas = activePanel?.querySelectorAll('textarea:not(.mdInput)');
-        if (textareas) {
-          textareas.forEach(ta => autoResizeTA(ta));
-        }
-      });
-            
-      if (activeTab === "tags") rebuildTagUI();
-      if (activeTab === "search") scheduleRenderSearchResults();
-
-      // saveDebounced();
-    }
-
-// START WORDCOUNT 
-
-function countWords(text) {
-  if (!text) return 0;
-
-  const cleaned = text
-    .split("\n")
-    .filter(line => !line.trim().startsWith("%% tag"))
-    .join(" ");
-
-  return cleaned
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .length;
-}
-    
-function subtreeWordCount(idx) {
-  const fam = familyIndices(idx);
-  let total = 0;
-
-  for (const i of fam) {
-    const n = nodes[i];
-    total += countWords(n.title);
-    total += countWords(n.body);
-  }
-
-  return total;
-}
-    
-// STOP WORDCOUNT
-
-    
-    // ---- Render (Structure tab) ----
-    function renderStructure() {
-      const scrollPos = window.scrollY;
-      const shouldRestoreScroll = !suppressNextScrollRestore;
-      suppressNextScrollRestore = false;
-
-      selMax.value = String(maxVisibleLevel);
-
-      canvas.innerHTML = "";
-
-      const hiddenByCollapse = new Set();
-      nodes.forEach((n, idx) => {
-        if (n.isCollapsed) familyIndices(idx).slice(1).forEach((i) => hiddenByCollapse.add(i));
-      });
-
-      const movingSet = sourceId ? new Set(familyIds(sourceId)) : new Set();
-      const revealSet = computeRevealSet();
-      const matchSet = new Set(matchIds);
-
-      nodes.forEach((n, idx) => {
-        if (n.level > maxVisibleLevel) return;
-        if (hiddenByCollapse.has(idx) && !revealSet.has(n.id)) return;
-
-        const isSource = sourceId === n.id;
-        const isValidTarget = !!sourceId && !movingSet.has(n.id);
-        const isMatch = searchQuery.trim() && matchSet.has(n.id);
-        const isActive = isMatch && matchPos >= 0 && matchIds[matchPos] === n.id;
-
-        const node = document.createElement("div");
-        node.setAttribute("data-node-id", n.id);
-        node.className =
-          `node level-${n.level}` +
-          (activeNodeId === n.id ? " activeNode" : "") +
-          (isSource ? " movingSource" : "") +
-          (isValidTarget ? " moveTarget" : "") +
-          (n.isCollapsed ? " collapsed" : "") +
-          (isMatch ? " match" : "") +
-          (isActive ? " activeMatch" : "");
-
-        node.addEventListener("click", (e) => {
-  // If this node is a valid move target, clicking it should MOVE, not select.
-  if (isValidTarget) {
-    toggleMove(n.id);
-    return;
-  }
-
-  // Otherwise, toggle "active" state to show/hide controls.
-  activeNodeId = (activeNodeId === n.id) ? "" : n.id;
-  scheduleRenderStructure();
-});
-
-        const hdr = document.createElement("div");
-        hdr.className = "hdr";
-
-        const pin = document.createElement("div");
-        pin.className = "pill gray";
-        pin.textContent = isSource ? "📍 PIN" : "⠿";
-        pin.title = "Pin branch to move";
-        pin.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleMove(n.id);
-        });
-
-        const col = document.createElement("div");
-        col.className = "pill gray";
-        col.textContent = hasChildren(idx) ? (n.isCollapsed ? "▶" : "▼") : "•";
-        col.title = hasChildren(idx) ? "Fold/unfold branch" : "No children";
-        col.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (hasChildren(idx)) toggleBranchCollapse(n.id);
-        });
-
-        const lvl = document.createElement("div");
-        lvl.className = "pill";
-        lvl.textContent = `H${n.level}`;
-
-// START COUNTER BADGE
-
-        const childCount = countDirectChildren(idx);
-        const subtreeCount = countSubtree(idx);
-        const wordCount = subtreeWordCount(idx);
-
-const meta = document.createElement("div");
-// meta.className = "pill gray";
-// meta.style.fontSize = "11px";
-meta.className = "nodeMeta";
-meta.textContent =
-  subtreeCount > 0
-    ? `(${childCount},${subtreeCount} • ${wordCount.toLocaleString()}w)`
-    : `(${childCount},0 • ${wordCount}w)`;
-
-meta.title = `${childCount} direct children, ${subtreeCount} total in subtree`;
-
-// --- MINI tools (always visible) ---
-const miniTools = document.createElement("div");
-miniTools.className = "miniTools";
-miniTools.addEventListener("click", (e) => e.stopPropagation());
-
-// Use a different variable name to avoid collisions
-const miniHasBody = !!(n.body && n.body.trim());
-
-// Mini: toggle body
-const miniBody = document.createElement("button");
-miniBody.type = "button";
-miniBody.className = "miniBtn" + (miniHasBody ? " primary" : "");
-miniBody.title = miniHasBody ? (n.showBody ? "Hide text" : "Show text") : "Add text";
-miniBody.textContent = "📝";
-// miniBody.addEventListener("click", () => toggleBody(n.id));
-
-// Mini: add sibling
-const miniAdd = document.createElement("button");
-miniAdd.type = "button";
-miniAdd.className = "miniBtn";
-miniAdd.title = "Add a new sibling after this branch";
-miniAdd.textContent = "＋";
-// miniAdd.addEventListener("click", () => addNewAfter(n.id));
-
-miniBody.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleBody(n.id);
-});
-
-miniAdd.addEventListener("click", (e) => {
-  e.stopPropagation();
-  addNewAfter(n.id);
-});
-
-const miniPromote = document.createElement("button");
-miniPromote.type = "button";
-miniPromote.className = "miniBtn";
-miniPromote.title = "Promote branch (H-1)";
-miniPromote.textContent = "←";
-miniPromote.disabled = n.level <= 1;
-miniPromote.addEventListener("click", (e) => {
-  e.stopPropagation();
-  if (n.level > 1) changeLevel(n.id, -1);
-});
-
-const miniDemote = document.createElement("button");
-miniDemote.type = "button";
-miniDemote.className = "miniBtn";
-miniDemote.title = "Demote branch (H+1)";
-miniDemote.textContent = "→";
-miniDemote.disabled = n.level >= 6;
-miniDemote.addEventListener("click", (e) => {
-  e.stopPropagation();
-  if (n.level < 6) changeLevel(n.id, +1);
-});
-        
-// APPEND
-// miniTools.append(miniBody, miniAdd);
-miniTools.append(miniBody, miniAdd, miniPromote, miniDemote);
-        
-// PASTE STOP MINITOOLS
-        
-        // --- TITLE: single-line ---
-        const title = document.createElement("textarea");
-        title.className = "title";
-        title.rows = 1;
-        title.value = (n.title || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, " ");
-        title.addEventListener("click", (e) => e.stopPropagation());
-        title.addEventListener("keydown", (e) => {
-          e.stopPropagation();
-          if (e.key === "Enter") e.preventDefault();
-        });
-// start
-
-        title.addEventListener("input", () => {
-  const start = title.selectionStart;
-  const end = title.selectionEnd;
-
-  const cleaned = title.value.replace(/[\r\n]/g, " ");
-  n.title = cleaned;
-
-  if (title.value !== cleaned) {
-    title.value = cleaned;
-    title.setSelectionRange(start, end); // Restore cursor
-  }
-  autoResizeTA(title);
-  markChangedTyping();
-});
-
-        
-        const tools = document.createElement("div");
-        tools.className = "tools";
-        tools.addEventListener("click", (e) => e.stopPropagation());
-
-        const dup = document.createElement("button");
-        dup.type = "button";
-        dup.textContent = "⧉ Duplicate";
-        dup.addEventListener("click", () => duplicateBranch(n.id));
-
-        const paste = document.createElement("button");
-        paste.type = "button";
-        paste.textContent = "📋 Paste";
-        paste.title = "Paste clipboard markdown as a sibling node after this branch (levels adjusted)";
-        paste.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        pasteClipboardAsSiblingAfter(n.id);
-  });
-
-        const left = document.createElement("button");
-        left.type = "button";
-        left.textContent = "←";
-        left.title = "Promote (H-1) for this branch";
-        left.addEventListener("click", () => changeLevel(n.id, -1));
-
-        const right = document.createElement("button");
-        right.type = "button";
-        right.textContent = "→";
-        right.title = "Demote (H+1) for this branch";
-        right.addEventListener("click", () => changeLevel(n.id, +1));
-
-        const tagKids = document.createElement("button");
-        tagKids.type = "button";
-        tagKids.textContent = `🏷 Tag H${n.level + 1}`;
-        tagKids.title = `Add a %% tag line to every direct H${n.level + 1} under this heading`;
-        tagKids.addEventListener("click", () => {
-          const payload = prompt(
-            `Add which tag to all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`,
-            "arc holiday"
-          );
-          if (!payload) return;
-          bulkTagDirectChildren(n.id, payload, "add");
-        });
-
-        const untagKids = document.createElement("button");
-        untagKids.type = "button";
-        untagKids.textContent = `🧽 Untag H${n.level + 1}`;
-        untagKids.title = `Remove that exact %% tag line from every direct H${n.level + 1} under this heading`;
-        untagKids.addEventListener("click", () => {
-          const payload = prompt(
-            `Remove which tag from all H${n.level + 1} under "${n.title || "Untitled"}"?\n\nExample: arc holiday`,
-            "arc holiday"
-          );
-          if (!payload) return;
-          bulkTagDirectChildren(n.id, payload, "remove");
-        });
-
-        const del = document.createElement("button");
-        del.type = "button";
-        del.textContent = "✕";
-        del.className = "warn";
-        del.title = "Delete branch";
-        del.addEventListener("click", () => deleteBranch(n.id));
-
-// START DELETE AND PROMOTE 
-
-const unwrap = document.createElement("button");
-unwrap.type = "button";
-unwrap.textContent = "⇪ Unwrap";
-unwrap.title = "Delete this heading and promote its children";
-unwrap.addEventListener("click", (e) => {
-  e.stopPropagation();
-  if (!confirm("Delete this heading and promote its children?")) return;
-  deleteAndPromoteChildren(n.id);
-});
-        
-// STOP DELETE AND PROMOTE 
-
-        
-        // if (n.level < 6) tools.append(bodyBtn, dup, add, paste, left, right, tagKids, untagKids, del);
-        // else tools.append(bodyBtn, dup, add, paste, left, right, del);
-
-        // if (n.level < 6) tools.append(dup, paste, left, right, tagKids, untagKids, del);
-        // else tools.append(dup, paste, left, right, del);
-
-if (n.level < 6) tools.append(dup, paste, tagKids, untagKids, unwrap, del);
-else tools.append(dup, paste, del);
-        
-
-        // hdr.append(pin, col, lvl, title, tools);
-        // hdr.append(pin, col, lvl, tools, title);
-        // hdr.append(pin, col, lvl, title);
-        // hdr.append(pin, col, lvl, miniTools, title);
-        // hdr.append(pin, col, lvl, meta, miniTools, title);
-        // hdr.append(pin, col, lvl, meta, miniTools, title);
-        hdr.append(lvl, pin, col, meta, miniTools, title);
-        node.appendChild(hdr);
-
-        // Body area: show if toggled, OR reveal+body-match-only while searching
-        const bodyShouldShow =
-          n.showBody ||
-          (revealMatches && searchQuery.trim() && nodeMatchesBodyOnly(n, searchQuery));
-
-        const bodyWrap = document.createElement("div");
-        bodyWrap.className = "body" + (bodyShouldShow ? " show" : "");
-
-        const bodyTA = document.createElement("textarea");
-        bodyTA.rows = 6;
-        bodyTA.wrap = "soft";
-        bodyTA.value = (n.body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
-
-        const stop = (e) => e.stopPropagation();
-        bodyTA.addEventListener("keydown", stop);
-        bodyTA.addEventListener("keypress", stop);
-        bodyTA.addEventListener("keyup", stop);
-
-        bodyTA.addEventListener("input", () => {
-          n.body = bodyTA.value;
-          n.tags = extractTagsFromBody(n.body);
-          markChangedTyping();
-        });
-
-        bodyTA.addEventListener("click", (e) => e.stopPropagation());
-        
-        // bodyWrap.appendChild(bodyTA);
-        // node.appendChild(bodyWrap);
-
-        // canvas.appendChild(node);
-
-bodyWrap.appendChild(bodyTA);
-node.appendChild(bodyWrap);
-
-if (bodyShouldShow) {
-  // Use setTimeout to ensure the DOM element is painted before measuring
-  setTimeout(() => autoResizeTA(bodyTA), 0);
 }
 
-        
-// NEW: controls under title + body
-node.appendChild(tools);
+// ---- Event wiring ----
+btnTabStructure.addEventListener("click", () => setTab("structure"));
+btnTabSearch.addEventListener("click", () => setTab("search"));
+btnTabTags.addEventListener("click", () => setTab("tags"));
 
-canvas.appendChild(node);
-        
-        autoResizeTA(title);
-      });
-
-      // window.scrollTo(0, scrollPos);
-      if (shouldRestoreScroll) {
-        window.scrollTo(0, scrollPos);
-      }
-
-    setCopiedFlag(copiedSinceChange); 
-    badgeSave.textContent = saveTimer ? "Unsaved..." : "Saved ✓";
-      
-      if (lastCreatedId) {
-        const el = canvas.querySelector(`[data-node-id="${lastCreatedId}"]`);
-        if (el) {
-          const t = el.querySelector(".title");
-          if (t) t.focus();
-        }
-        lastCreatedId = null;
-      }
-      
-if (pendingScrollToId) {
-  const targetId = pendingScrollToId;
-  pendingScrollToId = "";
-
-  requestAnimationFrame(() => {
-    const el = canvas.querySelector(`[data-node-id="${targetId}"]`);
-    if (!el) return;
-
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-
-    const t = el.querySelector(".title");
-    if (t) t.focus();
-
-    // Second pass after delayed textarea resizing/layout settles
-    setTimeout(() => {
-      const el2 = canvas.querySelector(`[data-node-id="${targetId}"]`);
-      if (!el2) return;
-      el2.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 80);
-  });
-}
-      
-    } // end function renderStructure 
-   
-    // ---- Buttons / events ----
-    btnTabStructure.addEventListener("click", () => setTab("structure"));
-    btnTabSearch.addEventListener("click", () => setTab("search"));
-    btnTabTags.addEventListener("click", () => setTab("tags"));
-
-    tagAllBtn.addEventListener("click", () => {
-      activeTag = "";
-      rebuildTagUI();
-      saveDebounced();
-    });
-
-    /* 4) ADD THIS event listener with the other button/events */
+tagAllBtn.addEventListener("click", () => { activeTag = ""; rebuildTagUI(); saveDebounced(); });
 
 btnCopyTags.addEventListener("click", async () => {
   const tags = allTags();
-
-  if (!tags.length) {
-    alert("No tags to copy yet.");
-    return;
-  }
-
+  if (!tags.length) { alert("No tags to copy yet."); return; }
   const ok = await copyText(tags.join("\n"));
-  if (!ok) {
-    alert("Copy failed.");
-    return;
-  }
-
+  if (!ok) { alert("Copy failed."); return; }
   const oldText = btnCopyTags.textContent;
   btnCopyTags.textContent = "Copied ✓";
-
-  setTimeout(() => {
-    btnCopyTags.textContent = oldText;
-  }, 1200);
+  setTimeout(() => { btnCopyTags.textContent = oldText; }, 1200);
 });
 
-    // ChatGPT
-btnLoad.addEventListener("click", () => {
+$(".btnLoad").addEventListener("click", () => {
   const text = taInput.value || "";
   if (!text.trim()) return;
-
   nodes = parseMarkdown(text);
   sourceId = null;
-
   markChangedFull();
-  refreshLayout(); 
+  refreshLayout();
 });
-    
-    btnUpdate.addEventListener("click", () => {
-      taInput.value = toMarkdown();
-      markChangedFull();
-    });
 
-    // UNDO FUNCTION 
-    btnUndo.addEventListener("click", () => undo());
-    document.addEventListener("keydown", (e) => {
-  const k = (e.key || "").toLowerCase();
-  const mod = e.metaKey || e.ctrlKey;
+$(".btnUpdate").addEventListener("click", () => { taInput.value = toMarkdown(); markChangedFull(); });
+$(".btnUndo").addEventListener("click", () => undo());
 
-  // Cmd/Ctrl+Z => structural undo only when NOT typing in an input/textarea
-  if (mod && k === "z" && !e.shiftKey) {
-    const t = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
-    const isTyping = t === "textarea" || t === "input";
-    if (!isTyping) {
-      e.preventDefault();
-      undo();
-    }
-  }
-});
-    // END UNDO 
-    
-    btnCopy.addEventListener("click", async () => {
-      const md = toMarkdown();
-      taInput.value = md;
-      const ok = await copyText(md);
-      if (ok) setCopiedFlag(true);
-      else alert("Copy failed.");
-      saveDebounced();
-    });
-
-btnExport.addEventListener("click", () => {
+$(".btnCopy").addEventListener("click", async () => {
   const md = toMarkdown();
   taInput.value = md;
+  const ok = await copyText(md);
+  if (ok) setCopiedFlag(true);
+  else alert("Copy failed.");
+  saveDebounced();
+});
 
-  const firstTitle =
-    nodes.find((n) => (n.title || "").trim())?.title || "outline";
-
-  const filename = `${slugifyFilename(firstTitle)}.md`;
-  downloadFile(filename, md, "text/markdown;charset=utf-8");
-
+$(".btnExport").addEventListener("click", () => {
+  const md = toMarkdown();
+  taInput.value = md;
+  const firstTitle = nodes.find((n) => (n.title || "").trim())?.title || "outline";
+  downloadFile(`${slugifyFilename(firstTitle)}.md`, md, "text/markdown;charset=utf-8");
   setCopiedFlag(false);
   saveDebounced();
 });
-    
-    btnReset.addEventListener("click", () => {
-      if (!confirm("Reset everything (including saved state for this app instance)?")) return;
-      nodes = [];
-      sourceId = null;
-      taInput.value = "";
-      maxVisibleLevel = 6;
 
-      searchQuery = "";
-      matchIds = [];
-      matchPos = -1;
+$(".btnReset").addEventListener("click", () => {
+  if (!confirm("Reset everything (including saved state for this app instance)?")) return;
+  nodes = []; sourceId = null; taInput.value = ""; maxVisibleLevel = 6;
+  searchQuery = ""; matchIds = []; matchPos = -1; activeTag = "";
+  setCopiedFlag(false);
+  try { localStorage.removeItem(KEY); } catch {}
+  saveDebounced();
+  scheduleRenderStructure();
+  rebuildTagUI();
+  rebuildMatchesNoRender();
+  scheduleRenderSearchResults();
+});
 
-      activeTag = "";
+$(".btnAddTop").addEventListener("click", () => addNewAfter(null));
 
-      setCopiedFlag(false);
-      try { localStorage.removeItem(KEY); } catch {}
-      saveDebounced();
-      scheduleRenderStructure();
-      rebuildTagUI();
-      rebuildMatchesNoRender();
-      scheduleRenderSearchResults();
-    });
+selMax.addEventListener("change", () => setMaxLevel(parseInt(selMax.value, 10)));
+$(".btnLvl1").addEventListener("click", () => setMaxLevel(1));
+$(".btnLvl2").addEventListener("click", () => setMaxLevel(2));
+$(".btnLvl3").addEventListener("click", () => setMaxLevel(3));
+$(".btnLvlAll").addEventListener("click", () => setMaxLevel(6));
 
-    btnAddTop.addEventListener("click", () => addNewAfter(null));
+inSearch.addEventListener("input", () => {
+  searchQuery = inSearch.value || "";
+  rebuildMatches();
+  if (activeTab === "search") scheduleRenderSearchResults();
+  saveDebounced();
+});
 
-    selMax.addEventListener("change", () => setMaxLevel(parseInt(selMax.value, 10)));
-    btnLvl1.addEventListener("click", () => setMaxLevel(1));
-    btnLvl2.addEventListener("click", () => setMaxLevel(2));
-    btnLvl3.addEventListener("click", () => setMaxLevel(3));
-    btnLvlAll.addEventListener("click", () => setMaxLevel(6));
+cbBody.addEventListener("change", () => {
+  searchInBody = !!cbBody.checked;
+  rebuildMatches();
+  if (activeTab === "search") scheduleRenderSearchResults();
+  saveDebounced();
+});
 
-    inSearch.addEventListener("input", () => {
-      searchQuery = inSearch.value || "";
-      rebuildMatches();
-      if (activeTab === "search") scheduleRenderSearchResults();
-      saveDebounced();
-    });
+cbReveal.addEventListener("change", () => {
+  revealMatches = !!cbReveal.checked;
+  scheduleRenderStructure();
+  saveDebounced();
+});
 
-    cbBody.addEventListener("change", () => {
-      searchInBody = !!cbBody.checked;
-      rebuildMatches();
-      if (activeTab === "search") scheduleRenderSearchResults();
-      saveDebounced();
-    });
+$(".btnPrev").addEventListener("click", () => jumpMatch(-1));
+$(".btnNext").addEventListener("click", () => jumpMatch(+1));
 
-    cbReveal.addEventListener("change", () => {
-      revealMatches = !!cbReveal.checked;
-      scheduleRenderStructure();
-      saveDebounced();
-    });
+inSearch.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    jumpMatch(e.shiftKey ? -1 : 1);
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    searchQuery = ""; matchIds = []; matchPos = -1; inSearch.value = "";
+    updateCount();
+    scheduleRenderStructure();
+    scheduleRenderSearchResults();
+    saveDebounced();
+  }
+});
 
-    btnPrev.addEventListener("click", () => jumpMatch(-1));
-    btnNext.addEventListener("click", () => jumpMatch(+1));
+taInput.addEventListener("input", () => { setCopiedFlag(false); saveDebounced(); });
 
-    inSearch.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (e.shiftKey) jumpMatch(-1);
-        else jumpMatch(+1);
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        searchQuery = "";
-        matchIds = [];
-        matchPos = -1;
-        inSearch.value = "";
-        updateCount();
-        scheduleRenderStructure();
-        scheduleRenderSearchResults();
-        saveDebounced();
-      }
-    });
-
-    taInput.addEventListener("input", () => {
-      // you changed the input text; it doesn't change nodes until Load
-      setCopiedFlag(false);
-      saveDebounced();
-    });
-
-    canvas.addEventListener("click", (e) => {
-  // If the click wasn't on a node, clear selection
-  const nodeEl = e.target.closest && e.target.closest(".node");
-  if (!nodeEl) {
+canvas.addEventListener("click", (e) => {
+  if (!e.target.closest || !e.target.closest(".node")) {
     activeNodeId = "";
     scheduleRenderStructure();
   }
 });
 
+// Global keyboard shortcuts
+document.addEventListener("keydown", (e) => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) {
+    const tag = (e.target?.tagName || "").toLowerCase();
+    if (tag !== "textarea" && tag !== "input") { e.preventDefault(); undo(); }
+  }
+});
+
+// Layout refresh
 function refreshLayout() {
   requestAnimationFrame(() => {
-    // Force the browser to re-evaluate percentage widths against current parent
-    container.style.width = "";         // clear any stale inline width
-    void container.getBoundingClientRect(); // trigger reflow
-
+    container.style.width = "";
+    void container.getBoundingClientRect();
     requestAnimationFrame(() => {
       scheduleRenderStructure();
-      //
       const activePanel = container.querySelector(".tabPanel.active");
-      const textareas = activePanel?.querySelectorAll("textarea:not(.mdInput)");
-      if (textareas) textareas.forEach((ta) => autoResizeTA(ta));
+      activePanel?.querySelectorAll("textarea:not(.mdInput)").forEach((ta) => autoResizeTA(ta));
     });
   });
 }
-    
+
 window.addEventListener("resize", refreshLayout);
 window.addEventListener("orientationchange", refreshLayout);
 window.addEventListener("pageshow", refreshLayout);
 
-// Watch for SquareSpace's layout engine finalising the parent's width.
-// This fires when the containing column goes from 0/partial → full width.
+// Watch parent width for Squarespace layout engine
 (function watchParentWidth() {
   const parent = container.parentElement;
   if (!parent) { refreshLayout(); return; }
@@ -2253,54 +1519,40 @@ window.addEventListener("pageshow", refreshLayout);
   if (window.ResizeObserver) {
     let settled = false;
     const ro = new ResizeObserver(() => {
-      if (container.offsetWidth > 100) { // has a real width now
-        if (!settled) {
-          settled = true;
-          refreshLayout();
-        }
+      if (container.offsetWidth > 100 && !settled) {
+        settled = true;
+        refreshLayout();
       }
     });
     ro.observe(parent);
-
-    // Still fire on load as a fallback
-    window.addEventListener("load", () => {
-      ro.observe(parent); // re-observe in case it was swapped
-      refreshLayout();
-    });
+    window.addEventListener("load", () => { ro.observe(parent); refreshLayout(); });
   } else {
-    // Fallback for older browsers: poll until the parent has width
     let tries = 0;
     function poll() {
-      if (container.offsetWidth > 100 || tries++ > 30) {
-        refreshLayout();
-      } else {
-        setTimeout(poll, 100);
-      }
+      if (container.offsetWidth > 100 || tries++ > 30) refreshLayout();
+      else setTimeout(poll, 100);
     }
     window.addEventListener("load", poll);
     poll();
   }
 })();
-    
-    // ---- Init ----
-    loadPref();
-    setCopiedFlag(copiedSinceChange);
 
-    selMax.value = String(maxVisibleLevel);
-    inSearch.value = searchQuery;
-    cbBody.checked = searchInBody;
-    cbReveal.checked = revealMatches;
+// ---- Init ----
+loadPref();
+setCopiedFlag(copiedSinceChange);
+selMax.value = String(maxVisibleLevel);
+inSearch.value = searchQuery;
+cbBody.checked = searchInBody;
+cbReveal.checked = revealMatches;
+badgeSave.className = "badge good badgeSave";
+badgeSave.textContent = "Saved ✓";
 
-    badgeSave.className = "badge good badgeSave";
-    badgeSave.textContent = "Saved ✓";
+rebuildMatches();
+rebuildTagUI();
+setTab(activeTab || "structure");
+saveDebounced();
+refreshLayout();
+```
 
-    // initial renders
-    rebuildMatches();
-    rebuildTagUI();
-    setTab(activeTab || "structure");
-    saveDebounced();
-    refreshLayout();
-    //
-    
-  });
+});
 })();
