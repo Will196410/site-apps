@@ -32,6 +32,12 @@
         color: #111;
         display: block;
       }
+      .mdse-wrapper .buildStamp {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #555;
+      }
       .mdse-wrapper, .mdse-wrapper * { box-sizing: border-box; }
       .mdse-wrapper .muted { color: #444; font-size: 13px; font-weight: 700; }
       .mdse-wrapper .btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
@@ -454,6 +460,7 @@
 
     container.innerHTML = `
       <div class="mdse-wrapper">
+        <div class="buildStamp">Generated: 17 Mar 2026, 15:17</div>
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
