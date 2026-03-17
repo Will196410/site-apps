@@ -438,10 +438,10 @@
     return parts.join("\n\n").replace(/\n{3,}/g, "\n\n");
   }
 
-  window.SiteApps.register("mdse", (container) => {
+  window.SiteApps.register("mdseStage", (container) => {
     ensureStyle();
 
-    const KEY = `siteapps:mdse:v2:${location.pathname}`;
+    const KEY = `siteapps:mdseStage:v2:${location.pathname}`;
 
     let nodes = [];
     let docPreamble = "";
@@ -453,7 +453,7 @@
     let pendingScrollId = null;
 
     container.innerHTML = `
-      <div class="mdse-wrapper" data-app="mdse">
+      <div class="mdse-wrapper">
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
@@ -758,131 +758,6 @@
         frag.appendChild(btn);
       });
       searchResults.appendChild(frag);
-    }
-
-    function extractCommentTags(text) {
-      const out = [];
-      const seen = new Set();
-      const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
-
-      lines.forEach((rawLine) => {
-        const m = rawLine.match(/^\s*\\?%%\s*tag\b(?:\s+(.+?)\s*)?$/i);
-        if (!m) return;
-        const tail = String(m[1] || "").trim();
-        if (!tail) return;
-
-        const parts = tail.includes(",")
-          ? tail.split(",").map((s) => s.trim()).filter(Boolean)
-          : [tail];
-
-        parts.forEach((part) => {
-          const key = part.toLowerCase();
-          if (!key || seen.has(key)) return;
-          seen.add(key);
-          out.push(part);
-        });
-      });
-
-      return out;
-    }
-
-    function buildTagGroups() {
-      const map = new Map();
-
-      nodes.forEach((n, idx) => {
-        extractCommentTags(n.body).forEach((tag) => {
-          const key = tag.toLowerCase();
-          let entry = map.get(key);
-          if (!entry) {
-            entry = { key, label: tag, hits: [] };
-            map.set(key, entry);
-          }
-          entry.hits.push({ n, idx });
-        });
-      });
-
-      return Array.from(map.values()).sort((a, b) =>
-        a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
-      );
-    }
-
-    function tagLineExcerpt(node, tagKey) {
-      const lines = String(node.body || "").replace(/\r\n?/g, "\n").split("\n");
-
-      for (const rawLine of lines) {
-        const m = rawLine.match(/^\s*\\?%%\s*tag\b(?:\s+(.+?)\s*)?$/i);
-        if (!m) continue;
-        const tail = String(m[1] || "").trim();
-        if (!tail) continue;
-
-        const parts = tail.includes(",")
-          ? tail.split(",").map((s) => s.trim()).filter(Boolean)
-          : [tail];
-
-        if (parts.some((part) => part.toLowerCase() === tagKey)) {
-          return rawLine.trim();
-        }
-      }
-
-      return resultExcerpt(node, tagKey);
-    }
-
-    function renderTags() {
-      tagsBar.innerHTML = "";
-      tagMatches.innerHTML = "";
-
-      if (!nodes.length) {
-        tagsMeta.textContent = "Load Markdown first, then view tags.";
-        return;
-      }
-
-      const groups = buildTagGroups();
-      if (!groups.length) {
-        activeTag = "";
-        tagsMeta.textContent = "No tags found. Use body lines such as %% tag something or \\%% tag something.";
-        return;
-      }
-
-      if (activeTag && !groups.some((g) => g.key === activeTag)) {
-        activeTag = "";
-      }
-      if (!activeTag && groups.length === 1) {
-        activeTag = groups[0].key;
-      }
-
-      const chipsFrag = document.createDocumentFragment();
-      groups.forEach((group) => {
-        const btn = document.createElement("button");
-        btn.className = `tagChip${activeTag === group.key ? " active" : ""}`;
-        btn.setAttribute("data-tag", group.key);
-        btn.textContent = `${group.label} (${group.hits.length})`;
-        chipsFrag.appendChild(btn);
-      });
-      tagsBar.appendChild(chipsFrag);
-
-      const totalTaggedNodes = groups.reduce((sum, group) => sum + group.hits.length, 0);
-      const activeGroup = groups.find((group) => group.key === activeTag) || null;
-
-      if (!activeGroup) {
-        tagsMeta.textContent = `${groups.length} tag${groups.length === 1 ? "" : "s"} across ${totalTaggedNodes} tagged node${totalTaggedNodes === 1 ? "" : "s"}. Tap a tag to view matches.`;
-        return;
-      }
-
-      tagsMeta.textContent = `${activeGroup.label}: ${activeGroup.hits.length} node${activeGroup.hits.length === 1 ? "" : "s"}`;
-
-      const frag = document.createDocumentFragment();
-      activeGroup.hits.forEach(({ n, idx }) => {
-        const btn = document.createElement("button");
-        btn.className = "searchItem";
-        btn.setAttribute("data-jump-id", n.id);
-        btn.innerHTML = `
-          <div class="searchItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
-          <div class="searchItemMeta">H${n.level} · Node ${idx + 1} · ${countWords(n.title) + countWords(n.body)}w</div>
-          <div class="searchItemExcerpt">${escapeHtml(tagLineExcerpt(n, activeGroup.key))}</div>
-        `;
-        frag.appendChild(btn);
-      });
-      tagMatches.appendChild(frag);
     }
 
     function addNewAfter(id) {
