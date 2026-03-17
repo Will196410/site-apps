@@ -205,9 +205,29 @@
       .mdse-wrapper .searchBox {
         margin-bottom: 12px;
       }
-      .mdse-wrapper .searchResults {
+      .mdse-wrapper .searchResults,
+      .mdse-wrapper .tagMatches {
         display: grid;
         gap: 10px;
+      }
+      .mdse-wrapper .tagsBar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 10px 0 12px;
+      }
+      .mdse-wrapper .tagChip {
+        border: 2px solid #111;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 800;
+        background: #fff;
+        cursor: pointer;
+      }
+      .mdse-wrapper .tagChip.active {
+        background: #111;
+        color: #fff;
       }
       .mdse-wrapper .searchItem {
         border: 2px solid rgba(0,0,0,.15);
@@ -428,6 +448,7 @@
     let activeNodeId = "";
     let activeTab = "structure";
     let searchQuery = "";
+    let activeTag = "";
     let pendingFocus = null;
     let pendingScrollId = null;
 
@@ -436,6 +457,7 @@
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
+          <button class="tabbtn" data-tab="tags">Tags</button>
         </div>
 
         <div class="tabPanel panelStructure active">
@@ -461,6 +483,12 @@
           <div class="muted searchMeta">No search yet.</div>
           <div class="searchResults"></div>
         </div>
+
+        <div class="tabPanel panelTags">
+          <div class="muted tagsMeta">No tags yet.</div>
+          <div class="tagsBar"></div>
+          <div class="tagMatches"></div>
+        </div>
       </div>
     `;
 
@@ -473,6 +501,9 @@
     const searchInput = root.querySelector(".searchInput");
     const searchMeta = root.querySelector(".searchMeta");
     const searchResults = root.querySelector(".searchResults");
+    const tagsMeta = root.querySelector(".tagsMeta");
+    const tagsBar = root.querySelector(".tagsBar");
+    const tagMatches = root.querySelector(".tagMatches");
     const summaryNodes = root.querySelector(".summaryNodes");
     const summaryWords = root.querySelector(".summaryWords");
     const summaryPreamble = root.querySelector(".summaryPreamble");
@@ -485,6 +516,7 @@
         activeNodeId,
         activeTab,
         searchQuery,
+        activeTag,
         rawInput: taInput.value || ""
       }));
     }, 180);
@@ -506,13 +538,15 @@
     }
 
     function switchTab(tab) {
-      activeTab = tab === "search" ? "search" : "structure";
+      activeTab = tab === "search" || tab === "tags" ? tab : "structure";
       root.querySelectorAll(".tabbtn").forEach((btn) => {
         btn.classList.toggle("active", btn.getAttribute("data-tab") === activeTab);
       });
       root.querySelector(".panelStructure").classList.toggle("active", activeTab === "structure");
       root.querySelector(".panelSearch").classList.toggle("active", activeTab === "search");
+      root.querySelector(".panelTags").classList.toggle("active", activeTab === "tags");
       if (activeTab === "search") renderSearch();
+      if (activeTab === "tags") renderTags();
       saveState();
     }
 
@@ -802,10 +836,12 @@
       const parsed = parseMarkdown(taInput.value || "");
       nodes = parsed.nodes;
       docPreamble = parsed.preamble;
+      activeTag = "";
       activeNodeId = nodes[0] ? nodes[0].id : "";
       pendingScrollId = activeNodeId || null;
       renderStructure();
       if (activeTab === "search") renderSearch();
+      if (activeTab === "tags") renderTags();
       saveState();
     });
 
@@ -827,11 +863,13 @@
       docPreamble = "";
       activeNodeId = "";
       searchQuery = "";
+      activeTag = "";
       taInput.value = "";
       searchInput.value = "";
       safeStorageRemove(KEY);
       renderStructure();
       renderSearch();
+      renderTags();
     });
 
     searchInput.addEventListener("input", () => {
@@ -840,14 +878,32 @@
       saveState();
     });
 
-    searchResults.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-jump-id]");
-      if (!btn) return;
-      const id = btn.getAttribute("data-jump-id");
+    function jumpToNodeFromPanel(id) {
       revealNode(id);
       switchTab("structure");
       renderStructure();
       saveState();
+    }
+
+    searchResults.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-jump-id]");
+      if (!btn) return;
+      jumpToNodeFromPanel(btn.getAttribute("data-jump-id"));
+    });
+
+    tagsBar.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-tag]");
+      if (!btn) return;
+      const tag = btn.getAttribute("data-tag") || "";
+      activeTag = activeTag === tag ? "" : tag;
+      renderTags();
+      saveState();
+    });
+
+    tagMatches.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-jump-id]");
+      if (!btn) return;
+      jumpToNodeFromPanel(btn.getAttribute("data-jump-id"));
     });
 
     canvas.addEventListener("click", (e) => {
@@ -888,6 +944,7 @@
 
     const syncInput = debounce(() => {
       if (activeTab === "search") scheduleSearchRender();
+      if (activeTab === "tags") renderTags();
       updateSummary();
       saveState();
     }, 120);
@@ -917,8 +974,9 @@
         if (Array.isArray(state.nodes)) nodes = state.nodes;
         if (typeof state.docPreamble === "string") docPreamble = state.docPreamble;
         if (typeof state.activeNodeId === "string") activeNodeId = state.activeNodeId;
-        if (typeof state.activeTab === "string") activeTab = state.activeTab === "search" ? "search" : "structure";
+        if (typeof state.activeTab === "string") activeTab = ["structure", "search", "tags"].includes(state.activeTab) ? state.activeTab : "structure";
         if (typeof state.searchQuery === "string") searchQuery = state.searchQuery;
+        if (typeof state.activeTag === "string") activeTag = state.activeTag;
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
       } catch (_) {
         // ignore broken saved state
@@ -929,5 +987,6 @@
     switchTab(activeTab);
     renderStructure();
     if (activeTab === "search") renderSearch();
+    if (activeTab === "tags") renderTags();
   });
 })();
