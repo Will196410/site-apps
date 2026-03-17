@@ -418,7 +418,7 @@
     return parts.join("\n\n").replace(/\n{3,}/g, "\n\n");
   }
 
-  window.SiteApps.register("mdse", (container) => {
+  window.SiteApps.register("mdseStage", (container) => {
     ensureStyle();
 
     const KEY = `siteapps:mdse:v2:${location.pathname}`;
