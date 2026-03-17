@@ -32,12 +32,6 @@
         color: #111;
         display: block;
       }
-      .mdse-wrapper .buildStamp {
-      margin: 0 0 10px;
-      font-size: 12px;
-      font-weight: 800;
-      color: #555;
-      }
       .mdse-wrapper, .mdse-wrapper * { box-sizing: border-box; }
       .mdse-wrapper .muted { color: #444; font-size: 13px; font-weight: 700; }
       .mdse-wrapper .btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
@@ -266,6 +260,13 @@
         padding: 12px;
         margin: 10px 0;
       }
+
+      .mdse-wrapper .buildStamp {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 800;
+        color: #555;
+      }
       @media (max-width: 700px) {
         .mdse-wrapper { padding: 14px; }
         .mdse-wrapper .headerRight { margin-left: 0; }
@@ -460,7 +461,7 @@
 
     container.innerHTML = `
       <div class="mdse-wrapper">
-        <div class="buildStamp">Generated: 17 Mar 2026, 15:17</div>
+        <div class="buildStamp">Generated: 17 Mar 2026, 16:05</div>
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
@@ -765,6 +766,132 @@
         frag.appendChild(btn);
       });
       searchResults.appendChild(frag);
+    }
+
+    function extractCommentTags(text) {
+      const out = [];
+      const seen = new Set();
+      const src = String(text || "").replace(/\r\n?/g, "\n");
+      const rx = /(?:^|\n)\s*\\?%%\s*tag\b[ \t]+([^\n]+)/gi;
+      let m;
+
+      while ((m = rx.exec(src))) {
+        const tail = String(m[1] || "").trim();
+        if (!tail) continue;
+
+        const parts = tail.includes(",")
+          ? tail.split(",").map((s) => s.trim()).filter(Boolean)
+          : [tail];
+
+        parts.forEach((part) => {
+          const clean = part.replace(/\s+/g, " ").trim();
+          const key = clean.toLowerCase();
+          if (!key || seen.has(key)) return;
+          seen.add(key);
+          out.push(clean);
+        });
+      }
+
+      return out;
+    }
+
+    function buildTagGroups() {
+      const map = new Map();
+
+      nodes.forEach((n, idx) => {
+        extractCommentTags(n.body).forEach((tag) => {
+          const key = tag.toLowerCase();
+          let entry = map.get(key);
+          if (!entry) {
+            entry = { key, label: tag, hits: [] };
+            map.set(key, entry);
+          }
+          entry.hits.push({ n, idx });
+        });
+      });
+
+      return Array.from(map.values()).sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+      );
+    }
+
+    function tagLineExcerpt(node, tagKey) {
+      const src = String(node.body || "").replace(/\r\n?/g, "\n");
+      const rx = /(?:^|\n)\s*\\?%%\s*tag\b[ \t]+([^\n]+)/gi;
+      let m;
+
+      while ((m = rx.exec(src))) {
+        const rawTail = String(m[1] || "").trim();
+        if (!rawTail) continue;
+
+        const parts = rawTail.includes(",")
+          ? rawTail.split(",").map((s) => s.trim()).filter(Boolean)
+          : [rawTail];
+
+        if (parts.some((part) => part.replace(/\s+/g, " ").trim().toLowerCase() === tagKey)) {
+          return `%% tag ${rawTail}`;
+        }
+      }
+
+      return resultExcerpt(node, tagKey);
+    }
+
+    function renderTags() {
+      tagsBar.innerHTML = "";
+      tagMatches.innerHTML = "";
+
+      if (!nodes.length) {
+        tagsMeta.textContent = "Load Markdown first, then view tags.";
+        return;
+      }
+
+      const groups = buildTagGroups();
+      if (!groups.length) {
+        activeTag = "";
+        tagsMeta.textContent = "No tags found. Use lines such as %% tag something or \\%% tag something anywhere inside a node body.";
+        return;
+      }
+
+      if (activeTag && !groups.some((g) => g.key === activeTag)) {
+        activeTag = "";
+      }
+      if (!activeTag && groups.length === 1) {
+        activeTag = groups[0].key;
+      }
+
+      const chipsFrag = document.createDocumentFragment();
+      groups.forEach((group) => {
+        const btn = document.createElement("button");
+        btn.className = `tagChip${activeTag === group.key ? " active" : ""}`;
+        btn.setAttribute("data-tag", group.key);
+        btn.textContent = `${group.label} (${group.hits.length})`;
+        chipsFrag.appendChild(btn);
+      });
+      tagsBar.appendChild(chipsFrag);
+
+      const totalTaggedNodes = groups.reduce((sum, group) => sum + group.hits.length, 0);
+      const activeGroup = groups.find((group) => group.key === activeTag) || null;
+
+      if (!activeGroup) {
+        tagsMeta.textContent = `${groups.length} tag${groups.length === 1 ? "" : "s"} across ${totalTaggedNodes} tagged node${totalTaggedNodes === 1 ? "" : "s"}. Tap a tag to view matches.`;
+        return;
+      }
+
+      tagsMeta.textContent = `${activeGroup.label}: ${activeGroup.hits.length} node${activeGroup.hits.length === 1 ? "" : "s"}`;
+
+      const frag = document.createDocumentFragment();
+      activeGroup.hits.forEach(({ n, idx }) => {
+        const btn = document.createElement("button");
+        btn.className = "searchItem";
+        btn.setAttribute("data-jump-id", n.id);
+        btn.innerHTML = `
+          <div class="searchItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+          <div class="searchItemMeta">H${n.level} · Node ${idx + 1} · ${countWords(n.title) + countWords(n.body)}w</div>
+          <div class="searchItemExcerpt">${escapeHtml(tagLineExcerpt(n, activeGroup.key))}</div>
+        `;
+        frag.appendChild(btn);
+      });
+      tagMatches.appendChild(frag);
     }
 
     function addNewAfter(id) {
