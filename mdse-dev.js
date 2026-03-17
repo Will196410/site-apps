@@ -149,12 +149,14 @@
       .mdse-wrapper .titleInput {
         display: block;
         width: 100%;
+        min-height: 60px;
         border: 2px solid rgba(0,0,0,.15);
         border-radius: 12px;
         padding: 12px 14px;
         font-size: 17px;
+        line-height: 1.35;
         font-weight: 800;
-        resize: none;
+        resize: vertical;
         overflow: hidden;
         background: #fbfbfb;
       }
@@ -461,7 +463,7 @@
 
     container.innerHTML = `
       <div class="mdse-wrapper">
-        <div class="buildStamp">Generated: 17 Mar 2026, 16:05</div>
+        <div class="buildStamp">Generated: 17 Mar 2026, 16:18</div>
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
@@ -493,6 +495,9 @@
         </div>
 
         <div class="tabPanel panelTags">
+          <div class="btnrow">
+            <button class="ghost btnCopyTags">Copy Tags</button>
+          </div>
           <div class="muted tagsMeta">No tags yet.</div>
           <div class="tagsBar"></div>
           <div class="tagMatches"></div>
@@ -505,6 +510,7 @@
     const btnLoad = root.querySelector(".btnLoad");
     const btnCopy = root.querySelector(".btnCopy");
     const btnReset = root.querySelector(".btnReset");
+    const btnCopyTags = root.querySelector(".btnCopyTags");
     const canvas = root.querySelector(".canvas");
     const searchInput = root.querySelector(".searchInput");
     const searchMeta = root.querySelector(".searchMeta");
@@ -894,6 +900,35 @@
       tagMatches.appendChild(frag);
     }
 
+    async function copyAllTagsToClipboard() {
+      const groups = buildTagGroups();
+      if (!groups.length) {
+        tagsMeta.textContent = "No tags to copy yet.";
+        return;
+      }
+
+      const text = groups.map((group) => group.label).join("\n");
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          copyTextFallback(text);
+        }
+        const base = tagsMeta.textContent;
+        tagsMeta.textContent = `Copied ${groups.length} tag${groups.length === 1 ? "" : "s"} to clipboard.`;
+        setTimeout(() => {
+          if (activeTab === "tags") renderTags();
+          else tagsMeta.textContent = base;
+        }, 1400);
+      } catch (_) {
+        copyTextFallback(text);
+        tagsMeta.textContent = `Copied ${groups.length} tag${groups.length === 1 ? "" : "s"} to clipboard.`;
+        setTimeout(() => {
+          if (activeTab === "tags") renderTags();
+        }, 1400);
+      }
+    }
+
     function addNewAfter(id) {
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
@@ -992,7 +1027,13 @@
       }
     });
 
+    btnCopyTags.addEventListener("click", () => {
+      copyAllTagsToClipboard();
+    });
+
     btnReset.addEventListener("click", () => {
+      const ok = window.confirm("Reset the app and clear the saved Markdown on this page?");
+      if (!ok) return;
       nodes = [];
       docPreamble = "";
       activeNodeId = "";
