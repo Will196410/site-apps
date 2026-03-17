@@ -35,7 +35,6 @@
       .mdse-wrapper, .mdse-wrapper * { box-sizing: border-box; }
       .mdse-wrapper .muted { color: #444; font-size: 13px; font-weight: 700; }
       .mdse-wrapper .btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
-      .mdse-wrapper .buildStamp { margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #555; }
       .mdse-wrapper .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
       .mdse-wrapper button {
         border: 2px solid #111;
