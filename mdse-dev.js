@@ -421,7 +421,7 @@
   window.SiteApps.register("mdseStage", (container) => {
     ensureStyle();
 
-    const KEY = `siteapps:mdse:v2:${location.pathname}`;
+    const KEY = `siteapps:mdseStage:v2:${location.pathname}`;
 
     let nodes = [];
     let docPreamble = "";
@@ -432,7 +432,7 @@
     let pendingScrollId = null;
 
     container.innerHTML = `
-      <div class="mdse-wrapper" data-app="mdse">
+      <div class="mdse-wrapper">
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
