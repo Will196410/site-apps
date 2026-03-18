@@ -10,7 +10,7 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-mdse-style-v3";
+  const STYLE_ID = "siteapps-mdse-style-v4";
   const BUILD_STAMP = (() => {
     try {
       return new Date().toLocaleString("en-GB", {
@@ -22,7 +22,7 @@
         hour12: false
       }).replace(",", "");
     } catch (_) {
-      return "18 Mar 2026 07:35";
+      return "18 Mar 2026 08:05";
     }
   })();
 
@@ -142,6 +142,7 @@
         border-color: #8b5a00;
         box-shadow: 0 8px 22px rgba(139,90,0,.10);
       }
+
       .mdse-wrapper .nodeHeader {
         display: flex;
         gap: 10px;
@@ -200,6 +201,7 @@
         border-top: 1px solid #eee;
       }
       .mdse-wrapper .node.activeNode .tools { display: flex; }
+
       .mdse-wrapper .pillBtn,
       .mdse-wrapper .infoPill {
         border: 2px solid #111;
@@ -220,6 +222,26 @@
         font-weight: 800;
         background: #fff;
       }
+      .mdse-wrapper .pinBtn {
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        padding: 4px 9px;
+        min-width: 38px;
+        font-size: 16px;
+        line-height: 1;
+        background: #fff;
+      }
+      .mdse-wrapper .pinBtn.active {
+        border-color: #8b5a00;
+        color: #8b5a00;
+        background: #fff8ec;
+      }
+      .mdse-wrapper .pinBtn.target {
+        border-color: #0b5fff;
+        color: #0b5fff;
+        background: #f5f9ff;
+      }
+
       .mdse-wrapper .indentGuide {
         border-left: 4px solid rgba(11,95,255,.12);
         padding-left: 10px;
@@ -283,21 +305,19 @@
         margin: 10px 0;
       }
 
-      .mdse-wrapper .topMeta{
+      .mdse-wrapper .topMeta {
         display:flex;
         gap:10px;
         align-items:center;
         flex-wrap:wrap;
         margin:0 0 10px;
       }
-
-      .mdse-wrapper .buildStamp{
+      .mdse-wrapper .buildStamp {
         font-size:12px;
         font-weight:800;
         color:#555;
       }
-
-      .mdse-wrapper .metaBadge{
+      .mdse-wrapper .metaBadge {
         font-size:12px;
         font-weight:900;
         padding:4px 9px;
@@ -305,23 +325,19 @@
         border-radius:999px;
         background:#fff;
       }
-
-      .mdse-wrapper .metaBadge.good{
+      .mdse-wrapper .metaBadge.good {
         border-color:#0b3d0b;
         color:#0b3d0b;
       }
-
-      .mdse-wrapper .metaBadge.warn{
+      .mdse-wrapper .metaBadge.warn {
         border-color:#7a0000;
         color:#7a0000;
       }
-
-      .mdse-wrapper .metaBadge.dim{
+      .mdse-wrapper .metaBadge.dim {
         border-color:#555;
         color:#555;
       }
-
-      .mdse-wrapper .metaBadge.pin{
+      .mdse-wrapper .metaBadge.pin {
         border-color:#8b5a00;
         color:#8b5a00;
       }
@@ -393,7 +409,7 @@
     try {
       localStorage.removeItem(key);
     } catch (_) {
-      // ignore storage failures
+      // ignore
     }
   }
 
@@ -559,13 +575,14 @@
     list.forEach((n) => {
       n.level = clamp(n.level + delta, 1, 6);
     });
+
     return list;
   }
 
   window.SiteApps.register("mdseStage", (container) => {
     ensureStyle();
 
-    const KEY = `siteapps:mdseStage:v3:${location.pathname}`;
+    const KEY = `siteapps:mdseStage:v4:${location.pathname}`;
 
     let nodes = [];
     let docPreamble = "";
@@ -695,7 +712,7 @@
       const title = getPinnedTitle();
       if (title) {
         pinBadge.className = "metaBadge pin jsPinBadge";
-        pinBadge.textContent = `Pinned: ${title}`;
+        pinBadge.textContent = `Pinned: ${title} → tap another pin`;
       } else {
         pinBadge.className = "metaBadge dim jsPinBadge";
         pinBadge.textContent = "Nothing pinned";
@@ -711,7 +728,7 @@
 
     function snapshotState() {
       return {
-        v: 3,
+        v: 4,
         nodes: cloneNodes(nodes),
         docPreamble,
         activeNodeId,
@@ -746,8 +763,8 @@
 
       searchInput.value = searchQuery;
       pendingTextHistory = null;
-      updatePinBadge();
       setCopyBadge();
+      updatePinBadge();
       switchTab(activeTab, { silent: true });
       renderStructure();
       if (activeTab === "search") renderSearch();
@@ -766,7 +783,7 @@
 
     function pushUndoSnapshot(reason, explicitState) {
       const shot = explicitState ? {
-        v: 3,
+        v: 4,
         nodes: cloneNodes(explicitState.nodes),
         docPreamble: typeof explicitState.docPreamble === "string" ? explicitState.docPreamble : "",
         activeNodeId: typeof explicitState.activeNodeId === "string" ? explicitState.activeNodeId : "",
@@ -777,8 +794,10 @@
         copiedSinceChange: !!explicitState.copiedSinceChange,
         pinnedRootId: typeof explicitState.pinnedRootId === "string" ? explicitState.pinnedRootId : ""
       } : snapshotState();
+
       const last = undoStack[undoStack.length - 1];
       if (last && statesEqual(last.state, shot)) return;
+
       undoStack.push({ reason: reason || "change", state: shot });
       if (undoStack.length > HISTORY_LIMIT) undoStack = undoStack.slice(-HISTORY_LIMIT);
       updateUndoButton();
@@ -846,6 +865,7 @@
       } else {
         preambleNote.innerHTML = "";
       }
+
       updatePinBadge();
       updateUndoButton();
     }
@@ -977,6 +997,16 @@
         const directChildren = getDirectChildCount(idx);
         const ownWords = countWords(n.title) + countWords(n.body);
         const canDropPinned = canDropPinnedAfter(n.id);
+        const pinIsActive = pinnedRootId === n.id;
+        const pinIsTarget = !!pinnedRootId && !pinIsActive && canDropPinned;
+
+        const pinTitle = !pinnedRootId
+          ? "Pin this branch to move it"
+          : pinIsActive
+            ? "Cancel pinned move"
+            : canDropPinned
+              ? "Move pinned branch after this one"
+              : "Cannot move pinned branch here";
 
         const nodeEl = document.createElement("div");
         nodeEl.className = `node${activeNodeId === n.id ? " activeNode" : ""}${n.level > 1 ? " indentGuide" : ""}${pinnedRootId === n.id ? " pinnedNode" : ""}`;
@@ -988,6 +1018,12 @@
             <div class="headerLeft">
               <div class="infoPill">H${n.level}</div>
               <button class="pillBtn" data-action="collapse" ${hasChildren ? "" : "disabled"}>${hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•"}</button>
+              <button
+                class="pinBtn${pinIsActive ? " active" : ""}${pinIsTarget ? " target" : ""}"
+                data-action="pin"
+                title="${escapeHtml(pinTitle)}"
+                aria-label="${escapeHtml(pinTitle)}"
+              >📌</button>
               <div class="infoPill nodeMetric">${ownWords}w</div>
               <div class="infoPill">${directChildren} child${directChildren === 1 ? "" : "ren"}</div>
               ${pinnedRootId === n.id ? `<div class="infoPill">Pinned</div>` : ""}
@@ -1007,8 +1043,6 @@
             <textarea class="bodyInput" data-type="body" placeholder="Body text..."></textarea>
           </div>
           <div class="tools">
-            <button class="ghost" data-action="pin">${pinnedRootId === n.id ? "Unpin" : "Pin branch"}</button>
-            <button class="ghost" data-action="drop" ${canDropPinned ? "" : "disabled"}>Move pinned after</button>
             <button class="ghost" data-action="wrap" ${directChildren ? "" : "disabled"}>Wrap children</button>
             <button class="warn" data-action="delete">Delete branch</button>
           </div>
@@ -1330,22 +1364,19 @@
         pinnedRootId = "";
       }
       nodes.splice(start, end - start);
-      if (activeNodeId === id) activeNodeId = nodes[start] ? nodes[start].id : (nodes[start - 1] ? nodes[start - 1].id : "");
+      if (activeNodeId === id) {
+        activeNodeId = nodes[start] ? nodes[start].id : (nodes[start - 1] ? nodes[start - 1].id : "");
+      }
       renderStructure();
       markDocChanged();
-    }
-
-    function togglePinBranch(id) {
-      pinnedRootId = pinnedRootId === id ? "" : id;
-      renderStructure();
-      markStateChanged();
     }
 
     function movePinnedAfter(targetId) {
       const pinnedIdx = getNodeIndexById(pinnedRootId);
       const targetIdx = getNodeIndexById(targetId);
-      if (pinnedIdx < 0 || targetIdx < 0) return;
-      if (!canDropPinnedAfter(targetId)) return;
+      if (pinnedIdx < 0 || targetIdx < 0) return false;
+      if (!canDropPinnedAfter(targetId)) return false;
+
       pushUndoSnapshot("move pinned branch");
 
       const [pinStart, pinEnd] = getFamilyRange(pinnedIdx);
@@ -1354,14 +1385,37 @@
 
       let insertionIdx = targetIdx;
       if (pinStart < targetIdx) insertionIdx -= (pinEnd - pinStart);
+
       const [, targetEnd] = getFamilyRange(insertionIdx);
       nodes.splice(targetEnd, 0, ...branch);
 
       activeNodeId = branch[0] ? branch[0].id : activeNodeId;
       pendingScrollId = activeNodeId || null;
-      pinnedRootId = activeNodeId;
+      pinnedRootId = "";
       renderStructure();
       markDocChanged();
+      return true;
+    }
+
+    function handlePinTap(id) {
+      if (!pinnedRootId) {
+        pinnedRootId = id;
+        activeNodeId = id;
+        renderStructure();
+        markStateChanged();
+        return;
+      }
+
+      if (pinnedRootId === id) {
+        pinnedRootId = "";
+        renderStructure();
+        markStateChanged();
+        return;
+      }
+
+      if (!movePinnedAfter(id)) {
+        renderStructure();
+      }
     }
 
     async function readPasteSourceText() {
@@ -1424,6 +1478,7 @@
       if (!childRoots.length) return;
 
       pushUndoSnapshot("wrap children");
+
       const parentTitle = String(nodes[idx].title || "").trim();
       const [start, end] = getFamilyRange(idx);
 
@@ -1508,6 +1563,7 @@
       if (!ok) return;
 
       pushUndoSnapshot("reset app");
+
       nodes = [];
       docPreamble = "";
       activeNodeId = "";
@@ -1579,12 +1635,11 @@
         const action = actionEl.getAttribute("data-action");
         if (action === "body") toggleBody(id);
         else if (action === "collapse") toggleCollapse(id);
+        else if (action === "pin") handlePinTap(id);
         else if (action === "add") addNewAfter(id);
         else if (action === "paste") await pasteMarkdownAfter(id);
         else if (action === "outdent") changeLevel(id, -1);
         else if (action === "indent") changeLevel(id, 1);
-        else if (action === "pin") togglePinBranch(id);
-        else if (action === "drop") movePinnedAfter(id);
         else if (action === "wrap") wrapChildren(id);
         else if (action === "delete") deleteBranch(id);
         return;
@@ -1663,12 +1718,13 @@
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
         copiedSinceChange = !!state.copiedSinceChange;
         pinnedRootId = typeof state.pinnedRootId === "string" ? state.pinnedRootId : "";
+
         if (Array.isArray(state.undoStack)) {
           undoStack = state.undoStack
             .map((entry) => ({
               reason: entry?.reason || "change",
               state: {
-                v: 3,
+                v: 4,
                 nodes: normalizeNodes(entry?.state?.nodes),
                 docPreamble: typeof entry?.state?.docPreamble === "string" ? entry.state.docPreamble : "",
                 activeNodeId: typeof entry?.state?.activeNodeId === "string" ? entry.state.activeNodeId : "",
