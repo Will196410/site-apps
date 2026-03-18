@@ -10,7 +10,21 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-mdse-style-v2";
+  const STYLE_ID = "siteapps-mdse-style-v3";
+  const BUILD_STAMP = (() => {
+    try {
+      return new Date().toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).replace(",", "");
+    } catch (_) {
+      return "18 Mar 2026 07:35";
+    }
+  })();
 
   function ensureStyle() {
     let style = document.getElementById(STYLE_ID);
@@ -110,17 +124,23 @@
       }
 
       .mdse-wrapper .node {
-        width: 100%;
+        --indent: 0px;
+        width: calc(100% - var(--indent));
+        margin: 10px 0 10px var(--indent);
         display: block;
         background: #fff;
         border: 2px solid rgba(0,0,0,.15);
         border-radius: 14px;
         padding: 12px;
-        margin: 10px 0;
+        position: relative;
       }
       .mdse-wrapper .node.activeNode {
         border-color: #0b5fff;
         box-shadow: 0 8px 22px rgba(11,95,255,.08);
+      }
+      .mdse-wrapper .node.pinnedNode {
+        border-color: #8b5a00;
+        box-shadow: 0 8px 22px rgba(139,90,0,.10);
       }
       .mdse-wrapper .nodeHeader {
         display: flex;
@@ -301,15 +321,22 @@
         color:#555;
       }
 
+      .mdse-wrapper .metaBadge.pin{
+        border-color:#8b5a00;
+        color:#8b5a00;
+      }
+
       @media (max-width: 700px) {
         .mdse-wrapper { padding: 14px; }
         .mdse-wrapper .headerRight { margin-left: 0; }
+        .mdse-wrapper .node { width: 100%; margin-left: 0; }
       }
     `;
   }
 
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+  const HISTORY_LIMIT = 10;
 
   function debounce(fn, ms) {
     let timer = null;
@@ -381,7 +408,6 @@
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
-
       const ok = document.execCommand("copy");
       document.body.removeChild(ta);
       return !!ok;
@@ -486,10 +512,60 @@
     }));
   }
 
+  function cloneNodes(arr) {
+    return normalizeNodes(arr).map((n) => ({ ...n }));
+  }
+
+  function mergeTextParts(a, b) {
+    const left = String(a || "").replace(/\s+$/, "");
+    const right = String(b || "").replace(/^\s+/, "");
+    if (!left) return right;
+    if (!right) return left;
+    return `${left}\n\n${right}`;
+  }
+
+  function ensureTagLine(body, tagLabel) {
+    const tag = String(tagLabel || "").replace(/\s+/g, " ").trim();
+    if (!tag) return String(body || "");
+
+    const src = String(body || "").replace(/\r\n?/g, "\n");
+    const lines = src ? src.split("\n") : [];
+    const wantedKey = tag.toLowerCase();
+
+    for (const line of lines) {
+      const m = line.match(/^\s*\\?%%\s*tag\b[ \t]+(.+)$/i);
+      if (!m) continue;
+      const tail = String(m[1] || "").trim();
+      const parts = tail.includes(",")
+        ? tail.split(",").map((s) => s.trim()).filter(Boolean)
+        : [tail];
+      if (parts.some((part) => part.replace(/\s+/g, " ").trim().toLowerCase() === wantedKey)) {
+        return src;
+      }
+    }
+
+    const line = `%% tag ${tag}`;
+    return src ? `${line}\n${src}` : line;
+  }
+
+  function normalizePastedNodesForPeerLevel(pastedNodes, peerLevel) {
+    const list = cloneNodes(pastedNodes);
+    if (!list.length) return list;
+
+    const minLevel = list.reduce((min, n) => Math.min(min, n.level), list[0].level);
+    const maxLevel = list.reduce((max, n) => Math.max(max, n.level), list[0].level);
+    const delta = clamp((peerLevel || 1) - minLevel, 1 - minLevel, 6 - maxLevel);
+
+    list.forEach((n) => {
+      n.level = clamp(n.level + delta, 1, 6);
+    });
+    return list;
+  }
+
   window.SiteApps.register("mdseStage", (container) => {
     ensureStyle();
 
-    const KEY = `siteapps:mdseStage:v2:${location.pathname}`;
+    const KEY = `siteapps:mdseStage:v3:${location.pathname}`;
 
     let nodes = [];
     let docPreamble = "";
@@ -499,13 +575,17 @@
     let activeTag = "";
     let pendingFocus = null;
     let pendingScrollId = null;
+    let pinnedRootId = "";
+    let undoStack = [];
+    let pendingTextHistory = null;
 
     container.innerHTML = `
       <div class="mdse-wrapper">
         <div class="topMeta">
-          <div class="buildStamp">Generated: 18 Mar 2026, 07:18</div>
+          <div class="buildStamp">Generated: ${escapeHtml(BUILD_STAMP)}</div>
           <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
           <span class="metaBadge warn jsCopyBadge">Not copied</span>
+          <span class="metaBadge dim jsPinBadge">Nothing pinned</span>
         </div>
 
         <div class="tabs">
@@ -518,6 +598,7 @@
           <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
           <div class="btnrow">
             <button class="primary btnLoad">Load Markdown</button>
+            <button class="ghost btnUndo" disabled>Undo</button>
             <button class="ghost btnCopy">Copy Result</button>
             <button class="ghost btnReset">Reset App</button>
           </div>
@@ -552,6 +633,7 @@
     const root = container.querySelector(".mdse-wrapper");
     const taInput = root.querySelector(".mdInput");
     const btnLoad = root.querySelector(".btnLoad");
+    const btnUndo = root.querySelector(".btnUndo");
     const btnCopy = root.querySelector(".btnCopy");
     const btnReset = root.querySelector(".btnReset");
     const btnCopyTags = root.querySelector(".btnCopyTags");
@@ -569,6 +651,7 @@
 
     const saveBadge = root.querySelector(".jsSaveBadge");
     const copyBadge = root.querySelector(".jsCopyBadge");
+    const pinBadge = root.querySelector(".jsPinBadge");
 
     let copiedSinceChange = false;
     let saveTimer = null;
@@ -602,16 +685,119 @@
       }
     }
 
-    function buildState() {
+    function getPinnedTitle() {
+      const idx = getNodeIndexById(pinnedRootId);
+      return idx >= 0 ? (nodes[idx].title || "(untitled)") : "";
+    }
+
+    function updatePinBadge() {
+      if (!pinBadge) return;
+      const title = getPinnedTitle();
+      if (title) {
+        pinBadge.className = "metaBadge pin jsPinBadge";
+        pinBadge.textContent = `Pinned: ${title}`;
+      } else {
+        pinBadge.className = "metaBadge dim jsPinBadge";
+        pinBadge.textContent = "Nothing pinned";
+      }
+    }
+
+    function updateUndoButton() {
+      if (!btnUndo) return;
+      const count = undoStack.length;
+      btnUndo.disabled = !count;
+      btnUndo.textContent = count ? `Undo (${count})` : "Undo";
+    }
+
+    function snapshotState() {
       return {
-        v: 2,
-        nodes,
+        v: 3,
+        nodes: cloneNodes(nodes),
         docPreamble,
         activeNodeId,
         activeTab,
         searchQuery,
         activeTag,
-        rawInput: taInput.value || ""
+        rawInput: taInput.value || "",
+        copiedSinceChange,
+        pinnedRootId
+      };
+    }
+
+    function applySnapshot(state, options = {}) {
+      nodes = cloneNodes(state?.nodes || []);
+      docPreamble = typeof state?.docPreamble === "string" ? state.docPreamble : "";
+      activeNodeId = typeof state?.activeNodeId === "string" ? state.activeNodeId : "";
+      activeTab = typeof state?.activeTab === "string" && ["structure", "search", "tags"].includes(state.activeTab)
+        ? state.activeTab
+        : "structure";
+      searchQuery = typeof state?.searchQuery === "string" ? state.searchQuery : "";
+      activeTag = typeof state?.activeTag === "string" ? state.activeTag : "";
+      taInput.value = typeof state?.rawInput === "string" ? state.rawInput : "";
+      copiedSinceChange = !!state?.copiedSinceChange;
+      pinnedRootId = typeof state?.pinnedRootId === "string" ? state.pinnedRootId : "";
+
+      if (activeNodeId && getNodeIndexById(activeNodeId) < 0) {
+        activeNodeId = nodes[0] ? nodes[0].id : "";
+      }
+      if (pinnedRootId && getNodeIndexById(pinnedRootId) < 0) {
+        pinnedRootId = "";
+      }
+
+      searchInput.value = searchQuery;
+      pendingTextHistory = null;
+      updatePinBadge();
+      setCopyBadge();
+      switchTab(activeTab, { silent: true });
+      renderStructure();
+      if (activeTab === "search") renderSearch();
+      if (activeTab === "tags") renderTags();
+      updateUndoButton();
+      if (!options.skipSave) persistStateNow();
+    }
+
+    function statesEqual(a, b) {
+      try {
+        return JSON.stringify(a) === JSON.stringify(b);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function pushUndoSnapshot(reason, explicitState) {
+      const shot = explicitState ? {
+        v: 3,
+        nodes: cloneNodes(explicitState.nodes),
+        docPreamble: typeof explicitState.docPreamble === "string" ? explicitState.docPreamble : "",
+        activeNodeId: typeof explicitState.activeNodeId === "string" ? explicitState.activeNodeId : "",
+        activeTab: typeof explicitState.activeTab === "string" ? explicitState.activeTab : "structure",
+        searchQuery: typeof explicitState.searchQuery === "string" ? explicitState.searchQuery : "",
+        activeTag: typeof explicitState.activeTag === "string" ? explicitState.activeTag : "",
+        rawInput: typeof explicitState.rawInput === "string" ? explicitState.rawInput : "",
+        copiedSinceChange: !!explicitState.copiedSinceChange,
+        pinnedRootId: typeof explicitState.pinnedRootId === "string" ? explicitState.pinnedRootId : ""
+      } : snapshotState();
+      const last = undoStack[undoStack.length - 1];
+      if (last && statesEqual(last.state, shot)) return;
+      undoStack.push({ reason: reason || "change", state: shot });
+      if (undoStack.length > HISTORY_LIMIT) undoStack = undoStack.slice(-HISTORY_LIMIT);
+      updateUndoButton();
+    }
+
+    function undoLast() {
+      const entry = undoStack.pop();
+      if (!entry) return;
+      applySnapshot(entry.state);
+      updateUndoButton();
+    }
+
+    function buildState() {
+      return {
+        ...snapshotState(),
+        undoStack: undoStack.map((entry) => ({
+          reason: entry.reason,
+          state: entry.state
+        }))
       };
     }
 
@@ -660,9 +846,11 @@
       } else {
         preambleNote.innerHTML = "";
       }
+      updatePinBadge();
+      updateUndoButton();
     }
 
-    function switchTab(tab) {
+    function switchTab(tab, options = {}) {
       activeTab = tab === "search" || tab === "tags" ? tab : "structure";
       root.querySelectorAll(".tabbtn").forEach((btn) => {
         btn.classList.toggle("active", btn.getAttribute("data-tab") === activeTab);
@@ -672,7 +860,7 @@
       root.querySelector(".panelTags").classList.toggle("active", activeTab === "tags");
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
-      markStateChanged();
+      if (!options.silent) markStateChanged();
     }
 
     function getNodeIndexById(id) {
@@ -711,6 +899,17 @@
       return count;
     }
 
+    function getDirectChildRootIndices(idx) {
+      const out = [];
+      if (idx < 0 || idx >= nodes.length) return out;
+      const baseLevel = nodes[idx].level;
+      for (let i = idx + 1; i < nodes.length; i++) {
+        if (nodes[i].level <= baseLevel) break;
+        if (nodes[i].level === baseLevel + 1) out.push(i);
+      }
+      return out;
+    }
+
     function computeHiddenIndices() {
       const hidden = new Set();
       for (let i = 0; i < nodes.length; i++) {
@@ -722,6 +921,12 @@
         }
       }
       return hidden;
+    }
+
+    function isIndexInsideFamily(candidateIdx, rootIdx) {
+      if (candidateIdx < 0 || rootIdx < 0) return false;
+      const [start, end] = getFamilyRange(rootIdx);
+      return candidateIdx >= start && candidateIdx < end;
     }
 
     function revealNode(id) {
@@ -750,6 +955,15 @@
       }
     }
 
+    function canDropPinnedAfter(targetId) {
+      const pinnedIdx = getNodeIndexById(pinnedRootId);
+      const targetIdx = getNodeIndexById(targetId);
+      if (pinnedIdx < 0 || targetIdx < 0) return false;
+      if (pinnedRootId === targetId) return false;
+      if (isIndexInsideFamily(targetIdx, pinnedIdx)) return false;
+      return true;
+    }
+
     function renderStructure() {
       updateSummary();
       const scrollY = window.scrollY;
@@ -762,10 +976,12 @@
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const directChildren = getDirectChildCount(idx);
         const ownWords = countWords(n.title) + countWords(n.body);
+        const canDropPinned = canDropPinnedAfter(n.id);
 
         const nodeEl = document.createElement("div");
-        nodeEl.className = `node${activeNodeId === n.id ? " activeNode" : ""}${n.level > 1 ? " indentGuide" : ""}`;
+        nodeEl.className = `node${activeNodeId === n.id ? " activeNode" : ""}${n.level > 1 ? " indentGuide" : ""}${pinnedRootId === n.id ? " pinnedNode" : ""}`;
         nodeEl.setAttribute("data-node-id", n.id);
+        nodeEl.style.setProperty("--indent", `${(n.level - 1) * 22}px`);
 
         nodeEl.innerHTML = `
           <div class="nodeHeader">
@@ -774,10 +990,12 @@
               <button class="pillBtn" data-action="collapse" ${hasChildren ? "" : "disabled"}>${hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•"}</button>
               <div class="infoPill nodeMetric">${ownWords}w</div>
               <div class="infoPill">${directChildren} child${directChildren === 1 ? "" : "ren"}</div>
+              ${pinnedRootId === n.id ? `<div class="infoPill">Pinned</div>` : ""}
             </div>
             <div class="headerRight">
               <button class="miniBtn" data-action="body">${n.showBody ? "Hide body" : "Show body"}</button>
               <button class="miniBtn" data-action="add">Add after</button>
+              <button class="miniBtn" data-action="paste">Paste after</button>
               <button class="miniBtn" data-action="outdent">←</button>
               <button class="miniBtn" data-action="indent">→</button>
             </div>
@@ -789,6 +1007,9 @@
             <textarea class="bodyInput" data-type="body" placeholder="Body text..."></textarea>
           </div>
           <div class="tools">
+            <button class="ghost" data-action="pin">${pinnedRootId === n.id ? "Unpin" : "Pin branch"}</button>
+            <button class="ghost" data-action="drop" ${canDropPinned ? "" : "disabled"}>Move pinned after</button>
+            <button class="ghost" data-action="wrap" ${directChildren ? "" : "disabled"}>Wrap children</button>
             <button class="warn" data-action="delete">Delete branch</button>
           </div>
         `;
@@ -818,7 +1039,7 @@
               try {
                 field.setSelectionRange(len, len);
               } catch (_) {
-                // ignore selection failures
+                // ignore
               }
               autoResizeTA(field);
             }
@@ -1047,6 +1268,7 @@
     function addNewAfter(id) {
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
+      pushUndoSnapshot("add node");
       const [, end] = getFamilyRange(idx);
       const level = nodes[idx].level;
       const newNode = {
@@ -1091,6 +1313,7 @@
       const deepest = family.reduce((max, n) => Math.max(max, n.level), family[0].level);
       const applied = clamp(delta, 1 - topLevel, 6 - deepest);
       if (!applied) return;
+      pushUndoSnapshot("change level");
       for (let i = start; i < end; i++) {
         nodes[i].level += applied;
       }
@@ -1101,9 +1324,121 @@
     function deleteBranch(id) {
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
+      pushUndoSnapshot("delete branch");
       const [start, end] = getFamilyRange(idx);
+      if (pinnedRootId && isIndexInsideFamily(getNodeIndexById(pinnedRootId), idx)) {
+        pinnedRootId = "";
+      }
       nodes.splice(start, end - start);
-      if (activeNodeId === id) activeNodeId = "";
+      if (activeNodeId === id) activeNodeId = nodes[start] ? nodes[start].id : (nodes[start - 1] ? nodes[start - 1].id : "");
+      renderStructure();
+      markDocChanged();
+    }
+
+    function togglePinBranch(id) {
+      pinnedRootId = pinnedRootId === id ? "" : id;
+      renderStructure();
+      markStateChanged();
+    }
+
+    function movePinnedAfter(targetId) {
+      const pinnedIdx = getNodeIndexById(pinnedRootId);
+      const targetIdx = getNodeIndexById(targetId);
+      if (pinnedIdx < 0 || targetIdx < 0) return;
+      if (!canDropPinnedAfter(targetId)) return;
+      pushUndoSnapshot("move pinned branch");
+
+      const [pinStart, pinEnd] = getFamilyRange(pinnedIdx);
+      const branch = cloneNodes(nodes.slice(pinStart, pinEnd));
+      nodes.splice(pinStart, pinEnd - pinStart);
+
+      let insertionIdx = targetIdx;
+      if (pinStart < targetIdx) insertionIdx -= (pinEnd - pinStart);
+      const [, targetEnd] = getFamilyRange(insertionIdx);
+      nodes.splice(targetEnd, 0, ...branch);
+
+      activeNodeId = branch[0] ? branch[0].id : activeNodeId;
+      pendingScrollId = activeNodeId || null;
+      pinnedRootId = activeNodeId;
+      renderStructure();
+      markDocChanged();
+    }
+
+    async function readPasteSourceText() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim()) return text;
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      const fallback = String(taInput.value || "");
+      return fallback.trim() ? fallback : "";
+    }
+
+    async function pasteMarkdownAfter(id) {
+      const idx = getNodeIndexById(id);
+      if (idx < 0) return;
+
+      const raw = await readPasteSourceText();
+      if (!raw.trim()) {
+        window.alert("Nothing available to paste. Copy Markdown first, or put it in the top textarea and try again.");
+        return;
+      }
+
+      const parsed = parseMarkdown(raw);
+      pushUndoSnapshot("paste markdown");
+
+      if (!parsed.nodes.length) {
+        nodes[idx].body = mergeTextParts(nodes[idx].body, parsed.preamble || raw);
+        nodes[idx].showBody = true;
+        activeNodeId = nodes[idx].id;
+        pendingFocus = { id: nodes[idx].id, field: "body" };
+        renderStructure();
+        markDocChanged();
+        return;
+      }
+
+      const peerLevel = nodes[idx].level;
+      const toInsert = normalizePastedNodesForPeerLevel(parsed.nodes, peerLevel);
+      if (parsed.preamble.trim()) {
+        toInsert[0].body = mergeTextParts(parsed.preamble, toInsert[0].body);
+        toInsert[0].showBody = true;
+      }
+
+      const [, end] = getFamilyRange(idx);
+      nodes.splice(end, 0, ...toInsert);
+      activeNodeId = toInsert[0].id;
+      pendingScrollId = activeNodeId;
+      pendingFocus = { id: activeNodeId, field: "title" };
+      renderStructure();
+      markDocChanged();
+    }
+
+    function wrapChildren(id) {
+      const idx = getNodeIndexById(id);
+      if (idx < 0) return;
+      const childRoots = getDirectChildRootIndices(idx);
+      if (!childRoots.length) return;
+
+      pushUndoSnapshot("wrap children");
+      const parentTitle = String(nodes[idx].title || "").trim();
+      const [start, end] = getFamilyRange(idx);
+
+      for (let i = idx + 1; i < end; i++) {
+        nodes[i].level = clamp(nodes[i].level - 1, 1, 6);
+      }
+
+      childRoots.forEach((childIdx) => {
+        if (nodes[childIdx] && parentTitle) {
+          nodes[childIdx].body = ensureTagLine(nodes[childIdx].body, parentTitle);
+        }
+      });
+
+      nodes[idx].isCollapsed = false;
+      activeNodeId = nodes[idx].id;
       renderStructure();
       markDocChanged();
     }
@@ -1121,16 +1456,22 @@
     });
 
     btnLoad.addEventListener("click", () => {
+      pushUndoSnapshot("load markdown");
       const parsed = parseMarkdown(taInput.value || "");
       nodes = parsed.nodes;
       docPreamble = parsed.preamble;
       activeTag = "";
       activeNodeId = nodes[0] ? nodes[0].id : "";
       pendingScrollId = activeNodeId || null;
+      pinnedRootId = "";
       renderStructure();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       markDocChanged();
+    });
+
+    btnUndo.addEventListener("click", () => {
+      undoLast();
     });
 
     btnCopy.addEventListener("click", async () => {
@@ -1151,6 +1492,7 @@
       if (ok) {
         copiedSinceChange = true;
         setCopyBadge();
+        markStateChanged();
       } else if (copyBadge) {
         copyBadge.className = "metaBadge warn jsCopyBadge";
         copyBadge.textContent = "Copy failed";
@@ -1165,6 +1507,7 @@
       const ok = window.confirm("Reset the app and clear the saved Markdown on this page?");
       if (!ok) return;
 
+      pushUndoSnapshot("reset app");
       nodes = [];
       docPreamble = "";
       activeNodeId = "";
@@ -1172,7 +1515,9 @@
       activeTag = "";
       pendingFocus = null;
       pendingScrollId = null;
+      pinnedRootId = "";
       copiedSinceChange = false;
+      pendingTextHistory = null;
 
       taInput.value = "";
       searchInput.value = "";
@@ -1220,7 +1565,7 @@
       jumpToNodeFromPanel(btn.getAttribute("data-jump-id"));
     });
 
-    canvas.addEventListener("click", (e) => {
+    canvas.addEventListener("click", async (e) => {
       const actionEl = e.target.closest("[data-action]");
       const nodeEl = e.target.closest(".node");
       if (!nodeEl) return;
@@ -1235,8 +1580,12 @@
         if (action === "body") toggleBody(id);
         else if (action === "collapse") toggleCollapse(id);
         else if (action === "add") addNewAfter(id);
+        else if (action === "paste") await pasteMarkdownAfter(id);
         else if (action === "outdent") changeLevel(id, -1);
         else if (action === "indent") changeLevel(id, 1);
+        else if (action === "pin") togglePinBranch(id);
+        else if (action === "drop") movePinnedAfter(id);
+        else if (action === "wrap") wrapChildren(id);
         else if (action === "delete") deleteBranch(id);
         return;
       }
@@ -1253,7 +1602,20 @@
       root.querySelectorAll(".node").forEach((el) => {
         el.classList.toggle("activeNode", el === nodeEl);
       });
+      if (e.target.matches("textarea[data-type]")) {
+        pendingTextHistory = snapshotState();
+      }
       markStateChanged();
+    });
+
+    canvas.addEventListener("keydown", (e) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      if (e.shiftKey) return;
+      if (String(e.key || "").toLowerCase() === "z") {
+        e.preventDefault();
+        undoLast();
+      }
     });
 
     const syncInput = debounce(() => {
@@ -1271,6 +1633,11 @@
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
       const node = nodes[idx];
+
+      if (target.matches("textarea[data-type]") && pendingTextHistory) {
+        pushUndoSnapshot("text edit", pendingTextHistory);
+        pendingTextHistory = null;
+      }
 
       const type = target.getAttribute("data-type");
       if (type === "title") node.title = target.value;
@@ -1294,6 +1661,27 @@
         if (typeof state.searchQuery === "string") searchQuery = state.searchQuery;
         if (typeof state.activeTag === "string") activeTag = state.activeTag;
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
+        copiedSinceChange = !!state.copiedSinceChange;
+        pinnedRootId = typeof state.pinnedRootId === "string" ? state.pinnedRootId : "";
+        if (Array.isArray(state.undoStack)) {
+          undoStack = state.undoStack
+            .map((entry) => ({
+              reason: entry?.reason || "change",
+              state: {
+                v: 3,
+                nodes: normalizeNodes(entry?.state?.nodes),
+                docPreamble: typeof entry?.state?.docPreamble === "string" ? entry.state.docPreamble : "",
+                activeNodeId: typeof entry?.state?.activeNodeId === "string" ? entry.state.activeNodeId : "",
+                activeTab: typeof entry?.state?.activeTab === "string" ? entry.state.activeTab : "structure",
+                searchQuery: typeof entry?.state?.searchQuery === "string" ? entry.state.searchQuery : "",
+                activeTag: typeof entry?.state?.activeTag === "string" ? entry.state.activeTag : "",
+                rawInput: typeof entry?.state?.rawInput === "string" ? entry.state.rawInput : "",
+                copiedSinceChange: !!entry?.state?.copiedSinceChange,
+                pinnedRootId: typeof entry?.state?.pinnedRootId === "string" ? entry.state.pinnedRootId : ""
+              }
+            }))
+            .slice(-HISTORY_LIMIT);
+        }
       } catch (_) {
         // ignore broken saved state
       }
@@ -1302,10 +1690,15 @@
     if (activeNodeId && getNodeIndexById(activeNodeId) < 0) {
       activeNodeId = nodes[0] ? nodes[0].id : "";
     }
+    if (pinnedRootId && getNodeIndexById(pinnedRootId) < 0) {
+      pinnedRootId = "";
+    }
 
     searchInput.value = searchQuery;
     setCopyBadge();
-    switchTab(activeTab);
+    updatePinBadge();
+    updateUndoButton();
+    switchTab(activeTab, { silent: true });
     renderStructure();
     if (activeTab === "search") renderSearch();
     if (activeTab === "tags") renderTags();
