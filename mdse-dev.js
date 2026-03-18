@@ -503,7 +503,7 @@
     container.innerHTML = `
       <div class="mdse-wrapper">
         <div class="topMeta">
-          <div class="buildStamp">Generated: 17 Mar 2026, 16:18</div>
+          <div class="buildStamp">Generated: 18 Mar 2026, 07:18</div>
           <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
           <span class="metaBadge warn jsCopyBadge">Not copied</span>
         </div>
