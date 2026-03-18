@@ -1043,7 +1043,7 @@
             <textarea class="bodyInput" data-type="body" placeholder="Body text..."></textarea>
           </div>
           <div class="tools">
-            <button class="ghost" data-action="wrap" ${directChildren ? "" : "disabled"}>Wrap children</button>
+            <button class="ghost" data-action="unwrap" ${directChildren ? "" : "disabled"}>Unwrap children</button>
             <button class="warn" data-action="delete">Delete branch</button>
           </div>
         `;
@@ -1471,13 +1471,13 @@
       markDocChanged();
     }
 
-    function wrapChildren(id) {
+    function unwrapChildren(id) {
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
       const childRoots = getDirectChildRootIndices(idx);
       if (!childRoots.length) return;
 
-      pushUndoSnapshot("wrap children");
+      pushUndoSnapshot("unwrap children");
 
       const parentTitle = String(nodes[idx].title || "").trim();
       const [start, end] = getFamilyRange(idx);
@@ -1640,7 +1640,7 @@
         else if (action === "paste") await pasteMarkdownAfter(id);
         else if (action === "outdent") changeLevel(id, -1);
         else if (action === "indent") changeLevel(id, 1);
-        else if (action === "wrap") wrapChildren(id);
+        else if (action === "unwrap") wrapChildren(id);
         else if (action === "delete") deleteBranch(id);
         return;
       }
