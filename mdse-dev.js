@@ -263,12 +263,44 @@
         margin: 10px 0;
       }
 
-      .mdse-wrapper .buildStamp {
-        margin: 0 0 10px;
-        font-size: 12px;
-        font-weight: 800;
-        color: #555;
-      }
+.mdse-wrapper .topMeta{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin:0 0 10px;
+}
+
+.mdse-wrapper .buildStamp{
+  font-size:12px;
+  font-weight:800;
+  color:#555;
+}
+
+.mdse-wrapper .metaBadge{
+  font-size:12px;
+  font-weight:900;
+  padding:4px 9px;
+  border:2px solid #111;
+  border-radius:999px;
+  background:#fff;
+}
+
+.mdse-wrapper .metaBadge.good{
+  border-color:#0b3d0b;
+  color:#0b3d0b;
+}
+
+.mdse-wrapper .metaBadge.warn{
+  border-color:#7a0000;
+  color:#7a0000;
+}
+
+.mdse-wrapper .metaBadge.dim{
+  border-color:#555;
+  color:#555;
+}
+      
       @media (max-width: 700px) {
         .mdse-wrapper { padding: 14px; }
         .mdse-wrapper .headerRight { margin-left: 0; }
@@ -346,7 +378,8 @@
     }
   }
 
-  function copyTextFallback(text) {
+function copyTextFallback(text) {
+  try {
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.setAttribute("readonly", "readonly");
@@ -354,15 +387,17 @@
     ta.style.left = "-9999px";
     ta.style.top = "0";
     document.body.appendChild(ta);
+    ta.focus();
     ta.select();
-    try {
-      document.execCommand("copy");
-    } catch (_) {
-      // ignore
-    }
-    document.body.removeChild(ta);
-  }
 
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (_) {
+    return false;
+  }
+}
+  
   function parseMarkdown(raw) {
     const text = String(raw || "").replace(/\r\n?/g, "\n");
     const lines = text.split("\n");
@@ -463,7 +498,13 @@
 
     container.innerHTML = `
       <div class="mdse-wrapper">
-        <div class="buildStamp">Generated: 17 Mar 2026, 16:18</div>
+      
+    <div class="topMeta">
+      <div class="buildStamp">Generated: 17 Mar 2026, 16:18</div>
+      <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
+      <span class="metaBadge warn jsCopyBadge">Not copied</span>
+    </div>
+
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="search">Search</button>
@@ -523,6 +564,12 @@
     const summaryPreamble = root.querySelector(".summaryPreamble");
     const preambleNote = root.querySelector(".preambleNote");
 
+const saveBadge = container.querySelector(".jsSaveBadge");
+const copyBadge = container.querySelector(".jsCopyBadge");
+
+let copiedSinceChange = false;
+let saveTimer = null;
+    
     const saveState = debounce(() => {
       safeStorageSet(KEY, JSON.stringify({
         nodes,
@@ -535,6 +582,69 @@
       }));
     }, 180);
 
+function setSaveBadgeSaved() {
+  if (!saveBadge) return;
+  saveBadge.className = "metaBadge good jsSaveBadge";
+  saveBadge.textContent = "Saved ✓";
+}
+
+function setSaveBadgeUnsaved() {
+  if (!saveBadge) return;
+  saveBadge.className = "metaBadge dim jsSaveBadge";
+  saveBadge.textContent = "Unsaved…";
+}
+
+function setCopyBadge() {
+  if (!copyBadge) return;
+  if (copiedSinceChange) {
+    copyBadge.className = "metaBadge good jsCopyBadge";
+    copyBadge.textContent = "Copied ✓";
+  } else {
+    copyBadge.className = "metaBadge warn jsCopyBadge";
+    copyBadge.textContent = "Not copied";
+  }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        v: 1,
+        nodes,
+        docPreamble,
+        activeNodeId,
+        activeTab,
+        searchQuery
+      })
+    );
+
+    if (saveBadge) {
+      saveBadge.className = "metaBadge good jsSaveBadge";
+      saveBadge.textContent = "Saved ✓";
+    }
+  } catch (_) {
+    if (saveBadge) {
+      saveBadge.className = "metaBadge warn jsSaveBadge";
+      saveBadge.textContent = "Not saved";
+    }
+  }
+}
+    
+function markChanged() {
+  copiedSinceChange = false;
+  setCopyBadge();
+  setSaveBadgeUnsaved();
+
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveState();
+    setSaveBadgeSaved();
+  }, 350);
+}
+
+    
     function totalWords() {
       return nodes.reduce((sum, n) => sum + countWords(n.title) + countWords(n.body), 0);
     }
@@ -1014,19 +1124,27 @@
       saveState();
     });
 
-    btnCopy.addEventListener("click", async () => {
-      const text = nodesToMarkdown(docPreamble, nodes);
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          copyTextFallback(text);
-        }
-      } catch (_) {
-        copyTextFallback(text);
-      }
-    });
+btnCopy.addEventListener("click", async () => {
+  const text = nodesToMarkdown(docPreamble, nodes);
+  let ok = false;
 
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } else {
+      ok = copyTextFallback(text);
+    }
+  } catch (_) {
+    ok = copyTextFallback(text);
+  }
+
+  if (ok) {
+    copiedSinceChange = true;
+    setCopyBadge();
+  }
+});
+    
     btnCopyTags.addEventListener("click", () => {
       copyAllTagsToClipboard();
     });
