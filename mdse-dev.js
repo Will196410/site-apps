@@ -263,44 +263,44 @@
         margin: 10px 0;
       }
 
-.mdse-wrapper .topMeta{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  flex-wrap:wrap;
-  margin:0 0 10px;
-}
+      .mdse-wrapper .topMeta{
+        display:flex;
+        gap:10px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin:0 0 10px;
+      }
 
-.mdse-wrapper .buildStamp{
-  font-size:12px;
-  font-weight:800;
-  color:#555;
-}
+      .mdse-wrapper .buildStamp{
+        font-size:12px;
+        font-weight:800;
+        color:#555;
+      }
 
-.mdse-wrapper .metaBadge{
-  font-size:12px;
-  font-weight:900;
-  padding:4px 9px;
-  border:2px solid #111;
-  border-radius:999px;
-  background:#fff;
-}
+      .mdse-wrapper .metaBadge{
+        font-size:12px;
+        font-weight:900;
+        padding:4px 9px;
+        border:2px solid #111;
+        border-radius:999px;
+        background:#fff;
+      }
 
-.mdse-wrapper .metaBadge.good{
-  border-color:#0b3d0b;
-  color:#0b3d0b;
-}
+      .mdse-wrapper .metaBadge.good{
+        border-color:#0b3d0b;
+        color:#0b3d0b;
+      }
 
-.mdse-wrapper .metaBadge.warn{
-  border-color:#7a0000;
-  color:#7a0000;
-}
+      .mdse-wrapper .metaBadge.warn{
+        border-color:#7a0000;
+        color:#7a0000;
+      }
 
-.mdse-wrapper .metaBadge.dim{
-  border-color:#555;
-  color:#555;
-}
-      
+      .mdse-wrapper .metaBadge.dim{
+        border-color:#555;
+        color:#555;
+      }
+
       @media (max-width: 700px) {
         .mdse-wrapper { padding: 14px; }
         .mdse-wrapper .headerRight { margin-left: 0; }
@@ -362,14 +362,6 @@
     }
   }
 
-  function safeStorageSet(key, value) {
-    try {
-      localStorage.setItem(key, value);
-    } catch (_) {
-      // ignore storage failures
-    }
-  }
-
   function safeStorageRemove(key) {
     try {
       localStorage.removeItem(key);
@@ -378,26 +370,26 @@
     }
   }
 
-function copyTextFallback(text) {
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "readonly");
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    ta.style.top = "0";
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
+  function copyTextFallback(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "readonly");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
 
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return !!ok;
-  } catch (_) {
-    return false;
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (_) {
+      return false;
+    }
   }
-}
-  
+
   function parseMarkdown(raw) {
     const text = String(raw || "").replace(/\r\n?/g, "\n");
     const lines = text.split("\n");
@@ -482,6 +474,18 @@ function copyTextFallback(text) {
     return parts.join("\n\n").replace(/\n{3,}/g, "\n\n");
   }
 
+  function normalizeNodes(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((n) => ({
+      id: typeof n?.id === "string" && n.id ? n.id : uid(),
+      level: clamp(parseInt(n?.level, 10) || 1, 1, 6),
+      title: typeof n?.title === "string" ? n.title : "",
+      body: typeof n?.body === "string" ? n.body : "",
+      showBody: !!n?.showBody,
+      isCollapsed: !!n?.isCollapsed
+    }));
+  }
+
   window.SiteApps.register("mdseStage", (container) => {
     ensureStyle();
 
@@ -498,12 +502,11 @@ function copyTextFallback(text) {
 
     container.innerHTML = `
       <div class="mdse-wrapper">
-      
-    <div class="topMeta">
-      <div class="buildStamp">Generated: 17 Mar 2026, 16:18</div>
-      <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
-      <span class="metaBadge warn jsCopyBadge">Not copied</span>
-    </div>
+        <div class="topMeta">
+          <div class="buildStamp">Generated: 17 Mar 2026, 16:18</div>
+          <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
+          <span class="metaBadge warn jsCopyBadge">Not copied</span>
+        </div>
 
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
@@ -564,14 +567,44 @@ function copyTextFallback(text) {
     const summaryPreamble = root.querySelector(".summaryPreamble");
     const preambleNote = root.querySelector(".preambleNote");
 
-const saveBadge = container.querySelector(".jsSaveBadge");
-const copyBadge = container.querySelector(".jsCopyBadge");
+    const saveBadge = root.querySelector(".jsSaveBadge");
+    const copyBadge = root.querySelector(".jsCopyBadge");
 
-let copiedSinceChange = false;
-let saveTimer = null;
-    
-    const saveState = debounce(() => {
-      safeStorageSet(KEY, JSON.stringify({
+    let copiedSinceChange = false;
+    let saveTimer = null;
+
+    function setSaveBadgeSaved() {
+      if (!saveBadge) return;
+      saveBadge.className = "metaBadge good jsSaveBadge";
+      saveBadge.textContent = "Saved ✓";
+    }
+
+    function setSaveBadgeUnsaved() {
+      if (!saveBadge) return;
+      saveBadge.className = "metaBadge dim jsSaveBadge";
+      saveBadge.textContent = "Unsaved…";
+    }
+
+    function setSaveBadgeNotSaved() {
+      if (!saveBadge) return;
+      saveBadge.className = "metaBadge warn jsSaveBadge";
+      saveBadge.textContent = "Not saved";
+    }
+
+    function setCopyBadge() {
+      if (!copyBadge) return;
+      if (copiedSinceChange) {
+        copyBadge.className = "metaBadge good jsCopyBadge";
+        copyBadge.textContent = "Copied ✓";
+      } else {
+        copyBadge.className = "metaBadge warn jsCopyBadge";
+        copyBadge.textContent = "Not copied";
+      }
+    }
+
+    function buildState() {
+      return {
+        v: 2,
         nodes,
         docPreamble,
         activeNodeId,
@@ -579,79 +612,47 @@ let saveTimer = null;
         searchQuery,
         activeTag,
         rawInput: taInput.value || ""
-      }));
-    }, 180);
-
-function setSaveBadgeSaved() {
-  if (!saveBadge) return;
-  saveBadge.className = "metaBadge good jsSaveBadge";
-  saveBadge.textContent = "Saved ✓";
-}
-
-function setSaveBadgeUnsaved() {
-  if (!saveBadge) return;
-  saveBadge.className = "metaBadge dim jsSaveBadge";
-  saveBadge.textContent = "Unsaved…";
-}
-
-function setCopyBadge() {
-  if (!copyBadge) return;
-  if (copiedSinceChange) {
-    copyBadge.className = "metaBadge good jsCopyBadge";
-    copyBadge.textContent = "Copied ✓";
-  } else {
-    copyBadge.className = "metaBadge warn jsCopyBadge";
-    copyBadge.textContent = "Not copied";
-  }
-}
-
-function saveState() {
-  try {
-    localStorage.setItem(
-      KEY,
-      JSON.stringify({
-        v: 1,
-        nodes,
-        docPreamble,
-        activeNodeId,
-        activeTab,
-        searchQuery
-      })
-    );
-
-    if (saveBadge) {
-      saveBadge.className = "metaBadge good jsSaveBadge";
-      saveBadge.textContent = "Saved ✓";
+      };
     }
-  } catch (_) {
-    if (saveBadge) {
-      saveBadge.className = "metaBadge warn jsSaveBadge";
-      saveBadge.textContent = "Not saved";
+
+    function persistStateNow() {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(buildState()));
+        setSaveBadgeSaved();
+        return true;
+      } catch (_) {
+        setSaveBadgeNotSaved();
+        return false;
+      }
     }
-  }
-}
-    
-function markChanged() {
-  copiedSinceChange = false;
-  setCopyBadge();
-  setSaveBadgeUnsaved();
 
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    saveState();
-    setSaveBadgeSaved();
-  }, 350);
-}
+    function scheduleSave() {
+      setSaveBadgeUnsaved();
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        persistStateNow();
+      }, 250);
+    }
 
-    
+    function markDocChanged() {
+      copiedSinceChange = false;
+      setCopyBadge();
+      scheduleSave();
+    }
+
+    function markStateChanged() {
+      scheduleSave();
+    }
+
     function totalWords() {
       return nodes.reduce((sum, n) => sum + countWords(n.title) + countWords(n.body), 0);
     }
 
     function updateSummary() {
+      const words = totalWords();
       summaryNodes.textContent = `${nodes.length} ${nodes.length === 1 ? "node" : "nodes"}`;
-      summaryWords.textContent = `${totalWords()} ${totalWords() === 1 ? "word" : "words"}`;
+      summaryWords.textContent = `${words} ${words === 1 ? "word" : "words"}`;
       summaryPreamble.textContent = docPreamble.trim() ? "Preamble preserved" : "No preamble";
 
       if (docPreamble.trim()) {
@@ -671,7 +672,7 @@ function markChanged() {
       root.querySelector(".panelTags").classList.toggle("active", activeTab === "tags");
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
-      saveState();
+      markStateChanged();
     }
 
     function getNodeIndexById(id) {
@@ -738,7 +739,7 @@ function markChanged() {
       root.querySelectorAll(".node").forEach((nodeEl) => {
         nodeEl.classList.toggle("activeNode", nodeEl.getAttribute("data-node-id") === activeNodeId);
       });
-      saveState();
+      markStateChanged();
     }
 
     function updateNodeMetric(nodeEl, node) {
@@ -1018,24 +1019,28 @@ function markChanged() {
       }
 
       const text = groups.map((group) => group.label).join("\n");
+      let ok = false;
+
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
+          ok = true;
         } else {
-          copyTextFallback(text);
+          ok = copyTextFallback(text);
         }
+      } catch (_) {
+        ok = copyTextFallback(text);
+      }
+
+      if (ok) {
         const base = tagsMeta.textContent;
         tagsMeta.textContent = `Copied ${groups.length} tag${groups.length === 1 ? "" : "s"} to clipboard.`;
         setTimeout(() => {
           if (activeTab === "tags") renderTags();
           else tagsMeta.textContent = base;
         }, 1400);
-      } catch (_) {
-        copyTextFallback(text);
-        tagsMeta.textContent = `Copied ${groups.length} tag${groups.length === 1 ? "" : "s"} to clipboard.`;
-        setTimeout(() => {
-          if (activeTab === "tags") renderTags();
-        }, 1400);
+      } else {
+        tagsMeta.textContent = "Copy failed.";
       }
     }
 
@@ -1056,7 +1061,7 @@ function markChanged() {
       activeNodeId = newNode.id;
       pendingFocus = { id: newNode.id, field: "title" };
       renderStructure();
-      saveState();
+      markDocChanged();
     }
 
     function toggleBody(id) {
@@ -1064,7 +1069,7 @@ function markChanged() {
       if (idx < 0) return;
       nodes[idx].showBody = !nodes[idx].showBody;
       renderStructure();
-      saveState();
+      markStateChanged();
     }
 
     function toggleCollapse(id) {
@@ -1074,7 +1079,7 @@ function markChanged() {
       if (!hasChildren) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
       renderStructure();
-      saveState();
+      markStateChanged();
     }
 
     function changeLevel(id, delta) {
@@ -1090,7 +1095,7 @@ function markChanged() {
         nodes[i].level += applied;
       }
       renderStructure();
-      saveState();
+      markDocChanged();
     }
 
     function deleteBranch(id) {
@@ -1100,7 +1105,7 @@ function markChanged() {
       nodes.splice(start, end - start);
       if (activeNodeId === id) activeNodeId = "";
       renderStructure();
-      saveState();
+      markDocChanged();
     }
 
     const scheduleSearchRender = makeRafScheduler(renderSearch);
@@ -1109,6 +1114,10 @@ function markChanged() {
       btn.addEventListener("click", () => {
         switchTab(btn.getAttribute("data-tab") || "structure");
       });
+    });
+
+    taInput.addEventListener("input", () => {
+      markStateChanged();
     });
 
     btnLoad.addEventListener("click", () => {
@@ -1121,30 +1130,33 @@ function markChanged() {
       renderStructure();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
-      saveState();
+      markDocChanged();
     });
 
-btnCopy.addEventListener("click", async () => {
-  const text = nodesToMarkdown(docPreamble, nodes);
-  let ok = false;
+    btnCopy.addEventListener("click", async () => {
+      const text = nodesToMarkdown(docPreamble, nodes);
+      let ok = false;
 
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      ok = true;
-    } else {
-      ok = copyTextFallback(text);
-    }
-  } catch (_) {
-    ok = copyTextFallback(text);
-  }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          ok = copyTextFallback(text);
+        }
+      } catch (_) {
+        ok = copyTextFallback(text);
+      }
 
-  if (ok) {
-    copiedSinceChange = true;
-    setCopyBadge();
-  }
-});
-    
+      if (ok) {
+        copiedSinceChange = true;
+        setCopyBadge();
+      } else if (copyBadge) {
+        copyBadge.className = "metaBadge warn jsCopyBadge";
+        copyBadge.textContent = "Copy failed";
+      }
+    });
+
     btnCopyTags.addEventListener("click", () => {
       copyAllTagsToClipboard();
     });
@@ -1152,30 +1164,39 @@ btnCopy.addEventListener("click", async () => {
     btnReset.addEventListener("click", () => {
       const ok = window.confirm("Reset the app and clear the saved Markdown on this page?");
       if (!ok) return;
+
       nodes = [];
       docPreamble = "";
       activeNodeId = "";
       searchQuery = "";
       activeTag = "";
+      pendingFocus = null;
+      pendingScrollId = null;
+      copiedSinceChange = false;
+
       taInput.value = "";
       searchInput.value = "";
+
       safeStorageRemove(KEY);
+
       renderStructure();
       renderSearch();
       renderTags();
+      setCopyBadge();
+      persistStateNow();
     });
 
     searchInput.addEventListener("input", () => {
       searchQuery = searchInput.value || "";
       scheduleSearchRender();
-      saveState();
+      markStateChanged();
     });
 
     function jumpToNodeFromPanel(id) {
       revealNode(id);
       switchTab("structure");
       renderStructure();
-      saveState();
+      markStateChanged();
     }
 
     searchResults.addEventListener("click", (e) => {
@@ -1190,7 +1211,7 @@ btnCopy.addEventListener("click", async () => {
       const tag = btn.getAttribute("data-tag") || "";
       activeTag = activeTag === tag ? "" : tag;
       renderTags();
-      saveState();
+      markStateChanged();
     });
 
     tagMatches.addEventListener("click", (e) => {
@@ -1232,14 +1253,14 @@ btnCopy.addEventListener("click", async () => {
       root.querySelectorAll(".node").forEach((el) => {
         el.classList.toggle("activeNode", el === nodeEl);
       });
-      saveState();
+      markStateChanged();
     });
 
     const syncInput = debounce(() => {
       if (activeTab === "search") scheduleSearchRender();
       if (activeTab === "tags") renderTags();
       updateSummary();
-      saveState();
+      markDocChanged();
     }, 120);
 
     canvas.addEventListener("input", (e) => {
@@ -1264,10 +1285,12 @@ btnCopy.addEventListener("click", async () => {
     if (saved) {
       try {
         const state = JSON.parse(saved);
-        if (Array.isArray(state.nodes)) nodes = state.nodes;
+        nodes = normalizeNodes(state.nodes);
         if (typeof state.docPreamble === "string") docPreamble = state.docPreamble;
         if (typeof state.activeNodeId === "string") activeNodeId = state.activeNodeId;
-        if (typeof state.activeTab === "string") activeTab = ["structure", "search", "tags"].includes(state.activeTab) ? state.activeTab : "structure";
+        if (typeof state.activeTab === "string" && ["structure", "search", "tags"].includes(state.activeTab)) {
+          activeTab = state.activeTab;
+        }
         if (typeof state.searchQuery === "string") searchQuery = state.searchQuery;
         if (typeof state.activeTag === "string") activeTag = state.activeTag;
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
@@ -1276,10 +1299,16 @@ btnCopy.addEventListener("click", async () => {
       }
     }
 
+    if (activeNodeId && getNodeIndexById(activeNodeId) < 0) {
+      activeNodeId = nodes[0] ? nodes[0].id : "";
+    }
+
     searchInput.value = searchQuery;
+    setCopyBadge();
     switchTab(activeTab);
     renderStructure();
     if (activeTab === "search") renderSearch();
     if (activeTab === "tags") renderTags();
+    persistStateNow();
   });
 })();
