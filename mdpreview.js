@@ -1,7 +1,3 @@
-<div data-app="md-editor" data-storage-key="my-notes">
-  </div>
-
-<script>
 (() => {
   "use strict";
 
@@ -141,4 +137,3 @@
   }
 
 })();
-</script>
