@@ -366,54 +366,54 @@
     return s.split("|").map(cell => cell.trim());
   }
 
-  function parseInline(text) {
-    let s = String(text || "");
-    const tokens = [];
+function parseInline(text) {
+  let s = String(text || "");
+  const tokens = [];
 
-    function stash(html) {
-      const key = `@@TOK${tokens.length}@@`;
-      tokens.push(html);
-      return key;
-    }
-
-    // code spans first
-    s = s.replace(/`([^`\n]+)`/g, (_, code) => {
-      return stash(`<code>${escapeHtml(code)}</code>`);
-    });
-
-    // images
-    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_, alt, url, title) => {
-  const safeUrl = sanitizeUrl(url);
-  const safeAlt = escapeAttr(alt);
-  const safeTitle = title ? ` title="${escapeAttr(title)}"` : "";
-  return stash(`<img src="${escapeAttr(safeUrl)}" alt="${safeAlt}"${safeTitle}>`);
-});
-
-    // links
-    s = s.replace(/$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(\[\^\)\\s\]\+\)\(\?\:\\s\+\"\(\[\^\"\]\*\)\"\)\?$end:math:text$/g, (_, label, url, title) => {
-      const safeUrl = sanitizeUrl(url);
-      const safeTitle = title ? ` title="${escapeAttr(title)}"` : "";
-      return stash(
-        `<a href="${escapeAttr(safeUrl)}" target="_blank" rel="noreferrer noopener"${safeTitle}>${escapeHtml(label)}</a>`
-      );
-    });
-
-    s = escapeHtml(s);
-
-    // emphasis
-    s = s.replace(/~~(.+?)~~/g, "<del>$1</del>");
-    s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    s = s.replace(/__(.+?)__/g, "<strong>$1</strong>");
-    s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    s = s.replace(/_(.+?)_/g, "<em>$1</em>");
-
-    tokens.forEach((html, i) => {
-      s = s.split(`@@TOK${i}@@`).join(html);
-    });
-
-    return s;
+  function stash(html) {
+    const key = `@@TOK${tokens.length}@@`;
+    tokens.push(html);
+    return key;
   }
 
+  // code spans first
+  s = s.replace(/`([^`\n]+)`/g, (_, code) => {
+    return stash(`<code>${escapeHtml(code)}</code>`);
+  });
+
+  // images
+  s = s.replace(/!$begin:math:display$\(\[\^$end:math:display$]*)\]$begin:math:text$\(\[\^\)\\s\]\+\)\(\?\:\\s\+\"\(\[\^\"\]\*\)\"\)\?$end:math:text$/g, (_, alt, url, title) => {
+    const safeUrl = sanitizeUrl(url);
+    const safeAlt = escapeAttr(alt);
+    const safeTitle = title ? ` title="${escapeAttr(title)}"` : "";
+    return stash(`<img src="${escapeAttr(safeUrl)}" alt="${safeAlt}"${safeTitle}>`);
+  });
+
+  // links
+  s = s.replace(/$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(\[\^\)\\s\]\+\)\(\?\:\\s\+\"\(\[\^\"\]\*\)\"\)\?$end:math:text$/g, (_, label, url, title) => {
+    const safeUrl = sanitizeUrl(url);
+    const safeTitle = title ? ` title="${escapeAttr(title)}"` : "";
+    return stash(
+      `<a href="${escapeAttr(safeUrl)}" target="_blank" rel="noreferrer noopener"${safeTitle}>${escapeHtml(label)}</a>`
+    );
+  });
+
+  s = escapeHtml(s);
+
+  // emphasis
+  s = s.replace(/~~(.+?)~~/g, "<del>$1</del>");
+  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/__(.+?)__/g, "<strong>$1</strong>");
+  s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  s = s.replace(/_(.+?)_/g, "<em>$1</em>");
+
+  tokens.forEach((html, i) => {
+    s = s.split(`@@TOK${i}@@`).join(html);
+  });
+
+  return s;
+}
+  
   function parseTable(lines, startIndex) {
     const headers = splitTableRow(lines[startIndex]);
     const aligns = splitTableRow(lines[startIndex + 1]).map(cell => {
