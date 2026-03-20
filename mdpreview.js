@@ -382,12 +382,12 @@
     });
 
     // images
-    s = s.replace(/!$begin:math:display$\(\[\^$end:math:display$]*)\]$begin:math:text$\(\[\^\)\\s\]\+\)\(\?\:\\s\+\"\(\[\^\"\]\*\)\"\)\?$end:math:text$/g, (_, alt, url, title) => {
-      const safeUrl = sanitizeUrl(url);
-      const safeAlt = escapeAttr(alt);
-      const safeTitle = title ? ` title="${escapeAttr(title)}"` : "";
-      return stash(`<img src="${escapeAttr(safeUrl)}" alt="${safeAlt}"${safeTitle}>`);
-    });
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_, alt, url, title) => {
+  const safeUrl = sanitizeUrl(url);
+  const safeAlt = escapeAttr(alt);
+  const safeTitle = title ? ` title="${escapeAttr(title)}"` : "";
+  return stash(`<img src="${escapeAttr(safeUrl)}" alt="${safeAlt}"${safeTitle}>`);
+});
 
     // links
     s = s.replace(/$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(\[\^\)\\s\]\+\)\(\?\:\\s\+\"\(\[\^\"\]\*\)\"\)\?$end:math:text$/g, (_, label, url, title) => {
