@@ -7,8 +7,8 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-mdpreview-style-v3";
-  const CUSTOM_STYLE_ID = "siteapps-mdpreview-custom-css";
+  const STYLE_ID = "siteapps-mdpreview-style-v4";
+  const DYNAMIC_STYLE_ID = "siteapps-md-dynamic-styles";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -16,63 +16,84 @@
     style.id = STYLE_ID;
     style.textContent = `
 [data-app="mdpreview"]{
-  font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  font-family:-apple-system,system-ui,sans-serif;
   background:#fff;
   border:2px solid #111;
-  padding:18px;
+  padding:20px;
   border-radius:14px;
+  max-width:1000px;
+  margin:20px auto;
   color:#111;
-  max-width:980px;
-  margin:14px auto;
 }
-[data-app="mdpreview"] .top-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-[data-app="mdpreview"] h3{ margin:0; font-size:20px; font-weight:900; }
-[data-app="mdpreview"] .badge{ font-size:12px; font-weight:900; padding:4px 8px; border:2px solid #111; border-radius:999px; }
+[data-app="mdpreview"] .app-header { display:flex; justify-content:space-between; margin-bottom:15px; }
+[data-app="mdpreview"] h3 { margin:0; font-weight:900; }
 
-[data-app="mdpreview"] .editor-grid {
+/* 3-Column / Area Layout */
+[data-app="mdpreview"] .main-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  margin-top: 10px;
+  gap: 20px;
+}
+[data-app="mdpreview"] .side-bar { display: flex; flex-direction: column; gap: 15px; }
+
+[data-app="mdpreview"] label { 
+  display:block; 
+  font-weight:900; 
+  font-size:12px; 
+  text-transform:uppercase; 
+  margin-bottom:5px;
+  color: #555;
 }
 
-[data-app="mdpreview"] label{ display:block; margin:10px 0 4px; font-weight:900; font-size:13px; text-transform: uppercase; }
-[data-app="mdpreview"] textarea{
+[data-app="mdpreview"] textarea {
   width:100%;
-  padding:10px;
-  border:2px solid #111;
-  border-radius:8px;
-  font-family:ui-monospace,monospace;
-  font-size:14px;
-  box-sizing: border-box;
-}
-[data-app="mdpreview"] #md-input { height: 300px; }
-[data-app="mdpreview"] #css-input { height: 100px; background: #fefefe; }
-
-[data-app="mdpreview"] .preview-pane{
-  width:100%;
-  height: 455px; /* Matches total height of MD + CSS inputs approx */
-  padding:15px;
   border:2px solid #111;
   border-radius:10px;
-  background:#fff;
+  padding:12px;
+  font-family: ui-monospace, monospace;
+  font-size:14px;
+  box-sizing: border-box;
+  resize: vertical;
+}
+[data-app="mdpreview"] #md-input { height: 350px; }
+[data-app="mdpreview"] #css-input { height: 150px; background: #fdfdfd; border-style: dashed; }
+
+[data-app="mdpreview"] .preview-container {
+  border: 2px solid #111;
+  border-radius: 10px;
+  padding: 20px;
+  background: #fff;
+  height: 565px;
   overflow-y: auto;
   box-sizing: border-box;
 }
 
-/* Default Preview Spacing Fixes */
-.preview-pane h1, .preview-pane h2, .preview-pane h3 { margin: 0.5em 0 0.2em 0; line-height: 1.2; }
-.preview-pane p { margin: 0 0 1em 0; }
+[data-app="mdpreview"] .actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+}
+[data-app="mdpreview"] button {
+  padding: 10px 16px;
+  font-weight: 900;
+  border: 2px solid #111;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #fff;
+}
+[data-app="mdpreview"] .btn-primary { background: #111; color: #fff; }
+[data-app="mdpreview"] .btn-download { background: #0b5fff; color: #fff; border-color: #0b5fff; }
 
-[data-app="mdpreview"] .controls{ display:flex; gap:10px; margin-top:15px; }
-[data-app="mdpreview"] button{ border:2px solid #111; border-radius:8px; cursor:pointer; padding:8px 12px; font-weight:900; background:#fff; }
-[data-app="mdpreview"] .btn-primary{ background:#0b5fff; color:#fff; border-color:#0b5fff; }
+@media (max-width: 800px) {
+  [data-app="mdpreview"] .main-grid { grid-template-columns: 1fr; }
+  [data-app="mdpreview"] .preview-container { height: 400px; }
+}
 `;
     document.head.appendChild(style);
   }
 
-  function simpleParse(md) {
-    if (!md) return "";
+  function parseMd(md) {
+    if (!md) return "<em>Markdown preview will appear here...</em>";
     return md
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -86,69 +107,75 @@
 
   window.SiteApps.register("mdpreview", (container) => {
     ensureStyle();
-    const keyPrefix = `siteapps:mdpreview:${container.getAttribute("data-storage-key") || "main"}`;
     
-    // Create custom style tag for this instance
-    let customStyleTag = document.getElementById(CUSTOM_STYLE_ID);
-    if (!customStyleTag) {
-      customStyleTag = document.createElement("style");
-      customStyleTag.id = CUSTOM_STYLE_ID;
-      document.head.appendChild(customStyleTag);
+    // Setup dynamic style tag for the custom CSS
+    let dynamicStyle = document.getElementById(DYNAMIC_STYLE_ID);
+    if (!dynamicStyle) {
+      dynamicStyle = document.createElement("style");
+      dynamicStyle.id = DYNAMIC_STYLE_ID;
+      document.head.appendChild(dynamicStyle);
     }
 
-    container.innerHTML = `
-      <div class="top-row">
-        <h3>Markdown + CSS Lab</h3>
-        <span class="badge" id="status">Ready</span>
-      </div>
+    const storageKey = `siteapps:mdpreview:${container.getAttribute("data-storage-key") || "default"}`;
 
-      <div class="editor-grid">
-        <div class="inputs">
-          <label>Markdown</label>
-          <textarea id="md-input" placeholder="# Header..."></textarea>
-          
-          <label>Custom CSS (applied to preview)</label>
-          <textarea id="css-input" placeholder=".preview-pane h1 { color: red; }"></textarea>
+    container.innerHTML = `
+      <div class="app-header">
+        <h3>Markdown + CSS Designer</h3>
+      </div>
+      
+      <div class="main-grid">
+        <div class="side-bar">
+          <div>
+            <label>1. Markdown Content</label>
+            <textarea id="md-input" placeholder="# Type here..."></textarea>
+          </div>
+          <div>
+            <label>2. Custom CSS (Styles the Preview)</label>
+            <textarea id="css-input" placeholder="h1 { color: blue; }"></textarea>
+          </div>
         </div>
         
-        <div class="outputs">
-          <label>Preview</label>
-          <div class="preview-pane" id="md-output"></div>
+        <div class="preview-side">
+          <label>3. Rendered Preview</label>
+          <div class="preview-container" id="md-render"></div>
         </div>
       </div>
 
-      <div class="controls">
-        <button class="btn-primary" id="btn-update">👁️ Update Preview</button>
-        <button id="btn-export">💾 Download .md</button>
-        <button style="color:red; border-color:red" id="btn-clear">🗑️ Clear</button>
+      <div class="actions">
+        <button class="btn-primary" id="btn-refresh">🔄 Refresh View</button>
+        <button class="btn-download" id="btn-dl">💾 Download .md</button>
+        <button style="color:red; border-color:red" id="btn-clr">🗑️ Clear</button>
       </div>
     `;
 
-    const mdIn = container.querySelector("#md-input");
-    const cssIn = container.querySelector("#css-input");
-    const output = container.querySelector("#md-output");
+    const mdArea = container.querySelector("#md-input");
+    const cssArea = container.querySelector("#css-input");
+    const renderDiv = container.querySelector("#md-render");
 
-    const updateAll = () => {
-      // Update Content
-      output.innerHTML = simpleParse(mdIn.value);
+    const defaultCSS = `/* Default spacing fixes */
+h1, h2, h3 { 
+  margin-top: 10px; 
+  margin-bottom: 5px; 
+}
+p { margin-bottom: 10px; }
+blockquote { 
+  border-left: 4px solid #111; 
+  padding-left: 10px; 
+  font-style: italic; 
+}`;
+
+    const update = () => {
+      renderDiv.innerHTML = parseMd(mdArea.value);
+      dynamicStyle.textContent = cssArea.value;
       
-      // Update Custom CSS
-      // We wrap the user's CSS to ensure it only affects the preview pane
-      customStyleTag.textContent = cssIn.value;
-      
-      // Save
-      localStorage.setItem(`${keyPrefix}:md`, mdIn.value);
-      localStorage.setItem(`${keyPrefix}:css`, cssIn.value);
-      
-      const badge = container.querySelector("#status");
-      badge.textContent = "Saved ✓";
-      setTimeout(() => { badge.textContent = "Ready"; }, 1000);
+      localStorage.setItem(`${storageKey}:content`, mdArea.value);
+      localStorage.setItem(`${storageKey}:styles`, cssArea.value);
     };
 
-    container.querySelector("#btn-update").onclick = updateAll;
+    container.querySelector("#btn-refresh").onclick = update;
 
-    container.querySelector("#btn-export").onclick = () => {
-      const blob = new Blob([mdIn.value], { type: "text/markdown" });
+    container.querySelector("#btn-dl").onclick = () => {
+      const blob = new Blob([mdArea.value], { type: "text/markdown" });
       const a = Object.assign(document.createElement("a"), {
         href: URL.createObjectURL(blob),
         download: "notes.md"
@@ -156,17 +183,25 @@
       a.click();
     };
 
-    container.querySelector("#btn-clear").onclick = () => {
-      if(confirm("Clear everything?")) {
-        mdIn.value = "";
-        cssIn.value = "";
-        updateAll();
+    container.querySelector("#btn-clr").onclick = () => {
+      if(confirm("Clear all?")) {
+        mdArea.value = "";
+        cssArea.value = defaultCSS;
+        update();
       }
     };
 
-    // Load Initial State
-    mdIn.value = localStorage.getItem(`${keyPrefix}:md`) || "";
-    cssIn.value = localStorage.getItem(`${keyPrefix}:css`) || "/* Example: */\n.preview-pane h1 { margin-bottom: 0px; }\n.preview-pane { background: #fff; }";
-    updateAll();
+    // Auto-save typing
+    mdArea.oninput = () => localStorage.setItem(`${storageKey}:content`, mdArea.value);
+    cssArea.oninput = () => {
+      dynamicStyle.textContent = cssArea.value;
+      localStorage.setItem(`${storageKey}:styles`, cssArea.value);
+    };
+
+    // Load initial data
+    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# Sample Header\nType your content here...";
+    cssArea.value = localStorage.getItem(`${storageKey}:styles`) || defaultCSS;
+    
+    update();
   });
 })();
