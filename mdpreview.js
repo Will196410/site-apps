@@ -376,7 +376,7 @@ function parseInline(text) {
     return key;
   }
 
-  const codeRe = new RegExp(String.raw"`([^`\n]+)`", "g");
+  const codeRe = new RegExp(String.raw("`([^`\n]+)`", "g");
   const imageRe = new RegExp(
     String.raw`!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)`,
     "g"
