@@ -1,71 +1,101 @@
 (() => {
   "use strict";
 
-  const STYLE_ID = "siteapps-md-v3";
+  // Registry setup
+  window.SiteApps = window.SiteApps || {};
+  window.SiteApps.registry = window.SiteApps.registry || {};
+  window.SiteApps.register = window.SiteApps.register || function (name, initFn) {
+    window.SiteApps.registry[name] = initFn;
+  };
+
+  const STYLE_ID = "siteapps-mdpreview-style-v1";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      [data-app="md-editor"] {
-        font-family: -apple-system, system-ui, sans-serif;
-        background: #fff;
-        border: 2px solid #111;
-        padding: 20px;
-        border-radius: 14px;
-        color: #111;
-        max-width: 800px;
-        margin: 20px auto;
-        box-shadow: 4px 4px 0px #111;
-      }
-      [data-app="md-editor"] h3 { margin-top: 0; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-      [data-app="md-editor"] textarea {
-        width: 100%;
-        height: 200px;
-        padding: 12px;
-        border: 2px solid #111;
-        border-radius: 8px;
-        font-family: monospace;
-        font-size: 15px;
-        box-sizing: border-box;
-        outline: none;
-      }
-      [data-app="md-editor"] .controls {
-        display: flex;
-        gap: 10px;
-        margin: 15px 0;
-        flex-wrap: wrap;
-      }
-      [data-app="md-editor"] button {
-        padding: 10px 15px;
-        font-weight: 900;
-        border: 2px solid #111;
-        border-radius: 8px;
-        cursor: pointer;
-        background: #fff;
-        transition: transform 0.1s;
-      }
-      [data-app="md-editor"] button:active { transform: translateY(2px); }
-      [data-app="md-editor"] .btn-primary { background: #00ff62; }
-      [data-app="md-editor"] .btn-save { background: #0084ff; color: #fff; }
-      [data-app="md-editor"] .preview-pane {
-        border: 2px solid #111;
-        background: #fdfdfd;
-        padding: 15px;
-        border-radius: 8px;
-        min-height: 50px;
-        line-height: 1.5;
-      }
-      [data-app="md-editor"] blockquote { border-left: 5px solid #111; margin-left: 0; padding-left: 15px; font-style: italic; }
-    `;
+[data-app="mdpreview"]{
+  font-family:-apple-system,system-ui,sans-serif;
+  background:#fff;
+  border:2px solid #111;
+  padding:18px;
+  border-radius:14px;
+  color:#111;
+  max-width:1000px;
+  margin:14px auto;
+}
+[data-app="mdpreview"] .header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+[data-app="mdpreview"] h3{ margin:0; font-weight:900; font-size:20px; }
+[data-app="mdpreview"] .badge{
+  font-size:14px;
+  font-weight:900;
+  padding:6px 10px;
+  border:2px solid #111;
+  border-radius:999px;
+  background:#fff;
+}
+[data-app="mdpreview"] .badge.good{ border-color:#0b3d0b; color:#0b3d0b; }
+[data-app="mdpreview"] .badge.dim{ border-color:#444; color:#444; }
+
+[data-app="mdpreview"] .editor-container{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+[data-app="mdpreview"] label{ display:block; margin-bottom:6px; font-weight:900; font-size:14px; }
+[data-app="mdpreview"] textarea, 
+[data-app="mdpreview"] .preview-area{
+  width:100%;
+  height:400px;
+  padding:12px;
+  border:2px solid #111;
+  border-radius:10px;
+  box-sizing: border-box;
+}
+[data-app="mdpreview"] textarea{
+  font-family: ui-monospace, monospace;
+  font-size:15px;
+  resize: none;
+}
+[data-app="mdpreview"] .preview-area{
+  background:#f9f9f9;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+[data-app="mdpreview"] .actions{
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+}
+[data-app="mdpreview"] button{
+  border:2px solid #111;
+  border-radius:10px;
+  cursor:pointer;
+  padding:10px 14px;
+  font-weight:900;
+  font-size:14px;
+  background:#fff;
+}
+[data-app="mdpreview"] .btn-download{ background:#0b5fff; color:#fff; border-color:#0b5fff; }
+[data-app="mdpreview"] .btn-clear{ color:#7a0000; border-color:#7a0000; }
+
+@media (max-width:750px){
+  [data-app="mdpreview"] .editor-container{ grid-template-columns: 1fr; }
+}
+`;
     document.head.appendChild(style);
   }
 
-  function parseMd(text) {
-    if (!text.trim()) return "<em>Preview will appear here...</em>";
-    return text
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;") 
+  function parse(md) {
+    if (!md) return "";
+    return md
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
@@ -74,66 +104,71 @@
       .replace(/\n/gim, '<br>');
   }
 
-  function initApp(container) {
-    if (!container || container.getAttribute('data-initialized')) return;
+  window.SiteApps.register("mdpreview", (container) => {
     ensureStyle();
-
-    const storageKey = `md_store_${container.getAttribute("data-storage-key") || "default"}`;
+    const storageKey = `siteapps:mdpreview:${container.getAttribute("data-storage-key") || "default"}`;
 
     container.innerHTML = `
-      <h3>Markdown Note</h3>
-      <textarea placeholder="Write something in # Markdown..."></textarea>
-      <div class="controls">
-        <button class="btn-primary" id="ref-btn">Update Preview</button>
-        <button class="btn-save" id="dl-btn">Save to File (.md)</button>
-        <button id="clr-btn">Clear</button>
+      <div class="header">
+        <h3>Markdown Preview</h3>
+        <span class="badge good" id="status-badge">Ready</span>
       </div>
-      <div class="preview-pane"></div>
+      <div class="editor-container">
+        <div>
+          <label>Editor</label>
+          <textarea id="input" placeholder="Type # Header..."></textarea>
+        </div>
+        <div>
+          <label>Preview</label>
+          <div id="preview" class="preview-area"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-download" id="dl-btn">💾 Save .md File</button>
+        <button class="btn-clear" id="clr-btn">🗑️ Clear All</button>
+      </div>
     `;
 
-    const area = container.querySelector('textarea');
-    const prev = container.querySelector('.preview-pane');
+    const ta = container.querySelector("#input");
+    const out = container.querySelector("#preview");
+    const status = container.querySelector("#status-badge");
 
-    // Load
-    const saved = localStorage.getItem(storageKey);
-    if (saved) area.value = saved;
-
-    const refresh = () => {
-      prev.innerHTML = parseMd(area.value);
-      localStorage.setItem(storageKey, area.value);
+    const update = () => {
+      out.innerHTML = parse(ta.value);
+      localStorage.setItem(storageKey, ta.value);
+      status.textContent = "Saved ✓";
+      status.className = "badge good";
     };
 
-    container.querySelector('#ref-btn').onclick = refresh;
-    
-    container.querySelector('#clr-btn').onclick = () => {
-      if(confirm("Delete everything?")) { area.value = ""; refresh(); }
-    };
+    let saveTimer;
+    ta.addEventListener("input", () => {
+      status.textContent = "Typing...";
+      status.className = "badge dim";
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(update, 300);
+    });
 
-    container.querySelector('#dl-btn').onclick = () => {
-      const blob = new Blob([area.value], {type: "text/markdown"});
-      const a = Object.assign(document.createElement('a'), {
+    container.querySelector("#dl-btn").onclick = () => {
+      const blob = new Blob([ta.value], { type: "text/markdown" });
+      const a = Object.assign(document.createElement("a"), {
         href: URL.createObjectURL(blob),
-        download: "markdown-note.md"
+        download: "document.md"
       });
       a.click();
     };
 
-    // Auto-save typing (but no live preview to prevent errors)
-    area.oninput = () => localStorage.setItem(storageKey, area.value);
+    container.querySelector("#clr-btn").onclick = () => {
+      if (confirm("Clear all text?")) {
+        ta.value = "";
+        update();
+      }
+    };
 
-    container.setAttribute('data-initialized', 'true');
-    refresh();
-  }
-
-  // BOOTSTRAPPER: This ensures it runs even if your loader doesn't call it.
-  const run = () => {
-    document.querySelectorAll('[data-app="md-editor"]').forEach(initApp);
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
-    run();
-  }
-
+    // Initial Load
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      ta.value = saved;
+      update();
+    }
+  });
 })();
