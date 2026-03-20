@@ -1,234 +1,154 @@
 (() => {
   "use strict";
 
-  // Ensure registry exists
   window.SiteApps = window.SiteApps || {};
   window.SiteApps.registry = window.SiteApps.registry || {};
-  window.SiteApps.register =
-    window.SiteApps.register ||
-    function (name, initFn) {
-      window.SiteApps.registry[name] = initFn;
-    };
+  window.SiteApps.register = window.SiteApps.register || function (name, initFn) {
+    window.SiteApps.registry[name] = initFn;
+  };
 
-  const STYLE_ID = "siteapps-md-editor-style-v1";
+  const STYLE_ID = "siteapps-md-manual-v2";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-/* Markdown Editor — high contrast + dual pane */
 [data-app="md-editor"]{
-  font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  background:#fff;
-  border:2px solid #111;
-  padding:18px;
-  border-radius:14px;
-  color:#111;
-  max-width:1100px;
-  margin:14px auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #fff;
+  border: 2px solid #111;
+  padding: 20px;
+  border-radius: 12px;
+  color: #111;
+  max-width: 900px;
+  margin: 20px auto;
 }
-[data-app="md-editor"] .top-row{
-  display:flex;
-  align-items:baseline;
-  justify-content:space-between;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-bottom:15px;
-}
-[data-app="md-editor"] h3{ margin:0; font-size:20px; font-weight:900; }
-
-[data-app="md-editor"] .badge{
-  font-size:14px;
-  font-weight:900;
-  padding:6px 10px;
-  border:2px solid #111;
-  border-radius:999px;
-  background:#fff;
-}
-[data-app="md-editor"] .badge.good{ border-color:#0b3d0b; color:#0b3d0b; }
-[data-app="md-editor"] .badge.dim{ border-color:#444; color:#444; }
-
-/* Grid Layout */
-[data-app="md-editor"] .editor-grid{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 10px;
-}
-
-[data-app="md-editor"] .pane-label{
-  font-weight: 900;
-  font-size: 14px;
-  margin-bottom: 6px;
-  display: block;
-}
-
-[data-app="md-editor"] textarea, 
-[data-app="md-editor"] .preview-area{
+[data-app="md-editor"] .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+[data-app="md-editor"] h3 { margin: 0; font-weight: 900; }
+[data-app="md-editor"] textarea {
   width: 100%;
-  height: 400px;
+  height: 250px;
   padding: 12px;
   border: 2px solid #111;
-  border-radius: 10px;
-  font-size: 15px;
-  overflow-y: auto;
+  border-radius: 8px;
+  font-family: "SF Mono", "Monaco", "Inconsolata", monospace;
+  font-size: 14px;
   box-sizing: border-box;
+  display: block;
 }
-
-[data-app="md-editor"] textarea{
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  line-height: 1.4;
-  resize: vertical;
+[data-app="md-editor"] .preview-box {
+  margin-top: 20px;
+  padding: 15px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background: #fafafa;
+  min-height: 100px;
 }
-
-[data-app="md-editor"] .preview-area{
-  background: #f9f9f9;
-  line-height: 1.6;
-}
-
-/* Basic Preview Styling */
-[data-app="md-editor"] .preview-area h1{ border-bottom: 2px solid #111; padding-bottom: 5px; }
-[data-app="md-editor"] .preview-area code{ background: #eee; padding: 2px 4px; border-radius: 4px; }
-[data-app="md-editor"] .preview-area blockquote{ border-left: 4px solid #111; margin: 0; padding-left: 15px; font-style: italic; }
-
-[data-app="md-editor"] .actions{
+[data-app="md-editor"] .controls {
   display: flex;
   gap: 10px;
   margin-top: 15px;
   flex-wrap: wrap;
 }
-
-[data-app="md-editor"] button{
+[data-app="md-editor"] button {
+  padding: 10px 18px;
+  font-weight: 800;
   border: 2px solid #111;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 10px 16px;
-  font-weight: 900;
-  font-size: 14px;
   background: #fff;
 }
-
-[data-app="md-editor"] .btn-save{ background: #0b5fff; color: #fff; border-color: #0b5fff; }
-[data-app="md-editor"] .btn-clear{ color: #7a0000; border-color: #7a0000; }
-
-@media (max-width: 800px){
-  [data-app="md-editor"] .editor-grid { grid-template-columns: 1fr; }
-  [data-app="md-editor"] textarea, [data-app="md-editor"] .preview-area { height: 300px; }
-}
+[data-app="md-editor"] .btn-primary { background: #111; color: #fff; }
+[data-app="md-editor"] .btn-save { background: #0066ff; color: #fff; border-color: #0066ff; }
+[data-app="md-editor"] .status { font-size: 12px; font-weight: bold; color: #666; }
 `;
     document.head.appendChild(style);
   }
 
-  // A very lightweight MD parser
-  function simpleMarkdownParse(md) {
-    let html = md
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") // Sanitize
+  function parseMarkdown(text) {
+    if (!text) return "<em>Nothing to preview...</em>";
+    return text
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;") // Basic safety
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-      .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-      .replace(/\*(.*)\*/gim, '<i>$1</i>')
-      .replace(/`(.*)`/gim, '<code>$1</code>')
-      .replace(/\n$/gim, '<br />')
-      .replace(/\n/gim, '<br />');
-    return html.trim();
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      .replace(/\n/gim, '<br>');
   }
 
   window.SiteApps.register("md-editor", (container) => {
+    if (!container) return;
     ensureStyle();
-    
-    const storageKey = `siteapps:mdeditor:${container.getAttribute("data-storage-key") || "default"}`;
-    let saveTimer = null;
 
-    // UI Construction
+    const storageKey = `siteapps:md:${container.getAttribute("data-storage-key") || "main"}`;
+
     container.innerHTML = `
-      <div class="top-row">
-        <h3>Markdown Live Editor</h3>
-        <div class="status-row">
-          <span class="badge dim" id="save-status">Saved ✓</span>
-        </div>
+      <div class="header">
+        <h3>Markdown Editor</h3>
+        <span class="status" id="status-msg">All changes saved</span>
       </div>
       
-      <div class="editor-grid">
-        <div>
-          <label class="pane-label">Markdown Input</label>
-          <textarea id="md-input" placeholder="Type # Header to start..."></textarea>
-        </div>
-        <div>
-          <label class="pane-label">Live Preview</label>
-          <div id="md-preview" class="preview-area"></div>
-        </div>
+      <textarea id="md-input" placeholder="Enter markdown here..."></textarea>
+      
+      <div class="controls">
+        <button class="btn-primary" id="btn-refresh">🔄 Refresh Preview</button>
+        <button class="btn-save" id="btn-download">💾 Download .md</button>
+        <button id="btn-clear">🗑️ Clear</button>
       </div>
 
-      <div class="actions">
-        <button class="btn-save" id="btn-download">💾 Download .md File</button>
-        <button class="btn-clear" id="btn-clear">🗑️ Clear</button>
-      </div>
+      <div class="preview-box" id="md-preview"></div>
     `;
 
     const input = container.querySelector("#md-input");
     const preview = container.querySelector("#md-preview");
-    const status = container.querySelector("#save-status");
-    const downloadBtn = container.querySelector("#btn-download");
-    const clearBtn = container.querySelector("#btn-clear");
+    const status = container.querySelector("#status-msg");
 
-    function updatePreview() {
-      preview.innerHTML = simpleMarkdownParse(input.value);
-    }
+    // Load saved data
+    const savedData = localStorage.getItem(storageKey);
+    if (savedData) input.value = savedData;
 
-    function saveState() {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify({ content: input.value }));
-        status.className = "badge good";
-        status.textContent = "Saved ✓";
-      } catch (e) {
-        status.textContent = "Error Saving";
+    const refreshPreview = () => {
+      preview.innerHTML = parseMarkdown(input.value);
+    };
+
+    const saveToLocal = () => {
+      localStorage.setItem(storageKey, input.value);
+      status.textContent = "Saved to browser ✓";
+      setTimeout(() => { status.textContent = "All changes saved"; }, 2000);
+    };
+
+    // Button Events
+    container.querySelector("#btn-refresh").onclick = refreshPreview;
+
+    container.querySelector("#btn-clear").onclick = () => {
+      if (confirm("Clear everything?")) {
+        input.value = "";
+        refreshPreview();
+        saveToLocal();
       }
-    }
+    };
 
-    function triggerAutoSave() {
-      status.className = "badge dim";
-      status.textContent = "Typing...";
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveState, 800);
-    }
-
-    function downloadFile() {
+    container.querySelector("#btn-download").onclick = () => {
       const blob = new Blob([input.value], { type: "text/markdown" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "document.md";
+      a.download = "notes.md";
       a.click();
       URL.revokeObjectURL(url);
-    }
+    };
 
-    // Events
-    input.addEventListener("input", () => {
-      updatePreview();
-      triggerAutoSave();
-    });
+    // Auto-save content while typing (without refreshing preview)
+    let debounce;
+    input.oninput = () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(saveToLocal, 500);
+    };
 
-    downloadBtn.addEventListener("click", downloadFile);
-
-    clearBtn.addEventListener("click", () => {
-      if (confirm("Clear all text?")) {
-        input.value = "";
-        updatePreview();
-        saveState();
-      }
-    });
-
-    // Initial Load
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey));
-      if (saved && saved.content) {
-        input.value = saved.content;
-      }
-    } catch (e) {}
-    
-    updatePreview();
+    // Initial render
+    refreshPreview();
   });
 })();
