@@ -7,13 +7,13 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-mdpreview-style-v5";
+  const STYLE_ID = "siteapps-mdpreview-style-v6";
   const DYNAMIC_STYLE_ID = "siteapps-md-dynamic-styles";
 
   const THEMES = {
+    modern: `/* Modern Clean */\n#md-render { background: #ffffff; color: #111; }\nh1, h2, h3 { margin: 10px 0 5px 0; }\np { margin-bottom: 15px; }`,
     paper: `/* Paper Theme */\n#md-render { background: #fdf6e3; color: #586e75; font-family: serif; }\nh1, h2, h3 { color: #268bd2; border-bottom: 1px solid #eee; margin: 10px 0; }`,
-    terminal: `/* Dark Terminal */\n#md-render { background: #1a1a1a; color: #00ff41; font-family: monospace; }\nh1, h2, h3 { color: #fff; border-bottom: 1px solid #333; }\nblockquote { border-left: 4px solid #00ff41; color: #aaa; }`,
-    modern: `/* Modern Clean */\n#md-render { background: #ffffff; color: #111; }\nh1, h2, h3 { margin: 10px 0 5px 0; }\np { margin-bottom: 15px; }`
+    terminal: `/* Dark Terminal */\n#md-render { background: #1a1a1a; color: #00ff41; font-family: monospace; }\nh1, h2, h3 { color: #fff; border-bottom: 1px solid #333; }\nblockquote { border-left: 4px solid #00ff41; color: #aaa; }`
   };
 
   function ensureStyle() {
@@ -40,19 +40,18 @@
   border: 2px solid #111; border-radius: 8px; padding: 25px;
   height: 615px; overflow-y: auto; box-sizing: border-box; transition: background 0.3s;
 }
-[data-app="mdpreview"] .actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+[data-app="mdpreview"] .actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 [data-app="mdpreview"] button, [data-app="mdpreview"] select {
   padding: 8px 14px; font-weight: 900; border: 2px solid #111; border-radius: 8px; cursor: pointer; background: #fff;
 }
-[data-app="mdpreview"] .btn-primary { background: #111; color: #fff; }
-[data-app="mdpreview"] select { background: #eee; }
+[data-app="mdpreview"] .badge { font-size: 10px; padding: 2px 6px; border: 1px solid #111; border-radius: 4px; background: #eee; }
 @media (max-width: 900px) { [data-app="mdpreview"] .main-grid { grid-template-columns: 1fr; } }
 `;
     document.head.appendChild(style);
   }
 
   function parseMd(md) {
-    if (!md) return "<em>Markdown preview will appear here...</em>";
+    if (!md) return "<em>Typing...</em>";
     return md
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -79,34 +78,33 @@
     container.innerHTML = `
       <div class="app-header">
         <h3>Markdown Lab</h3>
-        <div class="header-controls">
+        <div>
           <label style="display:inline; margin-right:5px;">Theme:</label>
           <select id="theme-select">
-            <option value="">-- Custom --</option>
-            <option value="modern">Modern Clean</option>
-            <option value="paper">Paper (Warm)</option>
-            <option value="terminal">Terminal (Dark)</option>
+            <option value="modern">Modern</option>
+            <option value="paper">Paper</option>
+            <option value="terminal">Terminal</option>
           </select>
         </div>
       </div>
       
       <div class="main-grid">
         <div class="side-bar">
-          <label>Markdown</label>
+          <label>Markdown <span class="badge">Live</span></label>
           <textarea id="md-input"></textarea>
-          <label>Custom CSS (use #md-render for bg)</label>
+          <label>Custom CSS <span class="badge">Live</span></label>
           <textarea id="css-input"></textarea>
         </div>
         <div class="preview-side">
-          <label>Live Preview</label>
+          <label>Preview</label>
           <div class="preview-container" id="md-render"></div>
         </div>
       </div>
 
       <div class="actions">
-        <button class="btn-primary" id="btn-refresh">🔄 Refresh Content</button>
         <button id="btn-dl">💾 Save .md</button>
         <button style="color:red; border-color:red" id="btn-clr">🗑️ Reset</button>
+        <span id="save-indicator" style="font-size:12px; opacity:0.6;">Saved</span>
       </div>
     `;
 
@@ -114,22 +112,34 @@
     const cssArea = container.querySelector("#css-input");
     const renderDiv = container.querySelector("#md-render");
     const themeSel = container.querySelector("#theme-select");
+    const indicator = container.querySelector("#save-indicator");
 
-    const update = () => {
+    let debounceTimer;
+
+    const updatePreview = () => {
       renderDiv.innerHTML = parseMd(mdArea.value);
       dynamicStyle.textContent = cssArea.value;
       localStorage.setItem(`${storageKey}:content`, mdArea.value);
       localStorage.setItem(`${storageKey}:styles`, cssArea.value);
+      indicator.textContent = "Saved ✓";
     };
+
+    mdArea.addEventListener('input', () => {
+      indicator.textContent = "Updating...";
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updatePreview, 300);
+    });
+
+    cssArea.addEventListener('input', () => {
+      dynamicStyle.textContent = cssArea.value;
+      localStorage.setItem(`${storageKey}:styles`, cssArea.value);
+    });
 
     themeSel.onchange = () => {
-      if (themeSel.value && THEMES[themeSel.value]) {
-        cssArea.value = THEMES[themeSel.value];
-        update();
-      }
+      cssArea.value = THEMES[themeSel.value];
+      updatePreview();
     };
 
-    container.querySelector("#btn-refresh").onclick = update;
     container.querySelector("#btn-dl").onclick = () => {
       const blob = new Blob([mdArea.value], { type: "text/markdown" });
       const a = Object.assign(document.createElement("a"), {
@@ -143,18 +153,13 @@
       if(confirm("Clear everything?")) {
         mdArea.value = "";
         cssArea.value = THEMES.modern;
-        update();
+        updatePreview();
       }
     };
 
-    cssArea.oninput = () => {
-      dynamicStyle.textContent = cssArea.value;
-      localStorage.setItem(`${storageKey}:styles`, cssArea.value);
-    };
-
-    // Load
-    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# Hello\nWelcome to the editor.";
+    // Load initial data
+    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# Hello\nType here and see it update!";
     cssArea.value = localStorage.getItem(`${storageKey}:styles`) || THEMES.modern;
-    update();
+    updatePreview();
   });
 })();
