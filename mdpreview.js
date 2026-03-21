@@ -7,7 +7,7 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-mdlab-style-v8";
+  const STYLE_ID = "siteapps-mdlab-style-v9";
   const DYNAMIC_STYLE_ID = "siteapps-mdlab-dynamic-styles";
 
   const DEFAULT_THEMES = {
@@ -49,7 +49,11 @@
   border: 2px solid #111; border-radius: 8px; padding: 25px;
   height: 660px; overflow-y: auto; box-sizing: border-box; transition: background 0.2s;
 }
-[data-app="markdown-lab"] .actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid #eee; padding-top: 15px; }
+[data-app="markdown-lab"] .status-bar {
+  display: flex; gap: 20px; padding: 10px 15px; background: #f9f9f9; border: 2px solid #111;
+  border-radius: 8px; margin-top: 15px; font-size: 12px; font-weight: 800; text-transform: uppercase;
+}
+[data-app="markdown-lab"] .actions { margin-top: 15px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 [data-app="markdown-lab"] button, [data-app="markdown-lab"] select {
   padding: 8px 14px; font-weight: 900; border: 2px solid #111; border-radius: 8px; cursor: pointer; background: #fff;
 }
@@ -65,21 +69,17 @@
     if (!md) return "<em>Lab is empty...</em>";
     return md
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      // Headers
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      // Tasks
       .replace(/^- \[ \] (.*$)/gim, '<div><input type="checkbox" disabled> $1</div>')
       .replace(/^- \[x\] (.*$)/gim, '<div><input type="checkbox" checked disabled> $1</div>')
-      // Tables (Basic)
       .replace(/\|(.+)\|/gim, (match) => {
-         if (match.includes('---')) return ""; // Skip separator row
+         if (match.includes('---')) return ""; 
          const cells = match.split('|').filter(c => c.trim() !== "").map(c => `<td>${c.trim()}</td>`).join('');
          return `<tr>${cells}</tr>`;
       })
       .replace(/(<tr>.*<\/tr>)+/gim, '<table>$1</table>')
-      // Formatting
       .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
       .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
       .replace(/\*(.*)\*/gim, '<em>$1</em>')
@@ -103,37 +103,43 @@
       <div class="app-header">
         <h3>Markdown Lab 🧪</h3>
         <div>
-          <label style="display:inline; margin-right:5px;">Theme:</label>
+          <label style="display:inline; margin-right:5px;">Styles:</label>
           <select id="theme-select"></select>
         </div>
       </div>
       
       <div class="main-grid">
         <div class="side-bar">
-          <label>Markdown Editor</label>
+          <label>Editor</label>
           <div class="snippet-bar">
             <button class="btn-snippet" data-snip="table">+ Table</button>
-            <button class="btn-snippet" data-snip="tasks">+ Task List</button>
+            <button class="btn-snippet" data-snip="tasks">+ Tasks</button>
             <button class="btn-snippet" data-snip="code">{ } Code</button>
             <button class="btn-snippet" data-snip="link">🔗 Link</button>
           </div>
           <textarea id="md-input"></textarea>
           
-          <label>Custom CSS</label>
+          <label>CSS Lab</label>
           <textarea id="css-input"></textarea>
-          <button id="btn-save-tpl" style="font-size:10px; margin-top:5px;">💾 Save CSS as Template</button>
+          <button id="btn-save-tpl" style="font-size:10px; margin-top:5px;">💾 Save Style Template</button>
         </div>
         
         <div class="preview-side">
-          <label>Result View</label>
+          <label>Output</label>
           <div class="preview-container" id="md-render"></div>
         </div>
+      </div>
+
+      <div class="status-bar">
+        <span id="stat-words">0 Words</span>
+        <span id="stat-chars">0 Chars</span>
+        <span id="stat-time">0 Min Read</span>
       </div>
 
       <div class="actions">
         <button id="btn-dl" class="btn-primary">💾 Save .md</button>
         <button id="btn-clr" style="color:red; border-color:red">🗑️ Reset</button>
-        <span id="save-indicator" style="font-size:11px; font-weight:bold; color: #aaa;">READY</span>
+        <span id="save-indicator" style="font-size:11px; font-weight:bold; color: #aaa; margin-left: auto;">READY</span>
       </div>
     `;
 
@@ -143,19 +149,33 @@
     const themeSel = container.querySelector("#theme-select");
     const indicator = container.querySelector("#save-indicator");
 
+    // Stats Elements
+    const sWords = container.querySelector("#stat-words");
+    const sChars = container.querySelector("#stat-chars");
+    const sTime = container.querySelector("#stat-time");
+
+    const updateStats = (text) => {
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const chars = text.length;
+      const readingTime = Math.ceil(words / 225);
+
+      sWords.textContent = `${words} Words`;
+      sChars.textContent = `${chars} Chars`;
+      sTime.textContent = `${readingTime} Min Read`;
+    };
+
     const updatePreview = () => {
       renderDiv.innerHTML = parseMd(mdArea.value);
       dynamicStyle.textContent = cssArea.value;
+      updateStats(mdArea.value);
       localStorage.setItem(`${storageKey}:content`, mdArea.value);
       localStorage.setItem(`${storageKey}:styles`, cssArea.value);
       indicator.textContent = "SAVED ✓";
     };
 
-    // Snippet insertion logic
     container.querySelectorAll('.btn-snippet').forEach(btn => {
       btn.onclick = () => {
-        const type = btn.getAttribute('data-snip');
-        const text = SNIPPETS[type];
+        const text = SNIPPETS[btn.getAttribute('data-snip')];
         const start = mdArea.selectionStart;
         const end = mdArea.selectionEnd;
         mdArea.value = mdArea.value.substring(0, start) + text + mdArea.value.substring(end);
@@ -176,10 +196,9 @@
       localStorage.setItem(`${storageKey}:styles`, cssArea.value);
     });
 
-    // Theme loading (Presets + Saved)
     const refreshThemes = () => {
       const custom = JSON.parse(localStorage.getItem('siteapps:mdlab:custom_templates') || "{}");
-      themeSel.innerHTML = '<option value="" disabled selected>Choose Styles...</option>';
+      themeSel.innerHTML = '<option value="" disabled selected>Load Style...</option>';
       Object.keys(DEFAULT_THEMES).forEach(k => themeSel.add(new Option(`Preset: ${k}`, `d:${k}`)));
       Object.keys(custom).forEach(k => themeSel.add(new Option(`Mine: ${k}`, `c:${k}`)));
     };
@@ -210,7 +229,7 @@
     container.querySelector("#btn-clr").onclick = () => { if(confirm("Clear content?")) { mdArea.value = ""; updatePreview(); } };
 
     // Initial Load
-    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# Welcome to the Lab\nExperiment with Markdown and CSS.";
+    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# Markdown Lab\nBegin your work...";
     cssArea.value = localStorage.getItem(`${storageKey}:styles`) || DEFAULT_THEMES.modern;
     refreshThemes();
     updatePreview();
