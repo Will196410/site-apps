@@ -7,8 +7,8 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-mdpreview-style-v7";
-  const DYNAMIC_STYLE_ID = "siteapps-md-dynamic-styles";
+  const STYLE_ID = "siteapps-mdlab-style-v8";
+  const DYNAMIC_STYLE_ID = "siteapps-mdlab-dynamic-styles";
 
   const DEFAULT_THEMES = {
     modern: `/* Modern Clean */\n#md-render { background: #ffffff; color: #111; }\nh1, h2, h3 { margin: 10px 0 5px 0; }\np { margin-bottom: 15px; }`,
@@ -16,56 +16,78 @@
     terminal: `/* Dark Terminal */\n#md-render { background: #1a1a1a; color: #00ff41; font-family: monospace; }\nh1, h2, h3 { color: #fff; border-bottom: 1px solid #333; }\nblockquote { border-left: 4px solid #00ff41; color: #aaa; }`
   };
 
+  const SNIPPETS = {
+    table: "\n| Header 1 | Header 2 |\n| -------- | -------- |\n| Cell 1   | Cell 2   |\n",
+    tasks: "\n- [ ] Task 1\n- [x] Task 2 (done)\n- [ ] Task 3\n",
+    code: "\n```javascript\nconsole.log('Hello World');\n```\n",
+    link: "[Display Text](https://example.com)"
+  };
+
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-[data-app="mdpreview"]{
+[data-app="markdown-lab"]{
   font-family:-apple-system,system-ui,sans-serif;
   background:#fff; border:2px solid #111; padding:20px; border-radius:14px;
-  max-width:1100px; margin:20px auto; color:#111;
+  max-width:1150px; margin:20px auto; color:#111; box-shadow: 6px 6px 0px #eee;
 }
-[data-app="mdpreview"] .app-header { display:flex; justify-content:space-between; margin-bottom:15px; align-items: center;}
-[data-app="mdpreview"] .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
-[data-app="mdpreview"] .side-bar { display: flex; flex-direction: column; gap: 10px; }
-[data-app="mdpreview"] label { display:block; font-weight:900; font-size:11px; text-transform:uppercase; margin: 5px 0; color: #555; }
-[data-app="mdpreview"] textarea {
+[data-app="markdown-lab"] .app-header { display:flex; justify-content:space-between; margin-bottom:15px; align-items: center;}
+[data-app="markdown-lab"] .main-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+[data-app="markdown-lab"] .side-bar { display: flex; flex-direction: column; gap: 10px; }
+[data-app="markdown-lab"] label { display:block; font-weight:900; font-size:11px; text-transform:uppercase; margin: 5px 0; color: #555; }
+[data-app="markdown-lab"] .snippet-bar { display: flex; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; }
+[data-app="markdown-lab"] .btn-snippet { padding: 4px 8px; font-size: 10px; background: #f0f0f0; border: 1px solid #111; border-radius: 4px; cursor: pointer; font-weight: bold; }
+[data-app="markdown-lab"] textarea {
   width:100%; border:2px solid #111; border-radius:8px; padding:10px;
   font-family: ui-monospace, monospace; font-size:13px; box-sizing: border-box;
 }
-[data-app="mdpreview"] #md-input { height: 350px; }
-[data-app="mdpreview"] #css-input { height: 180px; background: #f8f8f8; }
-[data-app="mdpreview"] .preview-container {
+[data-app="markdown-lab"] #md-input { height: 380px; }
+[data-app="markdown-lab"] #css-input { height: 160px; background: #fafafa; }
+[data-app="markdown-lab"] .preview-container {
   border: 2px solid #111; border-radius: 8px; padding: 25px;
-  height: 615px; overflow-y: auto; box-sizing: border-box; transition: background 0.3s;
+  height: 660px; overflow-y: auto; box-sizing: border-box; transition: background 0.2s;
 }
-[data-app="mdpreview"] .actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-[data-app="mdpreview"] button, [data-app="mdpreview"] select {
+[data-app="markdown-lab"] .actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid #eee; padding-top: 15px; }
+[data-app="markdown-lab"] button, [data-app="markdown-lab"] select {
   padding: 8px 14px; font-weight: 900; border: 2px solid #111; border-radius: 8px; cursor: pointer; background: #fff;
 }
-[data-app="mdpreview"] .template-row { display: flex; gap: 5px; margin-top: 5px; }
-[data-app="mdpreview"] .template-row button { padding: 4px 8px; font-size: 10px; }
-[data-app="mdpreview"] .btn-primary { background: #111; color: #fff; }
-@media (max-width: 900px) { [data-app="mdpreview"] .main-grid { grid-template-columns: 1fr; } }
+[data-app="markdown-lab"] .btn-primary { background: #111; color: #fff; }
+[data-app="markdown-lab"] table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+[data-app="markdown-lab"] table th, [data-app="markdown-lab"] table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+@media (max-width: 950px) { [data-app="markdown-lab"] .main-grid { grid-template-columns: 1fr; } }
 `;
     document.head.appendChild(style);
   }
 
   function parseMd(md) {
-    if (!md) return "<em>Typing...</em>";
+    if (!md) return "<em>Lab is empty...</em>";
     return md
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      // Headers
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      // Tasks
+      .replace(/^- \[ \] (.*$)/gim, '<div><input type="checkbox" disabled> $1</div>')
+      .replace(/^- \[x\] (.*$)/gim, '<div><input type="checkbox" checked disabled> $1</div>')
+      // Tables (Basic)
+      .replace(/\|(.+)\|/gim, (match) => {
+         if (match.includes('---')) return ""; // Skip separator row
+         const cells = match.split('|').filter(c => c.trim() !== "").map(c => `<td>${c.trim()}</td>`).join('');
+         return `<tr>${cells}</tr>`;
+      })
+      .replace(/(<tr>.*<\/tr>)+/gim, '<table>$1</table>')
+      // Formatting
       .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
       .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
       .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      .replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>')
       .replace(/\n/gim, '<br>');
   }
 
-  window.SiteApps.register("mdpreview", (container) => {
+  window.SiteApps.register("markdown-lab", (container) => {
     ensureStyle();
     
     let dynamicStyle = document.getElementById(DYNAMIC_STYLE_ID);
@@ -75,39 +97,43 @@
       document.head.appendChild(dynamicStyle);
     }
 
-    const storageKey = `siteapps:mdpreview:${container.getAttribute("data-storage-key") || "default"}`;
-    const templatesKey = `siteapps:mdpreview:custom_templates`;
+    const storageKey = `siteapps:mdlab:${container.getAttribute("data-storage-key") || "default"}`;
 
     container.innerHTML = `
       <div class="app-header">
-        <h3>Markdown Lab</h3>
+        <h3>Markdown Lab 🧪</h3>
         <div>
-          <label style="display:inline; margin-right:5px;">Templates:</label>
+          <label style="display:inline; margin-right:5px;">Theme:</label>
           <select id="theme-select"></select>
         </div>
       </div>
       
       <div class="main-grid">
         <div class="side-bar">
-          <label>Markdown</label>
+          <label>Markdown Editor</label>
+          <div class="snippet-bar">
+            <button class="btn-snippet" data-snip="table">+ Table</button>
+            <button class="btn-snippet" data-snip="tasks">+ Task List</button>
+            <button class="btn-snippet" data-snip="code">{ } Code</button>
+            <button class="btn-snippet" data-snip="link">🔗 Link</button>
+          </div>
           <textarea id="md-input"></textarea>
+          
           <label>Custom CSS</label>
           <textarea id="css-input"></textarea>
-          <div class="template-row">
-            <button id="btn-save-tpl">💾 Save CSS as Template</button>
-            <button id="btn-del-tpl" style="color:red; border-color:red">🗑️ Delete Selected</button>
-          </div>
+          <button id="btn-save-tpl" style="font-size:10px; margin-top:5px;">💾 Save CSS as Template</button>
         </div>
+        
         <div class="preview-side">
-          <label>Preview</label>
+          <label>Result View</label>
           <div class="preview-container" id="md-render"></div>
         </div>
       </div>
 
       <div class="actions">
-        <button id="btn-dl">💾 Save .md</button>
-        <button style="color:red; border-color:red" id="btn-clr">🗑️ Reset Editor</button>
-        <span id="save-indicator" style="font-size:12px; opacity:0.6;">Saved</span>
+        <button id="btn-dl" class="btn-primary">💾 Save .md</button>
+        <button id="btn-clr" style="color:red; border-color:red">🗑️ Reset</button>
+        <span id="save-indicator" style="font-size:11px; font-weight:bold; color: #aaa;">READY</span>
       </div>
     `;
 
@@ -117,42 +143,30 @@
     const themeSel = container.querySelector("#theme-select");
     const indicator = container.querySelector("#save-indicator");
 
-    let debounceTimer;
-
-    const getCustomTemplates = () => JSON.parse(localStorage.getItem(templatesKey) || "{}");
-
-    const refreshTemplateDropdown = () => {
-      const custom = getCustomTemplates();
-      themeSel.innerHTML = '<option value="" disabled selected>Select a template...</option>';
-      
-      const groupDefaults = document.createElement('optgroup');
-      groupDefaults.label = "Presets";
-      Object.keys(DEFAULT_THEMES).forEach(k => {
-        const opt = new Option(k.charAt(0).toUpperCase() + k.slice(1), `default:${k}`);
-        groupDefaults.appendChild(opt);
-      });
-      
-      const groupCustom = document.createElement('optgroup');
-      groupCustom.label = "My Templates";
-      Object.keys(custom).forEach(k => {
-        const opt = new Option(k, `custom:${k}`);
-        groupCustom.appendChild(opt);
-      });
-
-      themeSel.appendChild(groupDefaults);
-      themeSel.appendChild(groupCustom);
-    };
-
     const updatePreview = () => {
       renderDiv.innerHTML = parseMd(mdArea.value);
       dynamicStyle.textContent = cssArea.value;
       localStorage.setItem(`${storageKey}:content`, mdArea.value);
       localStorage.setItem(`${storageKey}:styles`, cssArea.value);
-      indicator.textContent = "Saved ✓";
+      indicator.textContent = "SAVED ✓";
     };
 
+    // Snippet insertion logic
+    container.querySelectorAll('.btn-snippet').forEach(btn => {
+      btn.onclick = () => {
+        const type = btn.getAttribute('data-snip');
+        const text = SNIPPETS[type];
+        const start = mdArea.selectionStart;
+        const end = mdArea.selectionEnd;
+        mdArea.value = mdArea.value.substring(0, start) + text + mdArea.value.substring(end);
+        mdArea.focus();
+        updatePreview();
+      };
+    });
+
+    let debounceTimer;
     mdArea.addEventListener('input', () => {
-      indicator.textContent = "Updating...";
+      indicator.textContent = "UPDATING...";
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(updatePreview, 300);
     });
@@ -162,58 +176,43 @@
       localStorage.setItem(`${storageKey}:styles`, cssArea.value);
     });
 
+    // Theme loading (Presets + Saved)
+    const refreshThemes = () => {
+      const custom = JSON.parse(localStorage.getItem('siteapps:mdlab:custom_templates') || "{}");
+      themeSel.innerHTML = '<option value="" disabled selected>Choose Styles...</option>';
+      Object.keys(DEFAULT_THEMES).forEach(k => themeSel.add(new Option(`Preset: ${k}`, `d:${k}`)));
+      Object.keys(custom).forEach(k => themeSel.add(new Option(`Mine: ${k}`, `c:${k}`)));
+    };
+
     themeSel.onchange = () => {
-      const [type, name] = themeSel.value.split(':');
-      if (type === 'default') {
-        cssArea.value = DEFAULT_THEMES[name];
-      } else {
-        cssArea.value = getCustomTemplates()[name];
-      }
+      const val = themeSel.value;
+      if (val.startsWith('d:')) cssArea.value = DEFAULT_THEMES[val.split(':')[1]];
+      else cssArea.value = JSON.parse(localStorage.getItem('siteapps:mdlab:custom_templates'))[val.split(':')[1]];
       updatePreview();
     };
 
     container.querySelector("#btn-save-tpl").onclick = () => {
-      const name = prompt("Enter a name for this CSS template:");
+      const name = prompt("Template Name:");
       if (name) {
-        const custom = getCustomTemplates();
+        const custom = JSON.parse(localStorage.getItem('siteapps:mdlab:custom_templates') || "{}");
         custom[name] = cssArea.value;
-        localStorage.setItem(templatesKey, JSON.stringify(custom));
-        refreshTemplateDropdown();
-      }
-    };
-
-    container.querySelector("#btn-del-tpl").onclick = () => {
-      const val = themeSel.value;
-      if (!val || !val.startsWith('custom:')) return alert("Select a custom template to delete.");
-      const name = val.split(':')[1];
-      if (confirm(`Delete template "${name}"?`)) {
-        const custom = getCustomTemplates();
-        delete custom[name];
-        localStorage.setItem(templatesKey, JSON.stringify(custom));
-        refreshTemplateDropdown();
+        localStorage.setItem('siteapps:mdlab:custom_templates', JSON.stringify(custom));
+        refreshThemes();
       }
     };
 
     container.querySelector("#btn-dl").onclick = () => {
       const blob = new Blob([mdArea.value], { type: "text/markdown" });
-      const a = Object.assign(document.createElement("a"), {
-        href: URL.createObjectURL(blob),
-        download: "note.md"
-      });
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "lab-note.md" });
       a.click();
     };
 
-    container.querySelector("#btn-clr").onclick = () => {
-      if(confirm("Clear content? (Your templates will be safe)")) {
-        mdArea.value = "";
-        updatePreview();
-      }
-    };
+    container.querySelector("#btn-clr").onclick = () => { if(confirm("Clear content?")) { mdArea.value = ""; updatePreview(); } };
 
     // Initial Load
-    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# My Notes\nStart typing...";
+    mdArea.value = localStorage.getItem(`${storageKey}:content`) || "# Welcome to the Lab\nExperiment with Markdown and CSS.";
     cssArea.value = localStorage.getItem(`${storageKey}:styles`) || DEFAULT_THEMES.modern;
-    refreshTemplateDropdown();
+    refreshThemes();
     updatePreview();
   });
 })();
