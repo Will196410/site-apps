@@ -10,8 +10,8 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-tagtable-style-v2";
-  const BUILD_STAMP = "25 Mar 2026 11:13 GMT";
+  const STYLE_ID = "siteapps-tagtable-style-v3";
+  const BUILD_STAMP = "25 Mar 2026 16:21 GMT";
   const CHATGPT_VERSION = "GPT-5.4 Thinking";
 
   function ensureStyle() {
@@ -470,11 +470,9 @@
 
   function parseImportedText(text) {
     const parsed = safeJsonParse(text);
-
     if (parsed && Array.isArray(parsed.records)) {
       return parsed.records.map(normalizeRecord).filter(Boolean);
     }
-
     return splitRecords(text);
   }
 
@@ -526,9 +524,6 @@
     const inputTA = document.createElement("textarea");
     inputTA.placeholder = "tag-one\ntag-two\ntag-three";
 
-    const controls = document.createElement("div");
-    controls.className = "controls";
-
     function makeBtn(text, cls, fn) {
       const b = document.createElement("button");
       b.type = "button";
@@ -538,13 +533,24 @@
       return b;
     }
 
+    const controls = document.createElement("div");
+    controls.className = "controls";
+
     const addBtn = makeBtn("Add lines", "btn-primary", addLinesFromInput);
     const clearInputBtn = makeBtn("Clear input", "", clearInput);
-    const exportBtn = makeBtn("Export list", "btn-copy", exportList);
+    const copyAllBtn = makeBtn("Copy all tags", "btn-copy", copyAllTags);
+    const exportBtn = makeBtn("Export file", "", exportList);
     const importBtn = makeBtn("Import file", "", () => fileInput.click());
     const clearAllBtn = makeBtn("Clear all", "btn-clear", clearAll);
 
-    controls.append(addBtn, clearInputBtn, exportBtn, importBtn, clearAllBtn);
+    controls.append(
+      addBtn,
+      clearInputBtn,
+      copyAllBtn,
+      exportBtn,
+      importBtn,
+      clearAllBtn
+    );
 
     const fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -554,28 +560,25 @@
     const searchLabel = document.createElement("label");
     searchLabel.textContent = "Search saved entries";
 
-    const searchInput = document.createElement("search");
-    // Safari-safe fallback: replace invalid element with actual input
-    const realSearchInput = document.createElement("input");
-    realSearchInput.type = "search";
-    realSearchInput.placeholder = "Type to filter the table…";
+    const searchInput = document.createElement("input");
+    searchInput.type = "search";
+    searchInput.placeholder = "Type to filter the table…";
 
     const searchActions = document.createElement("div");
     searchActions.className = "search-actions";
 
     const clearSearchBtn = makeBtn("Clear search", "", () => {
-      realSearchInput.value = "";
+      searchInput.value = "";
       searchQuery = "";
       renderTable();
       saveStateDebounced();
-      realSearchInput.focus();
+      searchInput.focus();
     });
 
     searchActions.append(clearSearchBtn);
 
     const searchMeta = document.createElement("div");
     searchMeta.className = "search-meta";
-    searchMeta.textContent = "";
 
     const tableLabel = document.createElement("label");
     tableLabel.textContent = "Saved entries";
@@ -605,13 +608,13 @@
     emptyBox.className = "empty";
     emptyBox.textContent = "No entries yet.";
 
+    const buildStamp = document.createElement("div");
+    buildStamp.className = "buildstamp";
+    buildStamp.textContent = `Build ${BUILD_STAMP} • ${CHATGPT_VERSION}`;
+
     const feedback = document.createElement("div");
     feedback.className = "feedback";
     feedback.textContent = "Copied!";
-
-    const buildStamp = document.createElement("div");
-    buildStamp.className = "buildstamp";
-    buildStamp.innerHTML = `Build ${escapeHtml(BUILD_STAMP)} • ${escapeHtml(CHATGPT_VERSION)}`;
 
     container.append(
       topRow,
@@ -621,7 +624,7 @@
       controls,
       fileInput,
       searchLabel,
-      realSearchInput,
+      searchInput,
       searchActions,
       searchMeta,
       tableLabel,
@@ -630,14 +633,6 @@
       buildStamp,
       feedback
     );
-
-    function escapeHtml(s) {
-      return String(s || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
 
     function showToast(message) {
       feedback.textContent = message;
@@ -665,7 +660,7 @@
     function saveState() {
       try {
         const state = {
-          v: 2,
+          v: 3,
           records,
           draftText: inputTA.value,
           searchQuery,
@@ -712,7 +707,7 @@
         if (typeof s.draftText === "string") inputTA.value = s.draftText;
         if (typeof s.searchQuery === "string") {
           searchQuery = s.searchQuery;
-          realSearchInput.value = s.searchQuery;
+          searchInput.value = s.searchQuery;
         }
         if (Array.isArray(s.records)) {
           records = mergeRecords([], s.records).records;
@@ -825,7 +820,9 @@
 
       const bits = [];
       bits.push(`Added ${merged.added}`);
-      if (merged.skipped) bits.push(`Skipped ${merged.skipped} duplicate${merged.skipped === 1 ? "" : "s"}`);
+      if (merged.skipped) {
+        bits.push(`Skipped ${merged.skipped} duplicate${merged.skipped === 1 ? "" : "s"}`);
+      }
       showToast(bits.join(" • "));
     }
 
@@ -834,34 +831,53 @@
       markDraftChanged();
     }
 
-    function clearAll() {
-      if (!records.length && !inputTA.value.trim()) return;
-      if (!confirm("Clear the saved entries and the input area?")) return;
+    async function copyAllTags() {
+      if (!records.length) {
+        alert("There are no saved tags to copy.");
+        return;
+      }
 
-      records = [];
-      inputTA.value = "";
-      realSearchInput.value = "";
-      searchQuery = "";
-      copiedSinceChange = false;
-      lastCopyAt = null;
-      renderTable();
-      saveStateDebounced();
-      showToast("Cleared");
+      const text = records.join("\n");
+      const ok = await copyText(text);
+      if (ok) {
+        copiedSinceChange = true;
+        lastCopyAt = new Date().toISOString();
+        renderBadges();
+        saveState();
+        showToast("All tags copied");
+      } else {
+        alert("Copy failed. Tap and hold, or try a different browser.");
+      }
     }
 
     function exportList() {
       if (!records.length) {
-        alert("There are no saved entries to export.");
+        alert("There are no saved tags to export.");
         return;
       }
 
       const text = records.join("\n");
       try {
         downloadTextFile(exportFilename(), text);
-        showToast("Exported");
+        showToast("Exported file");
       } catch (_) {
         alert("Export failed on this device.");
       }
+    }
+
+    function clearAll() {
+      if (!records.length && !inputTA.value.trim()) return;
+      if (!confirm("Clear the saved entries and the input area?")) return;
+
+      records = [];
+      inputTA.value = "";
+      searchInput.value = "";
+      searchQuery = "";
+      copiedSinceChange = false;
+      lastCopyAt = null;
+      renderTable();
+      saveStateDebounced();
+      showToast("Cleared");
     }
 
     fileInput.addEventListener("change", async () => {
@@ -885,7 +901,9 @@
 
         const bits = [];
         bits.push(`Imported ${merged.added}`);
-        if (merged.skipped) bits.push(`Skipped ${merged.skipped} duplicate${merged.skipped === 1 ? "" : "s"}`);
+        if (merged.skipped) {
+          bits.push(`Skipped ${merged.skipped} duplicate${merged.skipped === 1 ? "" : "s"}`);
+        }
         showToast(bits.join(" • "));
       } catch (_) {
         alert("Import failed.");
@@ -896,8 +914,8 @@
 
     inputTA.addEventListener("input", markDraftChanged);
 
-    realSearchInput.addEventListener("input", () => {
-      searchQuery = realSearchInput.value || "";
+    searchInput.addEventListener("input", () => {
+      searchQuery = searchInput.value || "";
       renderTable();
       saveStateDebounced();
     });
