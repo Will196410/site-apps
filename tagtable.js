@@ -10,7 +10,9 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-tagtable-style-v1";
+  const STYLE_ID = "siteapps-tagtable-style-v2";
+  const BUILD_STAMP = "25 Mar 2026 11:13 GMT";
+  const CHATGPT_VERSION = "GPT-5.4 Thinking";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -98,13 +100,28 @@
   appearance:none;
 }
 
-[data-app="tagtable"] textarea:focus{
+[data-app="tagtable"] input[type="search"]{
+  width:100%;
+  padding:12px;
+  border:2px solid #111;
+  border-radius:10px;
+  font-size:15px;
+  line-height:1.4;
+  box-sizing:border-box;
+  background:#fff;
+  color:#111;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
+[data-app="tagtable"] textarea:focus,
+[data-app="tagtable"] input[type="search"]:focus{
   outline:none;
   box-shadow:0 0 0 3px rgba(11,95,255,0.25);
 }
 
 [data-app="tagtable"] .controls,
-[data-app="tagtable"] .table-actions{
+[data-app="tagtable"] .search-actions{
   display:flex;
   flex-wrap:wrap;
   gap:10px;
@@ -249,15 +266,32 @@
   display:none;
 }
 
+[data-app="tagtable"] .search-meta{
+  margin-top:8px;
+  font-size:14px;
+  color:#333;
+  font-weight:700;
+}
+
+[data-app="tagtable"] .buildstamp{
+  margin-top:14px;
+  font-size:11px;
+  line-height:1.3;
+  color:#666;
+  text-align:right;
+  user-select:text;
+  -webkit-user-select:text;
+}
+
 @media (max-width:700px){
   [data-app="tagtable"] .controls,
-  [data-app="tagtable"] .table-actions{
+  [data-app="tagtable"] .search-actions{
     flex-direction:column;
     align-items:stretch;
   }
 
   [data-app="tagtable"] .controls button,
-  [data-app="tagtable"] .table-actions button{
+  [data-app="tagtable"] .search-actions button{
     width:100%;
   }
 
@@ -291,6 +325,10 @@
 
   [data-app="tagtable"] .delete-row{
     width:100%;
+  }
+
+  [data-app="tagtable"] .buildstamp{
+    text-align:left;
   }
 }
 `;
@@ -450,6 +488,7 @@
     let lastCopyAt = null;
     let saveTimer = null;
     let toastTimer = null;
+    let searchQuery = "";
 
     container.innerHTML = "";
 
@@ -512,6 +551,32 @@
     fileInput.className = "file-input";
     fileInput.accept = ".txt,.json,text/plain,application/json";
 
+    const searchLabel = document.createElement("label");
+    searchLabel.textContent = "Search saved entries";
+
+    const searchInput = document.createElement("search");
+    // Safari-safe fallback: replace invalid element with actual input
+    const realSearchInput = document.createElement("input");
+    realSearchInput.type = "search";
+    realSearchInput.placeholder = "Type to filter the table…";
+
+    const searchActions = document.createElement("div");
+    searchActions.className = "search-actions";
+
+    const clearSearchBtn = makeBtn("Clear search", "", () => {
+      realSearchInput.value = "";
+      searchQuery = "";
+      renderTable();
+      saveStateDebounced();
+      realSearchInput.focus();
+    });
+
+    searchActions.append(clearSearchBtn);
+
+    const searchMeta = document.createElement("div");
+    searchMeta.className = "search-meta";
+    searchMeta.textContent = "";
+
     const tableLabel = document.createElement("label");
     tableLabel.textContent = "Saved entries";
 
@@ -544,6 +609,10 @@
     feedback.className = "feedback";
     feedback.textContent = "Copied!";
 
+    const buildStamp = document.createElement("div");
+    buildStamp.className = "buildstamp";
+    buildStamp.innerHTML = `Build ${escapeHtml(BUILD_STAMP)} • ${escapeHtml(CHATGPT_VERSION)}`;
+
     container.append(
       topRow,
       inputLabel,
@@ -551,11 +620,24 @@
       inputTA,
       controls,
       fileInput,
+      searchLabel,
+      realSearchInput,
+      searchActions,
+      searchMeta,
       tableLabel,
       emptyBox,
       tableWrap,
+      buildStamp,
       feedback
     );
+
+    function escapeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
 
     function showToast(message) {
       feedback.textContent = message;
@@ -583,9 +665,10 @@
     function saveState() {
       try {
         const state = {
-          v: 1,
+          v: 2,
           records,
           draftText: inputTA.value,
+          searchQuery,
           copiedSinceChange,
           lastCopyAt
         };
@@ -627,6 +710,10 @@
         if (!s || typeof s !== "object") return;
 
         if (typeof s.draftText === "string") inputTA.value = s.draftText;
+        if (typeof s.searchQuery === "string") {
+          searchQuery = s.searchQuery;
+          realSearchInput.value = s.searchQuery;
+        }
         if (Array.isArray(s.records)) {
           records = mergeRecords([], s.records).records;
         }
@@ -638,18 +725,46 @@
       }
     }
 
+    function getFilteredRecords() {
+      const q = normalizeRecord(searchQuery).toLocaleLowerCase();
+      if (!q) return records.slice();
+      return records.filter((item) => item.toLocaleLowerCase().includes(q));
+    }
+
+    function renderSearchMeta(filtered) {
+      if (!records.length) {
+        searchMeta.textContent = "";
+        return;
+      }
+
+      if (!searchQuery.trim()) {
+        searchMeta.textContent = `Showing all ${records.length} ${records.length === 1 ? "entry" : "entries"}.`;
+        return;
+      }
+
+      searchMeta.textContent =
+        `Showing ${filtered.length} of ${records.length} ${records.length === 1 ? "entry" : "entries"} for “${searchQuery}”.`;
+    }
+
     function renderTable() {
       tbody.innerHTML = "";
 
+      const filtered = getFilteredRecords();
+
       if (!records.length) {
         emptyBox.style.display = "block";
+        emptyBox.textContent = "No entries yet.";
+        tableWrap.style.display = "none";
+      } else if (!filtered.length) {
+        emptyBox.style.display = "block";
+        emptyBox.textContent = "No entries match your search.";
         tableWrap.style.display = "none";
       } else {
         emptyBox.style.display = "none";
         tableWrap.style.display = "block";
       }
 
-      records.forEach((text) => {
+      filtered.forEach((text) => {
         const tr = document.createElement("tr");
 
         const tdText = document.createElement("td");
@@ -692,6 +807,7 @@
         tbody.appendChild(tr);
       });
 
+      renderSearchMeta(filtered);
       renderBadges();
     }
 
@@ -724,6 +840,8 @@
 
       records = [];
       inputTA.value = "";
+      realSearchInput.value = "";
+      searchQuery = "";
       copiedSinceChange = false;
       lastCopyAt = null;
       renderTable();
@@ -777,6 +895,12 @@
     });
 
     inputTA.addEventListener("input", markDraftChanged);
+
+    realSearchInput.addEventListener("input", () => {
+      searchQuery = realSearchInput.value || "";
+      renderTable();
+      saveStateDebounced();
+    });
 
     restoreState();
     renderTable();
