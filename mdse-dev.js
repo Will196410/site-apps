@@ -22,7 +22,7 @@
         hour12: false
       }).replace(",", "");
     } catch (_) {
-      return "27 Mar 2026 10:05";
+      return "27 Mar 2026 10:20";
     }
   })();
 
@@ -291,7 +291,8 @@
         display: flex;
         gap: 8px;
         align-items: center;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        width: 100%;
       }
       .mdse-wrapper .tocMarker {
         display: inline-flex;
@@ -304,6 +305,24 @@
         font-size: 12px;
         font-weight: 900;
         background: #fff;
+      }
+      .mdse-wrapper .tocMarkerBtn {
+        cursor: pointer;
+      }
+      .mdse-wrapper .tocMarkerBtn:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+      .mdse-wrapper .tocJumpBody {
+        flex: 1 1 auto;
+        min-width: 0;
+        border: 0;
+        border-radius: 0;
+        padding: 0;
+        background: transparent;
+        text-align: left;
+        font: inherit;
+        color: inherit;
       }
       .mdse-wrapper .tocMarker.none {
         opacity: 0.55;
@@ -1178,7 +1197,7 @@
         return;
       }
 
-      tocMeta.textContent = `${nodes.length} heading${nodes.length === 1 ? "" : "s"}. Tap one to jump to it in Structure.`;
+      tocMeta.textContent = `${nodes.length} heading${nodes.length === 1 ? "" : "s"}. Tap a heading to jump to it in Structure.`;
 
       const frag = document.createDocumentFragment();
 
@@ -1186,18 +1205,29 @@
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
 
-        const btn = document.createElement("button");
-        btn.className = "tocItem";
-        btn.setAttribute("data-jump-id", n.id);
-        btn.style.setProperty("--toc-indent", `${(n.level - 1) * 18}px`);
-        btn.innerHTML = `
+        const row = document.createElement("div");
+        row.className = "tocItem";
+        row.style.setProperty("--toc-indent", `${(n.level - 1) * 18}px`);
+
+        row.innerHTML = `
           <div class="tocHead">
-            <span class="tocMarker${hasChildren ? "" : " none"}">${marker}</span>
-            <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+            <button
+              class="tocMarker tocMarkerBtn${hasChildren ? "" : " none"}"
+              data-action="toc-toggle"
+              data-node-id="${escapeHtml(n.id)}"
+              ${hasChildren ? "" : "disabled"}
+              aria-label="${hasChildren ? (n.isCollapsed ? "Expand branch" : "Collapse branch") : "No children"}"
+              title="${hasChildren ? (n.isCollapsed ? "Expand branch" : "Collapse branch") : "No children"}"
+            >${marker}</button>
+
+            <button class="tocJumpBody" data-jump-id="${escapeHtml(n.id)}">
+              <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+              <div class="tocItemMeta">H${n.level} · Node ${idx + 1}</div>
+            </button>
           </div>
-          <div class="tocItemMeta">H${n.level} · Node ${idx + 1}</div>
         `;
-        frag.appendChild(btn);
+
+        frag.appendChild(row);
       });
 
       tocList.appendChild(frag);
@@ -1759,9 +1789,18 @@
     }
 
     tocList.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-jump-id]");
-      if (!btn) return;
-      jumpToNodeFromPanel(btn.getAttribute("data-jump-id"));
+      const toggleBtn = e.target.closest('[data-action="toc-toggle"]');
+      if (toggleBtn) {
+        const id = toggleBtn.getAttribute("data-node-id");
+        if (!id) return;
+        toggleCollapse(id);
+        renderTOC();
+        return;
+      }
+
+      const jumpBtn = e.target.closest("[data-jump-id]");
+      if (!jumpBtn) return;
+      jumpToNodeFromPanel(jumpBtn.getAttribute("data-jump-id"));
     });
 
     searchResults.addEventListener("click", (e) => {
