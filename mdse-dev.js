@@ -22,7 +22,7 @@
         hour12: false
       }).replace(",", "");
     } catch (_) {
-      return "18 Mar 2026 08:05";
+      return "27 Mar 2026 09:35";
     }
   })();
 
@@ -250,7 +250,8 @@
         margin-bottom: 12px;
       }
       .mdse-wrapper .searchResults,
-      .mdse-wrapper .tagMatches {
+      .mdse-wrapper .tagMatches,
+      .mdse-wrapper .tocList {
         display: grid;
         gap: 10px;
       }
@@ -273,7 +274,8 @@
         background: #111;
         color: #fff;
       }
-      .mdse-wrapper .searchItem {
+      .mdse-wrapper .searchItem,
+      .mdse-wrapper .tocItem {
         border: 2px solid rgba(0,0,0,.15);
         border-radius: 14px;
         background: #fff;
@@ -281,12 +283,18 @@
         text-align: left;
         width: 100%;
       }
-      .mdse-wrapper .searchItemTitle {
+      .mdse-wrapper .tocItem {
+        --toc-indent: 0px;
+        padding-left: calc(12px + var(--toc-indent));
+      }
+      .mdse-wrapper .searchItemTitle,
+      .mdse-wrapper .tocItemTitle {
         font-size: 16px;
         font-weight: 800;
         margin-bottom: 6px;
       }
-      .mdse-wrapper .searchItemMeta {
+      .mdse-wrapper .searchItemMeta,
+      .mdse-wrapper .tocItemMeta {
         font-size: 12px;
         font-weight: 800;
         color: #444;
@@ -607,6 +615,7 @@
 
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
+          <button class="tabbtn" data-tab="toc">Contents</button>
           <button class="tabbtn" data-tab="search">Search</button>
           <button class="tabbtn" data-tab="tags">Tags</button>
         </div>
@@ -626,6 +635,11 @@
           </div>
           <div class="preambleNote"></div>
           <div class="canvas"></div>
+        </div>
+
+        <div class="tabPanel panelToc">
+          <div class="muted tocMeta">No headings yet.</div>
+          <div class="tocList"></div>
         </div>
 
         <div class="tabPanel panelSearch">
@@ -655,6 +669,8 @@
     const btnReset = root.querySelector(".btnReset");
     const btnCopyTags = root.querySelector(".btnCopyTags");
     const canvas = root.querySelector(".canvas");
+    const tocMeta = root.querySelector(".tocMeta");
+    const tocList = root.querySelector(".tocList");
     const searchInput = root.querySelector(".searchInput");
     const searchMeta = root.querySelector(".searchMeta");
     const searchResults = root.querySelector(".searchResults");
@@ -745,7 +761,7 @@
       nodes = cloneNodes(state?.nodes || []);
       docPreamble = typeof state?.docPreamble === "string" ? state.docPreamble : "";
       activeNodeId = typeof state?.activeNodeId === "string" ? state.activeNodeId : "";
-      activeTab = typeof state?.activeTab === "string" && ["structure", "search", "tags"].includes(state.activeTab)
+      activeTab = typeof state?.activeTab === "string" && ["structure", "toc", "search", "tags"].includes(state.activeTab)
         ? state.activeTab
         : "structure";
       searchQuery = typeof state?.searchQuery === "string" ? state.searchQuery : "";
@@ -767,6 +783,7 @@
       updatePinBadge();
       switchTab(activeTab, { silent: true });
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       updateUndoButton();
@@ -871,13 +888,15 @@
     }
 
     function switchTab(tab, options = {}) {
-      activeTab = tab === "search" || tab === "tags" ? tab : "structure";
+      activeTab = ["structure", "toc", "search", "tags"].includes(tab) ? tab : "structure";
       root.querySelectorAll(".tabbtn").forEach((btn) => {
         btn.classList.toggle("active", btn.getAttribute("data-tab") === activeTab);
       });
       root.querySelector(".panelStructure").classList.toggle("active", activeTab === "structure");
+      root.querySelector(".panelToc").classList.toggle("active", activeTab === "toc");
       root.querySelector(".panelSearch").classList.toggle("active", activeTab === "search");
       root.querySelector(".panelTags").classList.toggle("active", activeTab === "tags");
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       if (!options.silent) markStateChanged();
@@ -917,6 +936,16 @@
         if (nodes[i].level === baseLevel + 1) count += 1;
       }
       return count;
+    }
+
+    function getDescendantCount(idx) {
+      if (idx < 0 || idx >= nodes.length) return 0;
+      const [start, end] = getFamilyRange(idx);
+      return Math.max(0, end - start - 1);
+    }
+
+    function getIndirectChildCount(idx) {
+      return Math.max(0, getDescendantCount(idx) - getDirectChildCount(idx));
     }
 
     function getDirectChildRootIndices(idx) {
@@ -967,11 +996,22 @@
       markStateChanged();
     }
 
-    function updateNodeMetric(nodeEl, node) {
-      const metric = nodeEl.querySelector(".nodeMetric");
-      if (metric) {
-        const ownWords = countWords(node.title) + countWords(node.body);
-        metric.textContent = `${ownWords}w`;
+    function updateNodeMetric(nodeEl, nodeId) {
+      if (!nodeEl) return;
+      const idx = getNodeIndexById(nodeId);
+      if (idx < 0) return;
+
+      const directMetric = nodeEl.querySelector(".nodeMetricDirect");
+      const indirectMetric = nodeEl.querySelector(".nodeMetricIndirect");
+
+      const direct = getDirectChildCount(idx);
+      const indirect = getIndirectChildCount(idx);
+
+      if (directMetric) {
+        directMetric.textContent = `${direct} direct`;
+      }
+      if (indirectMetric) {
+        indirectMetric.textContent = `${indirect} indirect`;
       }
     }
 
@@ -995,7 +1035,7 @@
 
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const directChildren = getDirectChildCount(idx);
-        const ownWords = countWords(n.title) + countWords(n.body);
+        const indirectChildren = getIndirectChildCount(idx);
         const canDropPinned = canDropPinnedAfter(n.id);
         const pinIsActive = pinnedRootId === n.id;
         const pinIsTarget = !!pinnedRootId && !pinIsActive && canDropPinned;
@@ -1024,8 +1064,8 @@
                 title="${escapeHtml(pinTitle)}"
                 aria-label="${escapeHtml(pinTitle)}"
               >📌</button>
-              <div class="infoPill nodeMetric">${ownWords}w</div>
-              <div class="infoPill">${directChildren} child${directChildren === 1 ? "" : "ren"}</div>
+              <div class="infoPill nodeMetricDirect">${directChildren} direct</div>
+              <div class="infoPill nodeMetricIndirect">${indirectChildren} indirect</div>
               ${pinnedRootId === n.id ? `<div class="infoPill">Pinned</div>` : ""}
             </div>
             <div class="headerRight">
@@ -1089,6 +1129,33 @@
           pendingScrollId = null;
         }
       });
+    }
+
+    function renderTOC() {
+      tocList.innerHTML = "";
+
+      if (!nodes.length) {
+        tocMeta.textContent = "Load Markdown first, then view contents.";
+        return;
+      }
+
+      tocMeta.textContent = `${nodes.length} heading${nodes.length === 1 ? "" : "s"}. Tap one to jump to it in Structure.`;
+
+      const frag = document.createDocumentFragment();
+
+      nodes.forEach((n, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "tocItem";
+        btn.setAttribute("data-jump-id", n.id);
+        btn.style.setProperty("--toc-indent", `${(n.level - 1) * 18}px`);
+        btn.innerHTML = `
+          <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+          <div class="tocItemMeta">H${n.level} · Node ${idx + 1}</div>
+        `;
+        frag.appendChild(btn);
+      });
+
+      tocList.appendChild(frag);
     }
 
     function resultExcerpt(node, query) {
@@ -1317,6 +1384,7 @@
       activeNodeId = newNode.id;
       pendingFocus = { id: newNode.id, field: "title" };
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1335,6 +1403,7 @@
       if (!hasChildren) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markStateChanged();
     }
 
@@ -1352,6 +1421,7 @@
         nodes[i].level += applied;
       }
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1368,6 +1438,7 @@
         activeNodeId = nodes[start] ? nodes[start].id : (nodes[start - 1] ? nodes[start - 1].id : "");
       }
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1393,6 +1464,7 @@
       pendingScrollId = activeNodeId || null;
       pinnedRootId = "";
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
       return true;
     }
@@ -1451,6 +1523,7 @@
         activeNodeId = nodes[idx].id;
         pendingFocus = { id: nodes[idx].id, field: "body" };
         renderStructure();
+        if (activeTab === "toc") renderTOC();
         markDocChanged();
         return;
       }
@@ -1468,6 +1541,7 @@
       pendingScrollId = activeNodeId;
       pendingFocus = { id: activeNodeId, field: "title" };
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1495,6 +1569,7 @@
       nodes[idx].isCollapsed = false;
       activeNodeId = nodes[idx].id;
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1520,6 +1595,7 @@
       pendingScrollId = activeNodeId || null;
       pinnedRootId = "";
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       markDocChanged();
@@ -1581,6 +1657,7 @@
       safeStorageRemove(KEY);
 
       renderStructure();
+      renderTOC();
       renderSearch();
       renderTags();
       setCopyBadge();
@@ -1599,6 +1676,12 @@
       renderStructure();
       markStateChanged();
     }
+
+    tocList.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-jump-id]");
+      if (!btn) return;
+      jumpToNodeFromPanel(btn.getAttribute("data-jump-id"));
+    });
 
     searchResults.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-jump-id]");
@@ -1674,6 +1757,7 @@
     });
 
     const syncInput = debounce(() => {
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") scheduleSearchRender();
       if (activeTab === "tags") renderTags();
       updateSummary();
@@ -1699,7 +1783,7 @@
       if (type === "body") node.body = target.value;
 
       autoResizeTA(target);
-      updateNodeMetric(nodeEl, node);
+      updateNodeMetric(nodeEl, id);
       syncInput();
     });
 
@@ -1710,7 +1794,7 @@
         nodes = normalizeNodes(state.nodes);
         if (typeof state.docPreamble === "string") docPreamble = state.docPreamble;
         if (typeof state.activeNodeId === "string") activeNodeId = state.activeNodeId;
-        if (typeof state.activeTab === "string" && ["structure", "search", "tags"].includes(state.activeTab)) {
+        if (typeof state.activeTab === "string" && ["structure", "toc", "search", "tags"].includes(state.activeTab)) {
           activeTab = state.activeTab;
         }
         if (typeof state.searchQuery === "string") searchQuery = state.searchQuery;
@@ -1756,6 +1840,7 @@
     updateUndoButton();
     switchTab(activeTab, { silent: true });
     renderStructure();
+    if (activeTab === "toc") renderTOC();
     if (activeTab === "search") renderSearch();
     if (activeTab === "tags") renderTags();
     persistStateNow();
