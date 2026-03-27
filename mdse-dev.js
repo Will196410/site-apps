@@ -22,7 +22,7 @@
         hour12: false
       }).replace(",", "");
     } catch (_) {
-      return "27 Mar 2026 09:35";
+      return "27 Mar 2026 10:05";
     }
   })();
 
@@ -287,11 +287,35 @@
         --toc-indent: 0px;
         padding-left: calc(12px + var(--toc-indent));
       }
+      .mdse-wrapper .tocHead {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .mdse-wrapper .tocMarker {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        padding: 2px 6px;
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+        background: #fff;
+      }
+      .mdse-wrapper .tocMarker.none {
+        opacity: 0.55;
+      }
       .mdse-wrapper .searchItemTitle,
       .mdse-wrapper .tocItemTitle {
         font-size: 16px;
         font-weight: 800;
         margin-bottom: 6px;
+      }
+      .mdse-wrapper .tocHead .tocItemTitle {
+        margin-bottom: 0;
       }
       .mdse-wrapper .searchItemMeta,
       .mdse-wrapper .tocItemMeta {
@@ -638,6 +662,9 @@
         </div>
 
         <div class="tabPanel panelToc">
+          <div class="btnrow">
+            <button class="ghost btnCopyToc">Copy Contents</button>
+          </div>
           <div class="muted tocMeta">No headings yet.</div>
           <div class="tocList"></div>
         </div>
@@ -667,6 +694,7 @@
     const btnUndo = root.querySelector(".btnUndo");
     const btnCopy = root.querySelector(".btnCopy");
     const btnReset = root.querySelector(".btnReset");
+    const btnCopyToc = root.querySelector(".btnCopyToc");
     const btnCopyTags = root.querySelector(".btnCopyTags");
     const canvas = root.querySelector(".canvas");
     const tocMeta = root.querySelector(".tocMeta");
@@ -1001,18 +1029,17 @@
       const idx = getNodeIndexById(nodeId);
       if (idx < 0) return;
 
+      const metricWords = nodeEl.querySelector(".nodeMetricWords");
       const directMetric = nodeEl.querySelector(".nodeMetricDirect");
       const indirectMetric = nodeEl.querySelector(".nodeMetricIndirect");
 
+      const ownWords = countWords(nodes[idx].title) + countWords(nodes[idx].body);
       const direct = getDirectChildCount(idx);
       const indirect = getIndirectChildCount(idx);
 
-      if (directMetric) {
-        directMetric.textContent = `${direct} direct`;
-      }
-      if (indirectMetric) {
-        indirectMetric.textContent = `${indirect} indirect`;
-      }
+      if (metricWords) metricWords.textContent = `${ownWords}w`;
+      if (directMetric) directMetric.textContent = `${direct} direct`;
+      if (indirectMetric) indirectMetric.textContent = `${indirect} indirect`;
     }
 
     function canDropPinnedAfter(targetId) {
@@ -1036,6 +1063,7 @@
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const directChildren = getDirectChildCount(idx);
         const indirectChildren = getIndirectChildCount(idx);
+        const ownWords = countWords(n.title) + countWords(n.body);
         const canDropPinned = canDropPinnedAfter(n.id);
         const pinIsActive = pinnedRootId === n.id;
         const pinIsTarget = !!pinnedRootId && !pinIsActive && canDropPinned;
@@ -1064,6 +1092,7 @@
                 title="${escapeHtml(pinTitle)}"
                 aria-label="${escapeHtml(pinTitle)}"
               >📌</button>
+              <div class="infoPill nodeMetricWords">${ownWords}w</div>
               <div class="infoPill nodeMetricDirect">${directChildren} direct</div>
               <div class="infoPill nodeMetricIndirect">${indirectChildren} indirect</div>
               ${pinnedRootId === n.id ? `<div class="infoPill">Pinned</div>` : ""}
@@ -1131,6 +1160,16 @@
       });
     }
 
+    function buildSimpleTOCText() {
+      return nodes.map((n, idx) => {
+        const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
+        const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
+        const indent = "  ".repeat(Math.max(0, n.level - 1));
+        const title = String(n.title || "").trim() || "(untitled heading)";
+        return `${indent}${marker} ${title}`;
+      }).join("\n");
+    }
+
     function renderTOC() {
       tocList.innerHTML = "";
 
@@ -1144,12 +1183,18 @@
       const frag = document.createDocumentFragment();
 
       nodes.forEach((n, idx) => {
+        const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
+        const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
+
         const btn = document.createElement("button");
         btn.className = "tocItem";
         btn.setAttribute("data-jump-id", n.id);
         btn.style.setProperty("--toc-indent", `${(n.level - 1) * 18}px`);
         btn.innerHTML = `
-          <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+          <div class="tocHead">
+            <span class="tocMarker${hasChildren ? "" : " none"}">${marker}</span>
+            <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+          </div>
           <div class="tocItemMeta">H${n.level} · Node ${idx + 1}</div>
         `;
         frag.appendChild(btn);
@@ -1363,6 +1408,38 @@
         }, 1400);
       } else {
         tagsMeta.textContent = "Copy failed.";
+      }
+    }
+
+    async function copyTOCToClipboard() {
+      if (!nodes.length) {
+        tocMeta.textContent = "No headings to copy yet.";
+        return;
+      }
+
+      const text = buildSimpleTOCText();
+      let ok = false;
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          ok = copyTextFallback(text);
+        }
+      } catch (_) {
+        ok = copyTextFallback(text);
+      }
+
+      if (ok) {
+        const base = tocMeta.textContent;
+        tocMeta.textContent = `Copied ${nodes.length} heading${nodes.length === 1 ? "" : "s"} to clipboard.`;
+        setTimeout(() => {
+          if (activeTab === "toc") renderTOC();
+          else tocMeta.textContent = base;
+        }, 1400);
+      } else {
+        tocMeta.textContent = "Copy failed.";
       }
     }
 
@@ -1628,6 +1705,10 @@
         copyBadge.className = "metaBadge warn jsCopyBadge";
         copyBadge.textContent = "Copy failed";
       }
+    });
+
+    btnCopyToc.addEventListener("click", () => {
+      copyTOCToClipboard();
     });
 
     btnCopyTags.addEventListener("click", () => {
