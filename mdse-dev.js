@@ -11,22 +11,26 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_STAMP = (() => {
+  const BUILD_CREATED_STAMP = "28 Mar 2026 06:26 GMT · GPT-5.4 Thinking";
+
+  function formatBrowserRunStamp() {
     try {
-      const when = new Date().toLocaleString("en-GB", {
+      const dt = new Date();
+      const text = dt.toLocaleString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: false,
-        timeZone: "Europe/London"
+        second: "2-digit",
+        hour12: false
       }).replace(",", "");
-      return `${when} · GPT-5.4 Thinking`;
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+      return `${text} · ${tz}`;
     } catch (_) {
-      return "28 Mar 2026 05:00 · GPT-5.4 Thinking";
+      return "Unavailable";
     }
-  })();
+  }
 
   function ensureStyle() {
     let style = document.getElementById(STYLE_ID);
@@ -373,12 +377,14 @@
         margin: 10px 0;
       }
 
-      .mdse-wrapper .topMeta {
+      .mdse-wrapper .bottomMeta {
         display:flex;
         gap:10px;
         align-items:center;
         flex-wrap:wrap;
-        margin:0 0 10px;
+        margin:14px 0 0;
+        padding-top:12px;
+        border-top:1px solid #eee;
       }
       .mdse-wrapper .buildStamp {
         font-size:12px;
@@ -666,13 +672,6 @@
 
     container.innerHTML = `
       <div class="mdse-wrapper">
-        <div class="topMeta">
-          <div class="buildStamp">Generated: ${escapeHtml(BUILD_STAMP)}</div>
-          <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
-          <span class="metaBadge warn jsCopyBadge">Not copied</span>
-          <span class="metaBadge dim jsPinBadge">Nothing pinned</span>
-        </div>
-
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="toc">Contents</button>
@@ -721,6 +720,14 @@
           <div class="tagsBar"></div>
           <div class="tagMatches"></div>
         </div>
+
+        <div class="bottomMeta">
+          <div class="buildStamp">Created: ${escapeHtml(BUILD_CREATED_STAMP)}</div>
+          <div class="buildStamp jsRunStamp">Browser run: ${escapeHtml(formatBrowserRunStamp())}</div>
+          <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
+          <span class="metaBadge warn jsCopyBadge">Not copied</span>
+          <span class="metaBadge dim jsPinBadge">Nothing pinned</span>
+        </div>
       </div>
     `;
 
@@ -746,9 +753,14 @@
     const summaryPreamble = root.querySelector(".summaryPreamble");
     const preambleNote = root.querySelector(".preambleNote");
 
+    const runStamp = root.querySelector(".jsRunStamp");
     const saveBadge = root.querySelector(".jsSaveBadge");
     const copyBadge = root.querySelector(".jsCopyBadge");
     const pinBadge = root.querySelector(".jsPinBadge");
+
+    if (runStamp) {
+      runStamp.textContent = `Browser run: ${formatBrowserRunStamp()}`;
+    }
 
     let copiedSinceChange = false;
     let saveTimer = null;
@@ -929,6 +941,14 @@
 
     function markStateChanged() {
       scheduleSave();
+    }
+
+    function persistSilently() {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      persistStateNow();
     }
 
     function totalWords() {
@@ -1307,7 +1327,7 @@
       }
 
       const hits = nodes
-        .map((n, idx) => ({ n, idx }))
+        .map((n) => ({ n }))
         .filter(({ n }) => (`${n.title}\n${n.body}`).toLowerCase().includes(q));
 
       searchMeta.textContent = `${hits.length} match${hits.length === 1 ? "" : "es"}`;
@@ -1315,7 +1335,7 @@
       if (!hits.length) return;
 
       const frag = document.createDocumentFragment();
-      hits.forEach(({ n, idx }) => {
+      hits.forEach(({ n }) => {
         const btn = document.createElement("button");
         btn.className = "searchItem";
         btn.setAttribute("data-jump-id", n.id);
@@ -1550,7 +1570,7 @@
       markStateChanged();
     }
 
-    function toggleCollapse(id) {
+    function toggleCollapse(id, options = {}) {
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
       const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > nodes[idx].level;
@@ -1558,7 +1578,9 @@
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
       renderStructure();
       if (activeTab === "toc") renderTOC();
-      markStateChanged();
+
+      if (options.silentBadges) persistSilently();
+      else markStateChanged();
     }
 
     function changeLevel(id, delta) {
@@ -1842,7 +1864,7 @@
         e.stopPropagation();
         const id = toggleBtn.getAttribute("data-node-id");
         if (!id) return;
-        toggleCollapse(id);
+        toggleCollapse(id, { silentBadges: true });
         return;
       }
 
