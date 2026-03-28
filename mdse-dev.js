@@ -13,16 +13,18 @@
   const STYLE_ID = "siteapps-mdse-style-v4";
   const BUILD_STAMP = (() => {
     try {
-      return new Date().toLocaleString("en-GB", {
+      const when = new Date().toLocaleString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: false
+        hour12: false,
+        timeZone: "Europe/London"
       }).replace(",", "");
+      return `${when} · GPT-5.4 Thinking`;
     } catch (_) {
-      return "27 Mar 2026 10:20";
+      return "28 Mar 2026 05:00 · GPT-5.4 Thinking";
     }
   })();
 
@@ -291,7 +293,6 @@
         display: flex;
         gap: 8px;
         align-items: center;
-        flex-wrap: nowrap;
         width: 100%;
       }
       .mdse-wrapper .tocMarker {
@@ -313,6 +314,9 @@
         cursor: default;
         opacity: 0.55;
       }
+      .mdse-wrapper .tocMarker.none {
+        opacity: 0.55;
+      }
       .mdse-wrapper .tocJumpBody {
         flex: 1 1 auto;
         min-width: 0;
@@ -323,9 +327,13 @@
         text-align: left;
         font: inherit;
         color: inherit;
+        cursor: pointer;
       }
-      .mdse-wrapper .tocMarker.none {
-        opacity: 0.55;
+      .mdse-wrapper .tocTitleRow {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        flex-wrap: wrap;
       }
       .mdse-wrapper .searchItemTitle,
       .mdse-wrapper .tocItemTitle {
@@ -335,6 +343,15 @@
       }
       .mdse-wrapper .tocHead .tocItemTitle {
         margin-bottom: 0;
+      }
+      .mdse-wrapper .tocLevel {
+        font-size: 12px;
+        font-weight: 900;
+        color: #444;
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: #fff;
       }
       .mdse-wrapper .searchItemMeta,
       .mdse-wrapper .tocItemMeta {
@@ -1019,6 +1036,29 @@
       return hidden;
     }
 
+    function computeVisibleTOCIndices() {
+      const visible = [];
+      const collapsedStack = [];
+
+      for (let i = 0; i < nodes.length; i++) {
+        const level = nodes[i].level;
+
+        while (collapsedStack.length && level <= collapsedStack[collapsedStack.length - 1]) {
+          collapsedStack.pop();
+        }
+
+        if (collapsedStack.length) continue;
+
+        visible.push(i);
+
+        if (nodes[i].isCollapsed) {
+          collapsedStack.push(level);
+        }
+      }
+
+      return visible;
+    }
+
     function isIndexInsideFamily(candidateIdx, rootIdx) {
       if (candidateIdx < 0 || rootIdx < 0) return false;
       const [start, end] = getFamilyRange(rootIdx);
@@ -1180,12 +1220,15 @@
     }
 
     function buildSimpleTOCText() {
-      return nodes.map((n, idx) => {
+      const visibleIndices = computeVisibleTOCIndices();
+
+      return visibleIndices.map((idx) => {
+        const n = nodes[idx];
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
         const indent = "  ".repeat(Math.max(0, n.level - 1));
         const title = String(n.title || "").trim() || "(untitled heading)";
-        return `${indent}${marker} ${title}`;
+        return `${indent}${marker} ${title} [H${n.level}]`;
       }).join("\n");
     }
 
@@ -1197,11 +1240,13 @@
         return;
       }
 
-      tocMeta.textContent = `${nodes.length} heading${nodes.length === 1 ? "" : "s"}. Tap a heading to jump to it in Structure.`;
+      const visibleIndices = computeVisibleTOCIndices();
+      tocMeta.textContent = `${visibleIndices.length} visible heading${visibleIndices.length === 1 ? "" : "s"}. Tap a heading to jump to it in Structure.`;
 
       const frag = document.createDocumentFragment();
 
-      nodes.forEach((n, idx) => {
+      visibleIndices.forEach((idx) => {
+        const n = nodes[idx];
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
 
@@ -1221,8 +1266,10 @@
             >${marker}</button>
 
             <button class="tocJumpBody" data-jump-id="${escapeHtml(n.id)}">
-              <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
-              <div class="tocItemMeta">H${n.level} · Node ${idx + 1}</div>
+              <div class="tocTitleRow">
+                <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+                <div class="tocLevel">H${n.level}</div>
+              </div>
             </button>
           </div>
         `;
@@ -1274,7 +1321,7 @@
         btn.setAttribute("data-jump-id", n.id);
         btn.innerHTML = `
           <div class="searchItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
-          <div class="searchItemMeta">H${n.level} · Node ${idx + 1} · ${countWords(n.title) + countWords(n.body)}w</div>
+          <div class="searchItemMeta">H${n.level} · ${countWords(n.title) + countWords(n.body)}w</div>
           <div class="searchItemExcerpt">${escapeHtml(resultExcerpt(n, q))}</div>
         `;
         frag.appendChild(btn);
@@ -1394,13 +1441,13 @@
       tagsMeta.textContent = `${activeGroup.label}: ${activeGroup.hits.length} node${activeGroup.hits.length === 1 ? "" : "s"}`;
 
       const frag = document.createDocumentFragment();
-      activeGroup.hits.forEach(({ n, idx }) => {
+      activeGroup.hits.forEach(({ n }) => {
         const btn = document.createElement("button");
         btn.className = "searchItem";
         btn.setAttribute("data-jump-id", n.id);
         btn.innerHTML = `
           <div class="searchItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
-          <div class="searchItemMeta">H${n.level} · Node ${idx + 1} · ${countWords(n.title) + countWords(n.body)}w</div>
+          <div class="searchItemMeta">H${n.level} · ${countWords(n.title) + countWords(n.body)}w</div>
           <div class="searchItemExcerpt">${escapeHtml(tagLineExcerpt(n, activeGroup.key))}</div>
         `;
         frag.appendChild(btn);
@@ -1791,10 +1838,11 @@
     tocList.addEventListener("click", (e) => {
       const toggleBtn = e.target.closest('[data-action="toc-toggle"]');
       if (toggleBtn) {
+        e.preventDefault();
+        e.stopPropagation();
         const id = toggleBtn.getAttribute("data-node-id");
         if (!id) return;
         toggleCollapse(id);
-        renderTOC();
         return;
       }
 
