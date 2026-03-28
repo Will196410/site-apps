@@ -377,6 +377,16 @@
         margin: 10px 0;
       }
 
+      .mdse-wrapper .topMeta {
+        display:flex;
+        gap:10px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin:0 0 12px;
+        padding-bottom:12px;
+        border-bottom:1px solid #eee;
+      }
+
       .mdse-wrapper .bottomMeta {
         display:flex;
         gap:10px;
@@ -672,6 +682,12 @@
 
     container.innerHTML = `
       <div class="mdse-wrapper">
+        <div class="topMeta">
+          <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
+          <span class="metaBadge warn jsCopyBadge">Not copied</span>
+          <span class="metaBadge dim jsPinBadge">Nothing pinned</span>
+        </div>
+
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
           <button class="tabbtn" data-tab="toc">Contents</button>
@@ -724,9 +740,6 @@
         <div class="bottomMeta">
           <div class="buildStamp">Created: ${escapeHtml(BUILD_CREATED_STAMP)}</div>
           <div class="buildStamp jsRunStamp">Browser run: ${escapeHtml(formatBrowserRunStamp())}</div>
-          <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
-          <span class="metaBadge warn jsCopyBadge">Not copied</span>
-          <span class="metaBadge dim jsPinBadge">Nothing pinned</span>
         </div>
       </div>
     `;
