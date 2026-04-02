@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_CREATED_STAMP = "31 Mar 2026 · GPT-5.4 Thinking";
+  const BUILD_CREATED_STAMP = "02 Apr 2026 13:18 BST · GPT-5.4 Thinking";
 
   function formatBrowserRunStamp() {
     try {
@@ -937,6 +937,14 @@
       }
     }
 
+    function flushSaveNow() {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      return persistStateNow();
+    }
+
     function scheduleSave() {
       setSaveBadgeUnsaved();
       if (saveTimer) clearTimeout(saveTimer);
@@ -957,13 +965,9 @@
     }
 
     function persistSilently() {
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      persistStateNow();
+      flushSaveNow();
     }
-
+    
     function totalWords() {
       return nodes.reduce((sum, n) => sum + countWords(n.title) + countWords(n.body), 0);
     }
@@ -2045,6 +2049,19 @@
       pinnedRootId = "";
     }
 
+    function handleLifecycleSave() {
+      flushSaveNow();
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") {
+        handleLifecycleSave();
+      }
+    });
+
+    window.addEventListener("pagehide", handleLifecycleSave);
+    window.addEventListener("beforeunload", handleLifecycleSave);
+    
     searchInput.value = searchQuery;
     setCopyBadge();
     updatePinBadge();
