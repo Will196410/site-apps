@@ -436,7 +436,9 @@
 
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-  const HISTORY_LIMIT = 10;
+  
+  // Adjusted limit to 5 levels
+  const HISTORY_LIMIT = 5;
 
   function debounce(fn, ms) {
     let timer = null;
@@ -916,14 +918,9 @@
       updateUndoButton();
     }
 
+    // Adjusted buildState to exclude undoStack from persistence
     function buildState() {
-      return {
-        ...snapshotState(),
-        undoStack: undoStack.map((entry) => ({
-          reason: entry.reason,
-          state: entry.state
-        }))
-      };
+      return snapshotState();
     }
 
     function persistStateNow() {
@@ -2013,26 +2010,8 @@
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
         copiedSinceChange = !!state.copiedSinceChange;
         pinnedRootId = typeof state.pinnedRootId === "string" ? state.pinnedRootId : "";
-
-        if (Array.isArray(state.undoStack)) {
-          undoStack = state.undoStack
-            .map((entry) => ({
-              reason: entry?.reason || "change",
-              state: {
-                v: 4,
-                nodes: normalizeNodes(entry?.state?.nodes),
-                docPreamble: typeof entry?.state?.docPreamble === "string" ? entry.state.docPreamble : "",
-                activeNodeId: typeof entry?.state?.activeNodeId === "string" ? entry.state.activeNodeId : "",
-                activeTab: typeof entry?.state?.activeTab === "string" ? entry.state.activeTab : "structure",
-                searchQuery: typeof entry?.state?.searchQuery === "string" ? entry.state.searchQuery : "",
-                activeTag: typeof entry?.state?.activeTag === "string" ? entry.state.activeTag : "",
-                rawInput: typeof entry?.state?.rawInput === "string" ? entry.state.rawInput : "",
-                copiedSinceChange: !!entry?.state?.copiedSinceChange,
-                pinnedRootId: typeof entry?.state?.pinnedRootId === "string" ? entry.state.pinnedRootId : ""
-              }
-            }))
-            .slice(-HISTORY_LIMIT);
-        }
+        
+        // Undo history is intentionally NOT loaded from storage
       } catch (_) {
         // ignore broken saved state
       }
