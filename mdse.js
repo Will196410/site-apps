@@ -11,20 +11,26 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_STAMP = (() => {
+  const BUILD_CREATED_STAMP = "31 Mar 2026 · GPT-5.4 Thinking";
+
+  function formatBrowserRunStamp() {
     try {
-      return new Date().toLocaleString("en-GB", {
+      const dt = new Date();
+      const text = dt.toLocaleString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
         hour12: false
       }).replace(",", "");
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+      return `${text} · ${tz}`;
     } catch (_) {
-      return "18 Mar 2026 08:05";
+      return "Unavailable";
     }
-  })();
+  }
 
   function ensureStyle() {
     let style = document.getElementById(STYLE_ID);
@@ -250,7 +256,8 @@
         margin-bottom: 12px;
       }
       .mdse-wrapper .searchResults,
-      .mdse-wrapper .tagMatches {
+      .mdse-wrapper .tagMatches,
+      .mdse-wrapper .tocList {
         display: grid;
         gap: 10px;
       }
@@ -273,7 +280,8 @@
         background: #111;
         color: #fff;
       }
-      .mdse-wrapper .searchItem {
+      .mdse-wrapper .searchItem,
+      .mdse-wrapper .tocItem {
         border: 2px solid rgba(0,0,0,.15);
         border-radius: 14px;
         background: #fff;
@@ -281,12 +289,76 @@
         text-align: left;
         width: 100%;
       }
-      .mdse-wrapper .searchItemTitle {
+      .mdse-wrapper .tocItem {
+        --toc-indent: 0px;
+        padding-left: calc(12px + var(--toc-indent));
+      }
+      .mdse-wrapper .tocHead {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        width: 100%;
+      }
+      .mdse-wrapper .tocMarker {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        padding: 2px 6px;
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+        background: #fff;
+      }
+      .mdse-wrapper .tocMarkerBtn {
+        cursor: pointer;
+      }
+      .mdse-wrapper .tocMarkerBtn:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+      .mdse-wrapper .tocMarker.none {
+        opacity: 0.55;
+      }
+      .mdse-wrapper .tocJumpBody {
+        flex: 1 1 auto;
+        min-width: 0;
+        border: 0;
+        border-radius: 0;
+        padding: 0;
+        background: transparent;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+      }
+      .mdse-wrapper .tocTitleRow {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .mdse-wrapper .searchItemTitle,
+      .mdse-wrapper .tocItemTitle {
         font-size: 16px;
         font-weight: 800;
         margin-bottom: 6px;
       }
-      .mdse-wrapper .searchItemMeta {
+      .mdse-wrapper .tocHead .tocItemTitle {
+        margin-bottom: 0;
+      }
+      .mdse-wrapper .tocLevel {
+        font-size: 12px;
+        font-weight: 900;
+        color: #444;
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: #fff;
+      }
+      .mdse-wrapper .searchItemMeta,
+      .mdse-wrapper .tocItemMeta {
         font-size: 12px;
         font-weight: 800;
         color: #444;
@@ -310,7 +382,19 @@
         gap:10px;
         align-items:center;
         flex-wrap:wrap;
-        margin:0 0 10px;
+        margin:0 0 12px;
+        padding-bottom:12px;
+        border-bottom:1px solid #eee;
+      }
+
+      .mdse-wrapper .bottomMeta {
+        display:flex;
+        gap:10px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin:14px 0 0;
+        padding-top:12px;
+        border-top:1px solid #eee;
       }
       .mdse-wrapper .buildStamp {
         font-size:12px;
@@ -599,7 +683,6 @@
     container.innerHTML = `
       <div class="mdse-wrapper">
         <div class="topMeta">
-          <div class="buildStamp">Generated: ${escapeHtml(BUILD_STAMP)}</div>
           <span class="metaBadge dim jsSaveBadge">Saved ✓</span>
           <span class="metaBadge warn jsCopyBadge">Not copied</span>
           <span class="metaBadge dim jsPinBadge">Nothing pinned</span>
@@ -607,6 +690,7 @@
 
         <div class="tabs">
           <button class="tabbtn active" data-tab="structure">Structure</button>
+          <button class="tabbtn" data-tab="toc">Contents</button>
           <button class="tabbtn" data-tab="search">Search</button>
           <button class="tabbtn" data-tab="tags">Tags</button>
         </div>
@@ -628,6 +712,14 @@
           <div class="canvas"></div>
         </div>
 
+        <div class="tabPanel panelToc">
+          <div class="btnrow">
+            <button class="ghost btnCopyToc">Copy Contents</button>
+          </div>
+          <div class="muted tocMeta">No headings yet.</div>
+          <div class="tocList"></div>
+        </div>
+
         <div class="tabPanel panelSearch">
           <div class="searchBox">
             <input class="searchInput" type="text" placeholder="Search titles and body text...">
@@ -644,6 +736,11 @@
           <div class="tagsBar"></div>
           <div class="tagMatches"></div>
         </div>
+
+        <div class="bottomMeta">
+          <div class="buildStamp">Created: ${escapeHtml(BUILD_CREATED_STAMP)}</div>
+          <div class="buildStamp jsRunStamp">Browser run: ${escapeHtml(formatBrowserRunStamp())}</div>
+        </div>
       </div>
     `;
 
@@ -653,8 +750,11 @@
     const btnUndo = root.querySelector(".btnUndo");
     const btnCopy = root.querySelector(".btnCopy");
     const btnReset = root.querySelector(".btnReset");
+    const btnCopyToc = root.querySelector(".btnCopyToc");
     const btnCopyTags = root.querySelector(".btnCopyTags");
     const canvas = root.querySelector(".canvas");
+    const tocMeta = root.querySelector(".tocMeta");
+    const tocList = root.querySelector(".tocList");
     const searchInput = root.querySelector(".searchInput");
     const searchMeta = root.querySelector(".searchMeta");
     const searchResults = root.querySelector(".searchResults");
@@ -666,9 +766,14 @@
     const summaryPreamble = root.querySelector(".summaryPreamble");
     const preambleNote = root.querySelector(".preambleNote");
 
+    const runStamp = root.querySelector(".jsRunStamp");
     const saveBadge = root.querySelector(".jsSaveBadge");
     const copyBadge = root.querySelector(".jsCopyBadge");
     const pinBadge = root.querySelector(".jsPinBadge");
+
+    if (runStamp) {
+      runStamp.textContent = `Browser run: ${formatBrowserRunStamp()}`;
+    }
 
     let copiedSinceChange = false;
     let saveTimer = null;
@@ -745,7 +850,7 @@
       nodes = cloneNodes(state?.nodes || []);
       docPreamble = typeof state?.docPreamble === "string" ? state.docPreamble : "";
       activeNodeId = typeof state?.activeNodeId === "string" ? state.activeNodeId : "";
-      activeTab = typeof state?.activeTab === "string" && ["structure", "search", "tags"].includes(state.activeTab)
+      activeTab = typeof state?.activeTab === "string" && ["structure", "toc", "search", "tags"].includes(state.activeTab)
         ? state.activeTab
         : "structure";
       searchQuery = typeof state?.searchQuery === "string" ? state.searchQuery : "";
@@ -767,6 +872,7 @@
       updatePinBadge();
       switchTab(activeTab, { silent: true });
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       updateUndoButton();
@@ -850,6 +956,14 @@
       scheduleSave();
     }
 
+    function persistSilently() {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      persistStateNow();
+    }
+
     function totalWords() {
       return nodes.reduce((sum, n) => sum + countWords(n.title) + countWords(n.body), 0);
     }
@@ -871,13 +985,15 @@
     }
 
     function switchTab(tab, options = {}) {
-      activeTab = tab === "search" || tab === "tags" ? tab : "structure";
+      activeTab = ["structure", "toc", "search", "tags"].includes(tab) ? tab : "structure";
       root.querySelectorAll(".tabbtn").forEach((btn) => {
         btn.classList.toggle("active", btn.getAttribute("data-tab") === activeTab);
       });
       root.querySelector(".panelStructure").classList.toggle("active", activeTab === "structure");
+      root.querySelector(".panelToc").classList.toggle("active", activeTab === "toc");
       root.querySelector(".panelSearch").classList.toggle("active", activeTab === "search");
       root.querySelector(".panelTags").classList.toggle("active", activeTab === "tags");
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       if (!options.silent) markStateChanged();
@@ -919,6 +1035,16 @@
       return count;
     }
 
+    function getDescendantCount(idx) {
+      if (idx < 0 || idx >= nodes.length) return 0;
+      const [start, end] = getFamilyRange(idx);
+      return Math.max(0, end - start - 1);
+    }
+
+    function getIndirectChildCount(idx) {
+      return Math.max(0, getDescendantCount(idx) - getDirectChildCount(idx));
+    }
+
     function getDirectChildRootIndices(idx) {
       const out = [];
       if (idx < 0 || idx >= nodes.length) return out;
@@ -941,6 +1067,29 @@
         }
       }
       return hidden;
+    }
+
+    function computeVisibleTOCIndices() {
+      const visible = [];
+      const collapsedStack = [];
+
+      for (let i = 0; i < nodes.length; i++) {
+        const level = nodes[i].level;
+
+        while (collapsedStack.length && level <= collapsedStack[collapsedStack.length - 1]) {
+          collapsedStack.pop();
+        }
+
+        if (collapsedStack.length) continue;
+
+        visible.push(i);
+
+        if (nodes[i].isCollapsed) {
+          collapsedStack.push(level);
+        }
+      }
+
+      return visible;
     }
 
     function isIndexInsideFamily(candidateIdx, rootIdx) {
@@ -967,12 +1116,22 @@
       markStateChanged();
     }
 
-    function updateNodeMetric(nodeEl, node) {
-      const metric = nodeEl.querySelector(".nodeMetric");
-      if (metric) {
-        const ownWords = countWords(node.title) + countWords(node.body);
-        metric.textContent = `${ownWords}w`;
-      }
+    function updateNodeMetric(nodeEl, nodeId) {
+      if (!nodeEl) return;
+      const idx = getNodeIndexById(nodeId);
+      if (idx < 0) return;
+
+      const metricWords = nodeEl.querySelector(".nodeMetricWords");
+      const directMetric = nodeEl.querySelector(".nodeMetricDirect");
+      const indirectMetric = nodeEl.querySelector(".nodeMetricIndirect");
+
+      const ownWords = countWords(nodes[idx].title) + countWords(nodes[idx].body);
+      const direct = getDirectChildCount(idx);
+      const indirect = getIndirectChildCount(idx);
+
+      if (metricWords) metricWords.textContent = `${ownWords}w`;
+      if (directMetric) directMetric.textContent = `${direct} direct`;
+      if (indirectMetric) indirectMetric.textContent = `${indirect} indirect`;
     }
 
     function canDropPinnedAfter(targetId) {
@@ -982,6 +1141,54 @@
       if (pinnedRootId === targetId) return false;
       if (isIndexInsideFamily(targetIdx, pinnedIdx)) return false;
       return true;
+    }
+
+    function buildBranchMarkdownById(id) {
+      const idx = getNodeIndexById(id);
+      if (idx < 0) return "";
+      const [start, end] = getFamilyRange(idx);
+      return nodesToMarkdown("", nodes.slice(start, end));
+    }
+
+    async function copyTextToClipboard(text) {
+      let ok = false;
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          ok = copyTextFallback(text);
+        }
+      } catch (_) {
+        ok = copyTextFallback(text);
+      }
+
+      if (ok) {
+        copiedSinceChange = true;
+        setCopyBadge();
+        markStateChanged();
+      } else if (copyBadge) {
+        copyBadge.className = "metaBadge warn jsCopyBadge";
+        copyBadge.textContent = "Copy failed";
+      }
+
+      return ok;
+    }
+
+    async function copyNodeBranch(id, triggerEl) {
+      const text = buildBranchMarkdownById(id);
+      if (!text) return false;
+
+      const ok = await copyTextToClipboard(text);
+      if (ok && triggerEl) {
+        const original = triggerEl.textContent;
+        triggerEl.textContent = "Copied";
+        setTimeout(() => {
+          if (triggerEl.isConnected) triggerEl.textContent = original;
+        }, 1000);
+      }
+      return ok;
     }
 
     function renderStructure() {
@@ -995,6 +1202,7 @@
 
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const directChildren = getDirectChildCount(idx);
+        const indirectChildren = getIndirectChildCount(idx);
         const ownWords = countWords(n.title) + countWords(n.body);
         const canDropPinned = canDropPinnedAfter(n.id);
         const pinIsActive = pinnedRootId === n.id;
@@ -1024,11 +1232,13 @@
                 title="${escapeHtml(pinTitle)}"
                 aria-label="${escapeHtml(pinTitle)}"
               >📌</button>
-              <div class="infoPill nodeMetric">${ownWords}w</div>
-              <div class="infoPill">${directChildren} child${directChildren === 1 ? "" : "ren"}</div>
+              <div class="infoPill nodeMetricWords">${ownWords}w</div>
+              <div class="infoPill nodeMetricDirect">${directChildren} direct</div>
+              <div class="infoPill nodeMetricIndirect">${indirectChildren} indirect</div>
               ${pinnedRootId === n.id ? `<div class="infoPill">Pinned</div>` : ""}
             </div>
             <div class="headerRight">
+              <button class="miniBtn" data-action="copy-node">Copy node</button>
               <button class="miniBtn" data-action="body">${n.showBody ? "Hide body" : "Show body"}</button>
               <button class="miniBtn" data-action="add">Add after</button>
               <button class="miniBtn" data-action="paste">Paste after</button>
@@ -1091,6 +1301,67 @@
       });
     }
 
+    function buildSimpleTOCText() {
+      const visibleIndices = computeVisibleTOCIndices();
+
+      return visibleIndices.map((idx) => {
+        const n = nodes[idx];
+        const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
+        const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
+        const indent = "  ".repeat(Math.max(0, n.level - 1));
+        const title = String(n.title || "").trim() || "(untitled heading)";
+        return `${indent}${marker} ${title} [H${n.level}]`;
+      }).join("\n");
+    }
+
+    function renderTOC() {
+      tocList.innerHTML = "";
+
+      if (!nodes.length) {
+        tocMeta.textContent = "Load Markdown first, then view contents.";
+        return;
+      }
+
+      const visibleIndices = computeVisibleTOCIndices();
+      tocMeta.textContent = `${visibleIndices.length} visible heading${visibleIndices.length === 1 ? "" : "s"}. Tap a heading to jump to it in Structure.`;
+
+      const frag = document.createDocumentFragment();
+
+      visibleIndices.forEach((idx) => {
+        const n = nodes[idx];
+        const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
+        const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
+
+        const row = document.createElement("div");
+        row.className = "tocItem";
+        row.style.setProperty("--toc-indent", `${(n.level - 1) * 18}px`);
+
+        row.innerHTML = `
+          <div class="tocHead">
+            <button
+              class="tocMarker tocMarkerBtn${hasChildren ? "" : " none"}"
+              data-action="toc-toggle"
+              data-node-id="${escapeHtml(n.id)}"
+              ${hasChildren ? "" : "disabled"}
+              aria-label="${hasChildren ? (n.isCollapsed ? "Expand branch" : "Collapse branch") : "No children"}"
+              title="${hasChildren ? (n.isCollapsed ? "Expand branch" : "Collapse branch") : "No children"}"
+            >${marker}</button>
+
+            <button class="tocJumpBody" data-jump-id="${escapeHtml(n.id)}">
+              <div class="tocTitleRow">
+                <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
+                <div class="tocLevel">H${n.level}</div>
+              </div>
+            </button>
+          </div>
+        `;
+
+        frag.appendChild(row);
+      });
+
+      tocList.appendChild(frag);
+    }
+
     function resultExcerpt(node, query) {
       const hay = `${node.title}\n${node.body}`.trim();
       if (!hay) return "(empty node)";
@@ -1118,7 +1389,7 @@
       }
 
       const hits = nodes
-        .map((n, idx) => ({ n, idx }))
+        .map((n) => ({ n }))
         .filter(({ n }) => (`${n.title}\n${n.body}`).toLowerCase().includes(q));
 
       searchMeta.textContent = `${hits.length} match${hits.length === 1 ? "" : "es"}`;
@@ -1126,13 +1397,13 @@
       if (!hits.length) return;
 
       const frag = document.createDocumentFragment();
-      hits.forEach(({ n, idx }) => {
+      hits.forEach(({ n }) => {
         const btn = document.createElement("button");
         btn.className = "searchItem";
         btn.setAttribute("data-jump-id", n.id);
         btn.innerHTML = `
           <div class="searchItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
-          <div class="searchItemMeta">H${n.level} · Node ${idx + 1} · ${countWords(n.title) + countWords(n.body)}w</div>
+          <div class="searchItemMeta">H${n.level} · ${countWords(n.title) + countWords(n.body)}w</div>
           <div class="searchItemExcerpt">${escapeHtml(resultExcerpt(n, q))}</div>
         `;
         frag.appendChild(btn);
@@ -1252,13 +1523,13 @@
       tagsMeta.textContent = `${activeGroup.label}: ${activeGroup.hits.length} node${activeGroup.hits.length === 1 ? "" : "s"}`;
 
       const frag = document.createDocumentFragment();
-      activeGroup.hits.forEach(({ n, idx }) => {
+      activeGroup.hits.forEach(({ n }) => {
         const btn = document.createElement("button");
         btn.className = "searchItem";
         btn.setAttribute("data-jump-id", n.id);
         btn.innerHTML = `
           <div class="searchItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
-          <div class="searchItemMeta">H${n.level} · Node ${idx + 1} · ${countWords(n.title) + countWords(n.body)}w</div>
+          <div class="searchItemMeta">H${n.level} · ${countWords(n.title) + countWords(n.body)}w</div>
           <div class="searchItemExcerpt">${escapeHtml(tagLineExcerpt(n, activeGroup.key))}</div>
         `;
         frag.appendChild(btn);
@@ -1274,18 +1545,7 @@
       }
 
       const text = groups.map((group) => group.label).join("\n");
-      let ok = false;
-
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          ok = true;
-        } else {
-          ok = copyTextFallback(text);
-        }
-      } catch (_) {
-        ok = copyTextFallback(text);
-      }
+      const ok = await copyTextToClipboard(text);
 
       if (ok) {
         const base = tagsMeta.textContent;
@@ -1296,6 +1556,27 @@
         }, 1400);
       } else {
         tagsMeta.textContent = "Copy failed.";
+      }
+    }
+
+    async function copyTOCToClipboard() {
+      if (!nodes.length) {
+        tocMeta.textContent = "No headings to copy yet.";
+        return;
+      }
+
+      const text = buildSimpleTOCText();
+      const ok = await copyTextToClipboard(text);
+
+      if (ok) {
+        const base = tocMeta.textContent;
+        tocMeta.textContent = `Copied ${nodes.length} heading${nodes.length === 1 ? "" : "s"} to clipboard.`;
+        setTimeout(() => {
+          if (activeTab === "toc") renderTOC();
+          else tocMeta.textContent = base;
+        }, 1400);
+      } else {
+        tocMeta.textContent = "Copy failed.";
       }
     }
 
@@ -1317,6 +1598,7 @@
       activeNodeId = newNode.id;
       pendingFocus = { id: newNode.id, field: "title" };
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1328,14 +1610,17 @@
       markStateChanged();
     }
 
-    function toggleCollapse(id) {
+    function toggleCollapse(id, options = {}) {
       const idx = getNodeIndexById(id);
       if (idx < 0) return;
       const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > nodes[idx].level;
       if (!hasChildren) return;
       nodes[idx].isCollapsed = !nodes[idx].isCollapsed;
       renderStructure();
-      markStateChanged();
+      if (activeTab === "toc") renderTOC();
+
+      if (options.silentBadges) persistSilently();
+      else markStateChanged();
     }
 
     function changeLevel(id, delta) {
@@ -1352,6 +1637,7 @@
         nodes[i].level += applied;
       }
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1368,6 +1654,7 @@
         activeNodeId = nodes[start] ? nodes[start].id : (nodes[start - 1] ? nodes[start - 1].id : "");
       }
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1393,6 +1680,7 @@
       pendingScrollId = activeNodeId || null;
       pinnedRootId = "";
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
       return true;
     }
@@ -1451,6 +1739,7 @@
         activeNodeId = nodes[idx].id;
         pendingFocus = { id: nodes[idx].id, field: "body" };
         renderStructure();
+        if (activeTab === "toc") renderTOC();
         markDocChanged();
         return;
       }
@@ -1468,6 +1757,7 @@
       pendingScrollId = activeNodeId;
       pendingFocus = { id: activeNodeId, field: "title" };
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1495,6 +1785,7 @@
       nodes[idx].isCollapsed = false;
       activeNodeId = nodes[idx].id;
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       markDocChanged();
     }
 
@@ -1520,6 +1811,7 @@
       pendingScrollId = activeNodeId || null;
       pinnedRootId = "";
       renderStructure();
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") renderSearch();
       if (activeTab === "tags") renderTags();
       markDocChanged();
@@ -1531,27 +1823,11 @@
 
     btnCopy.addEventListener("click", async () => {
       const text = nodesToMarkdown(docPreamble, nodes);
-      let ok = false;
+      await copyTextToClipboard(text);
+    });
 
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          ok = true;
-        } else {
-          ok = copyTextFallback(text);
-        }
-      } catch (_) {
-        ok = copyTextFallback(text);
-      }
-
-      if (ok) {
-        copiedSinceChange = true;
-        setCopyBadge();
-        markStateChanged();
-      } else if (copyBadge) {
-        copyBadge.className = "metaBadge warn jsCopyBadge";
-        copyBadge.textContent = "Copy failed";
-      }
+    btnCopyToc.addEventListener("click", () => {
+      copyTOCToClipboard();
     });
 
     btnCopyTags.addEventListener("click", () => {
@@ -1581,6 +1857,7 @@
       safeStorageRemove(KEY);
 
       renderStructure();
+      renderTOC();
       renderSearch();
       renderTags();
       setCopyBadge();
@@ -1599,6 +1876,22 @@
       renderStructure();
       markStateChanged();
     }
+
+    tocList.addEventListener("click", (e) => {
+      const toggleBtn = e.target.closest('[data-action="toc-toggle"]');
+      if (toggleBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = toggleBtn.getAttribute("data-node-id");
+        if (!id) return;
+        toggleCollapse(id, { silentBadges: true });
+        return;
+      }
+
+      const jumpBtn = e.target.closest("[data-jump-id]");
+      if (!jumpBtn) return;
+      jumpToNodeFromPanel(jumpBtn.getAttribute("data-jump-id"));
+    });
 
     searchResults.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-jump-id]");
@@ -1636,6 +1929,7 @@
         if (action === "body") toggleBody(id);
         else if (action === "collapse") toggleCollapse(id);
         else if (action === "pin") handlePinTap(id);
+        else if (action === "copy-node") await copyNodeBranch(id, actionEl);
         else if (action === "add") addNewAfter(id);
         else if (action === "paste") await pasteMarkdownAfter(id);
         else if (action === "outdent") changeLevel(id, -1);
@@ -1674,6 +1968,7 @@
     });
 
     const syncInput = debounce(() => {
+      if (activeTab === "toc") renderTOC();
       if (activeTab === "search") scheduleSearchRender();
       if (activeTab === "tags") renderTags();
       updateSummary();
@@ -1699,7 +1994,7 @@
       if (type === "body") node.body = target.value;
 
       autoResizeTA(target);
-      updateNodeMetric(nodeEl, node);
+      updateNodeMetric(nodeEl, id);
       syncInput();
     });
 
@@ -1710,7 +2005,7 @@
         nodes = normalizeNodes(state.nodes);
         if (typeof state.docPreamble === "string") docPreamble = state.docPreamble;
         if (typeof state.activeNodeId === "string") activeNodeId = state.activeNodeId;
-        if (typeof state.activeTab === "string" && ["structure", "search", "tags"].includes(state.activeTab)) {
+        if (typeof state.activeTab === "string" && ["structure", "toc", "search", "tags"].includes(state.activeTab)) {
           activeTab = state.activeTab;
         }
         if (typeof state.searchQuery === "string") searchQuery = state.searchQuery;
@@ -1756,6 +2051,7 @@
     updateUndoButton();
     switchTab(activeTab, { silent: true });
     renderStructure();
+    if (activeTab === "toc") renderTOC();
     if (activeTab === "search") renderSearch();
     if (activeTab === "tags") renderTags();
     persistStateNow();
