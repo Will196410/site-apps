@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_CREATED_STAMP = "28 Mar 2026 06:26 GMT · GPT-5.4 Thinking";
+  const BUILD_CREATED_STAMP = "31 Mar 2026 · GPT-5.4 Thinking";
 
   function formatBrowserRunStamp() {
     try {
@@ -436,7 +436,9 @@
 
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-  const HISTORY_LIMIT = 10;
+  
+  // Adjusted limit to 5 levels
+  const HISTORY_LIMIT = 5;
 
   function debounce(fn, ms) {
     let timer = null;
@@ -916,14 +918,9 @@
       updateUndoButton();
     }
 
+    // Adjusted buildState to exclude undoStack from persistence
     function buildState() {
-      return {
-        ...snapshotState(),
-        undoStack: undoStack.map((entry) => ({
-          reason: entry.reason,
-          state: entry.state
-        }))
-      };
+      return snapshotState();
     }
 
     function persistStateNow() {
@@ -1143,6 +1140,54 @@
       return true;
     }
 
+    function buildBranchMarkdownById(id) {
+      const idx = getNodeIndexById(id);
+      if (idx < 0) return "";
+      const [start, end] = getFamilyRange(idx);
+      return nodesToMarkdown("", nodes.slice(start, end));
+    }
+
+    async function copyTextToClipboard(text) {
+      let ok = false;
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          ok = copyTextFallback(text);
+        }
+      } catch (_) {
+        ok = copyTextFallback(text);
+      }
+
+      if (ok) {
+        copiedSinceChange = true;
+        setCopyBadge();
+        markStateChanged();
+      } else if (copyBadge) {
+        copyBadge.className = "metaBadge warn jsCopyBadge";
+        copyBadge.textContent = "Copy failed";
+      }
+
+      return ok;
+    }
+
+    async function copyNodeBranch(id, triggerEl) {
+      const text = buildBranchMarkdownById(id);
+      if (!text) return false;
+
+      const ok = await copyTextToClipboard(text);
+      if (ok && triggerEl) {
+        const original = triggerEl.textContent;
+        triggerEl.textContent = "Copied";
+        setTimeout(() => {
+          if (triggerEl.isConnected) triggerEl.textContent = original;
+        }, 1000);
+      }
+      return ok;
+    }
+
     function renderStructure() {
       updateSummary();
       const scrollY = window.scrollY;
@@ -1190,6 +1235,7 @@
               ${pinnedRootId === n.id ? `<div class="infoPill">Pinned</div>` : ""}
             </div>
             <div class="headerRight">
+              <button class="miniBtn" data-action="copy-node">Copy node</button>
               <button class="miniBtn" data-action="body">${n.showBody ? "Hide body" : "Show body"}</button>
               <button class="miniBtn" data-action="add">Add after</button>
               <button class="miniBtn" data-action="paste">Paste after</button>
@@ -1496,18 +1542,7 @@
       }
 
       const text = groups.map((group) => group.label).join("\n");
-      let ok = false;
-
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          ok = true;
-        } else {
-          ok = copyTextFallback(text);
-        }
-      } catch (_) {
-        ok = copyTextFallback(text);
-      }
+      const ok = await copyTextToClipboard(text);
 
       if (ok) {
         const base = tagsMeta.textContent;
@@ -1528,18 +1563,7 @@
       }
 
       const text = buildSimpleTOCText();
-      let ok = false;
-
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          ok = true;
-        } else {
-          ok = copyTextFallback(text);
-        }
-      } catch (_) {
-        ok = copyTextFallback(text);
-      }
+      const ok = await copyTextToClipboard(text);
 
       if (ok) {
         const base = tocMeta.textContent;
@@ -1796,27 +1820,7 @@
 
     btnCopy.addEventListener("click", async () => {
       const text = nodesToMarkdown(docPreamble, nodes);
-      let ok = false;
-
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          ok = true;
-        } else {
-          ok = copyTextFallback(text);
-        }
-      } catch (_) {
-        ok = copyTextFallback(text);
-      }
-
-      if (ok) {
-        copiedSinceChange = true;
-        setCopyBadge();
-        markStateChanged();
-      } else if (copyBadge) {
-        copyBadge.className = "metaBadge warn jsCopyBadge";
-        copyBadge.textContent = "Copy failed";
-      }
+      await copyTextToClipboard(text);
     });
 
     btnCopyToc.addEventListener("click", () => {
@@ -1922,6 +1926,7 @@
         if (action === "body") toggleBody(id);
         else if (action === "collapse") toggleCollapse(id);
         else if (action === "pin") handlePinTap(id);
+        else if (action === "copy-node") await copyNodeBranch(id, actionEl);
         else if (action === "add") addNewAfter(id);
         else if (action === "paste") await pasteMarkdownAfter(id);
         else if (action === "outdent") changeLevel(id, -1);
@@ -2005,26 +2010,8 @@
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
         copiedSinceChange = !!state.copiedSinceChange;
         pinnedRootId = typeof state.pinnedRootId === "string" ? state.pinnedRootId : "";
-
-        if (Array.isArray(state.undoStack)) {
-          undoStack = state.undoStack
-            .map((entry) => ({
-              reason: entry?.reason || "change",
-              state: {
-                v: 4,
-                nodes: normalizeNodes(entry?.state?.nodes),
-                docPreamble: typeof entry?.state?.docPreamble === "string" ? entry.state.docPreamble : "",
-                activeNodeId: typeof entry?.state?.activeNodeId === "string" ? entry.state.activeNodeId : "",
-                activeTab: typeof entry?.state?.activeTab === "string" ? entry.state.activeTab : "structure",
-                searchQuery: typeof entry?.state?.searchQuery === "string" ? entry.state.searchQuery : "",
-                activeTag: typeof entry?.state?.activeTag === "string" ? entry.state.activeTag : "",
-                rawInput: typeof entry?.state?.rawInput === "string" ? entry.state.rawInput : "",
-                copiedSinceChange: !!entry?.state?.copiedSinceChange,
-                pinnedRootId: typeof entry?.state?.pinnedRootId === "string" ? entry.state.pinnedRootId : ""
-              }
-            }))
-            .slice(-HISTORY_LIMIT);
-        }
+        
+        // Undo history is intentionally NOT loaded from storage
       } catch (_) {
         // ignore broken saved state
       }
