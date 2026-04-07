@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_CREATED_STAMP = "31 Mar 2026 · GPT-5.4 Thinking";
+  const BUILD_CREATED_STAMP = "07 Apr 2026 12:05 BST · GPT-5.4 Thinking";
 
   function formatBrowserRunStamp() {
     try {
@@ -436,8 +436,7 @@
 
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const uid = () => `n_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-  
-  // Adjusted limit to 5 levels
+
   const HISTORY_LIMIT = 5;
 
   function debounce(fn, ms) {
@@ -626,27 +625,46 @@
     return `${left}\n\n${right}`;
   }
 
+  function extractHtmlCommentTags(text) {
+    const out = [];
+    const seen = new Set();
+    const src = String(text || "").replace(/\r\n?/g, "\n");
+    const rx = /<!--\s*tag\b([\s\S]*?)-->/gi;
+    let m;
+
+    while ((m = rx.exec(src))) {
+      const tail = String(m[1] || "").replace(/\s+/g, " ").trim();
+      if (!tail) continue;
+
+      const parts = tail.includes(",")
+        ? tail.split(",").map((s) => s.trim()).filter(Boolean)
+        : [tail];
+
+      parts.forEach((part) => {
+        const clean = part.replace(/\s+/g, " ").trim();
+        const key = clean.toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        out.push(clean);
+      });
+    }
+
+    return out;
+  }
+
   function ensureTagLine(body, tagLabel) {
     const tag = String(tagLabel || "").replace(/\s+/g, " ").trim();
     if (!tag) return String(body || "");
 
     const src = String(body || "").replace(/\r\n?/g, "\n");
-    const lines = src ? src.split("\n") : [];
     const wantedKey = tag.toLowerCase();
+    const existing = extractHtmlCommentTags(src);
 
-    for (const line of lines) {
-      const m = line.match(/^\s*\\?%%\s*tag\b[ \t]+(.+)$/i);
-      if (!m) continue;
-      const tail = String(m[1] || "").trim();
-      const parts = tail.includes(",")
-        ? tail.split(",").map((s) => s.trim()).filter(Boolean)
-        : [tail];
-      if (parts.some((part) => part.replace(/\s+/g, " ").trim().toLowerCase() === wantedKey)) {
-        return src;
-      }
+    if (existing.some((part) => part.toLowerCase() === wantedKey)) {
+      return src;
     }
 
-    const line = `%% tag ${tag}`;
+    const line = `<!-- tag ${tag} -->`;
     return src ? `${line}\n${src}` : line;
   }
 
@@ -918,7 +936,6 @@
       updateUndoButton();
     }
 
-    // Adjusted buildState to exclude undoStack from persistence
     function buildState() {
       return snapshotState();
     }
@@ -1409,30 +1426,7 @@
     }
 
     function extractCommentTags(text) {
-      const out = [];
-      const seen = new Set();
-      const src = String(text || "").replace(/\r\n?/g, "\n");
-      const rx = /(?:^|\n)\s*\\?%%\s*tag\b[ \t]+([^\n]+)/gi;
-      let m;
-
-      while ((m = rx.exec(src))) {
-        const tail = String(m[1] || "").trim();
-        if (!tail) continue;
-
-        const parts = tail.includes(",")
-          ? tail.split(",").map((s) => s.trim()).filter(Boolean)
-          : [tail];
-
-        parts.forEach((part) => {
-          const clean = part.replace(/\s+/g, " ").trim();
-          const key = clean.toLowerCase();
-          if (!key || seen.has(key)) return;
-          seen.add(key);
-          out.push(clean);
-        });
-      }
-
-      return out;
+      return extractHtmlCommentTags(text);
     }
 
     function buildTagGroups() {
@@ -1457,11 +1451,11 @@
 
     function tagLineExcerpt(node, tagKey) {
       const src = String(node.body || "").replace(/\r\n?/g, "\n");
-      const rx = /(?:^|\n)\s*\\?%%\s*tag\b[ \t]+([^\n]+)/gi;
+      const rx = /<!--\s*tag\b([\s\S]*?)-->/gi;
       let m;
 
       while ((m = rx.exec(src))) {
-        const rawTail = String(m[1] || "").trim();
+        const rawTail = String(m[1] || "").replace(/\s+/g, " ").trim();
         if (!rawTail) continue;
 
         const parts = rawTail.includes(",")
@@ -1469,7 +1463,7 @@
           : [rawTail];
 
         if (parts.some((part) => part.replace(/\s+/g, " ").trim().toLowerCase() === tagKey)) {
-          return `%% tag ${rawTail}`;
+          return `<!-- tag ${rawTail} -->`;
         }
       }
 
@@ -1488,7 +1482,7 @@
       const groups = buildTagGroups();
       if (!groups.length) {
         activeTag = "";
-        tagsMeta.textContent = "No tags found. Use lines such as %% tag something or \\%% tag something anywhere inside a node body.";
+        tagsMeta.textContent = "No tags found. Use HTML comments such as <!-- tag mainArc --> anywhere inside a node body.";
         return;
       }
 
@@ -2010,8 +2004,6 @@
         if (typeof state.rawInput === "string") taInput.value = state.rawInput;
         copiedSinceChange = !!state.copiedSinceChange;
         pinnedRootId = typeof state.pinnedRootId === "string" ? state.pinnedRootId : "";
-        
-        // Undo history is intentionally NOT loaded from storage
       } catch (_) {
         // ignore broken saved state
       }
