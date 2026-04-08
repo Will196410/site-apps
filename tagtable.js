@@ -10,8 +10,8 @@
       window.SiteApps.registry[name] = initFn;
     };
 
-  const STYLE_ID = "siteapps-tagtable-style-v3";
-  const BUILD_STAMP = "25 Mar 2026 16:21 GMT";
+  const STYLE_ID = "siteapps-tagtable-style-v4";
+  const BUILD_STAMP = "08 Apr 2026 21:05 BST";
   const CHATGPT_VERSION = "GPT-5.4 Thinking";
 
   function ensureStyle() {
@@ -218,6 +218,19 @@
   background:#eef4ff;
 }
 
+[data-app="tagtable"] .tag-main{
+  display:block;
+  font-weight:800;
+}
+
+[data-app="tagtable"] .tag-purpose{
+  display:block;
+  margin-top:4px;
+  font-size:13px;
+  font-weight:600;
+  color:#555;
+}
+
 [data-app="tagtable"] .actions-cell{
   padding:8px;
   text-align:center;
@@ -357,48 +370,99 @@
     return normalizeRecord(s).toLocaleLowerCase();
   }
 
+  function parseRecordLine(line) {
+    const raw = normalizeRecord(line);
+    if (!raw) return null;
+
+    const splitAt = raw.indexOf("==");
+    if (splitAt === -1) {
+      const textOnly = normalizeRecord(raw);
+      if (!textOnly) return null;
+      return { text: textOnly, purpose: "" };
+    }
+
+    const text = normalizeRecord(raw.slice(0, splitAt));
+    const purpose = normalizeRecord(raw.slice(splitAt + 2));
+
+    if (!text) return null;
+    return { text, purpose };
+  }
+
+  function formatRecordLine(record) {
+    const text = normalizeRecord(record && record.text);
+    const purpose = normalizeRecord(record && record.purpose);
+    if (!text) return "";
+    return purpose ? `${text} == ${purpose}` : text;
+  }
+
   function splitRecords(s) {
     return normalizeLineEndings(s)
       .split("\n")
-      .map(normalizeRecord)
+      .map(parseRecordLine)
       .filter(Boolean);
   }
 
   function sortRecords(list) {
     return list.slice().sort((a, b) => {
-      const primary = a.localeCompare(b, undefined, {
+      const primary = a.text.localeCompare(b.text, undefined, {
         sensitivity: "base",
         numeric: true
       });
       if (primary !== 0) return primary;
-      return a.localeCompare(b, undefined, {
+
+      const secondary = a.text.localeCompare(b.text, undefined, {
         sensitivity: "variant",
         numeric: true
       });
+      if (secondary !== 0) return secondary;
+
+      return (a.purpose || "").localeCompare(b.purpose || "", undefined, {
+        sensitivity: "base",
+        numeric: true
+      });
     });
+  }
+
+  function normalizeImportedRecord(item) {
+    if (typeof item === "string") return parseRecordLine(item);
+    if (!item || typeof item !== "object") return null;
+
+    const text = normalizeRecord(item.text);
+    const purpose = normalizeRecord(item.purpose);
+
+    if (!text) return null;
+    return { text, purpose };
   }
 
   function mergeRecords(existing, incoming) {
     const map = new Map();
 
     existing.forEach((item) => {
-      const text = normalizeRecord(item);
-      if (!text) return;
-      const key = recordKey(text);
-      if (!map.has(key)) map.set(key, text);
+      const rec = normalizeImportedRecord(item);
+      if (!rec) return;
+      const key = recordKey(rec.text);
+      if (!map.has(key)) map.set(key, rec);
     });
 
     let added = 0;
     let skipped = 0;
+    let updated = 0;
 
     incoming.forEach((item) => {
-      const text = normalizeRecord(item);
-      if (!text) return;
-      const key = recordKey(text);
+      const rec = normalizeImportedRecord(item);
+      if (!rec) return;
+
+      const key = recordKey(rec.text);
       if (map.has(key)) {
-        skipped += 1;
+        const current = map.get(key);
+        if (!current.purpose && rec.purpose) {
+          map.set(key, { text: current.text, purpose: rec.purpose });
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
       } else {
-        map.set(key, text);
+        map.set(key, rec);
         added += 1;
       }
     });
@@ -406,7 +470,8 @@
     return {
       records: sortRecords(Array.from(map.values())),
       added,
-      skipped
+      skipped,
+      updated
     };
   }
 
@@ -471,7 +536,7 @@
   function parseImportedText(text) {
     const parsed = safeJsonParse(text);
     if (parsed && Array.isArray(parsed.records)) {
-      return parsed.records.map(normalizeRecord).filter(Boolean);
+      return parsed.records.map(normalizeImportedRecord).filter(Boolean);
     }
     return splitRecords(text);
   }
@@ -519,10 +584,10 @@
 
     const help = document.createElement("p");
     help.className = "help";
-    help.textContent = "Add lines to the table, then tap any saved entry to copy it.";
+    help.textContent = "Use “tag == purpose” if you want to say what a tag refers to. Example: Samsung TV == my TV";
 
     const inputTA = document.createElement("textarea");
-    inputTA.placeholder = "tag-one\ntag-two\ntag-three";
+    inputTA.placeholder = "Samsung TV == my TV\nMac mini == office computer\nBlue mug";
 
     function makeBtn(text, cls, fn) {
       const b = document.createElement("button");
@@ -660,7 +725,7 @@
     function saveState() {
       try {
         const state = {
-          v: 3,
+          v: 4,
           records,
           draftText: inputTA.value,
           searchQuery,
@@ -723,7 +788,11 @@
     function getFilteredRecords() {
       const q = normalizeRecord(searchQuery).toLocaleLowerCase();
       if (!q) return records.slice();
-      return records.filter((item) => item.toLocaleLowerCase().includes(q));
+
+      return records.filter((item) => {
+        const haystack = `${item.text} ${item.purpose || ""}`.toLocaleLowerCase();
+        return haystack.includes(q);
+      });
     }
 
     function renderSearchMeta(filtered) {
@@ -759,23 +828,36 @@
         tableWrap.style.display = "block";
       }
 
-      filtered.forEach((text) => {
+      filtered.forEach((record) => {
         const tr = document.createElement("tr");
 
         const tdText = document.createElement("td");
         const copyBtn = document.createElement("button");
         copyBtn.type = "button";
         copyBtn.className = "copy-row";
-        copyBtn.textContent = text;
         copyBtn.title = "Tap to copy";
+
+        const main = document.createElement("span");
+        main.className = "tag-main";
+        main.textContent = record.text;
+
+        copyBtn.appendChild(main);
+
+        if (record.purpose) {
+          const purpose = document.createElement("span");
+          purpose.className = "tag-purpose";
+          purpose.textContent = `Refers to: ${record.purpose}`;
+          copyBtn.appendChild(purpose);
+        }
+
         copyBtn.addEventListener("click", async () => {
-          const ok = await copyText(text);
+          const ok = await copyText(record.text);
           if (ok) {
             copiedSinceChange = true;
             lastCopyAt = new Date().toISOString();
             renderBadges();
             saveState();
-            showToast(`Copied: ${text}`);
+            showToast(`Copied: ${record.text}`);
           } else {
             alert("Copy failed. Tap and hold, or try a different browser.");
           }
@@ -789,9 +871,9 @@
         deleteBtn.type = "button";
         deleteBtn.className = "delete-row";
         deleteBtn.textContent = "Delete";
-        deleteBtn.title = `Delete ${text}`;
+        deleteBtn.title = `Delete ${record.text}`;
         deleteBtn.addEventListener("click", () => {
-          records = records.filter((item) => recordKey(item) !== recordKey(text));
+          records = records.filter((item) => recordKey(item.text) !== recordKey(record.text));
           renderTable();
           markDataChanged();
           showToast("Deleted");
@@ -820,6 +902,7 @@
 
       const bits = [];
       bits.push(`Added ${merged.added}`);
+      if (merged.updated) bits.push(`Updated ${merged.updated} purpose${merged.updated === 1 ? "" : "s"}`);
       if (merged.skipped) {
         bits.push(`Skipped ${merged.skipped} duplicate${merged.skipped === 1 ? "" : "s"}`);
       }
@@ -837,7 +920,7 @@
         return;
       }
 
-      const text = records.join("\n");
+      const text = records.map((item) => item.text).join("\n");
       const ok = await copyText(text);
       if (ok) {
         copiedSinceChange = true;
@@ -856,7 +939,7 @@
         return;
       }
 
-      const text = records.join("\n");
+      const text = records.map(formatRecordLine).filter(Boolean).join("\n");
       try {
         downloadTextFile(exportFilename(), text);
         showToast("Exported file");
@@ -901,6 +984,7 @@
 
         const bits = [];
         bits.push(`Imported ${merged.added}`);
+        if (merged.updated) bits.push(`Updated ${merged.updated} purpose${merged.updated === 1 ? "" : "s"}`);
         if (merged.skipped) {
           bits.push(`Skipped ${merged.skipped} duplicate${merged.skipped === 1 ? "" : "s"}`);
         }
