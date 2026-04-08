@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-tagtable-style-v4";
-  const BUILD_STAMP = "08 Apr 2026 21:05 BST";
+  const BUILD_STAMP = "08 Apr 2026 21:18 BST";
   const CHATGPT_VERSION = "GPT-5.4 Thinking";
 
   function ensureStyle() {
@@ -268,6 +268,7 @@
   transition:opacity .2s, transform .2s;
   pointer-events:none;
   max-width:min(90vw, 360px);
+  white-space:pre-wrap;
 }
 
 [data-app="tagtable"] .feedback.show{
@@ -368,6 +369,36 @@
 
   function recordKey(s) {
     return normalizeRecord(s).toLocaleLowerCase();
+  }
+
+  function expandTagEscapes(s) {
+    const src = String(s || "");
+    let out = "";
+
+    for (let i = 0; i < src.length; i += 1) {
+      const ch = src[i];
+
+      if (ch !== "\\") {
+        out += ch;
+        continue;
+      }
+
+      const next = src[i + 1];
+      if (next === "m") {
+        out += "\n";
+        i += 1;
+      } else if (next === "t") {
+        out += "\t";
+        i += 1;
+      } else if (next === "\\") {
+        out += "\\";
+        i += 1;
+      } else {
+        out += "\\";
+      }
+    }
+
+    return out;
   }
 
   function parseRecordLine(line) {
@@ -502,7 +533,7 @@
   }
 
   async function copyText(text) {
-    if (!text) return false;
+    if (!text && text !== "") return false;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
@@ -584,10 +615,10 @@
 
     const help = document.createElement("p");
     help.className = "help";
-    help.textContent = "Use “tag == purpose” if you want to say what a tag refers to. Example: Samsung TV == my TV";
+    help.textContent = "Use “tag == purpose” if you want to say what a tag refers to. Escape sequences for copied tags: \\m = line break, \\t = tab.";
 
     const inputTA = document.createElement("textarea");
-    inputTA.placeholder = "Samsung TV == my TV\nMac mini == office computer\nBlue mug";
+    inputTA.placeholder = "Samsung\\tTV == my TV\nLine one\\mLine two == multi-line tag\nBlue mug";
 
     function makeBtn(text, cls, fn) {
       const b = document.createElement("button");
@@ -851,7 +882,8 @@
         }
 
         copyBtn.addEventListener("click", async () => {
-          const ok = await copyText(record.text);
+          const expandedText = expandTagEscapes(record.text);
+          const ok = await copyText(expandedText);
           if (ok) {
             copiedSinceChange = true;
             lastCopyAt = new Date().toISOString();
@@ -920,7 +952,7 @@
         return;
       }
 
-      const text = records.map((item) => item.text).join("\n");
+      const text = records.map((item) => expandTagEscapes(item.text)).join("\n");
       const ok = await copyText(text);
       if (ok) {
         copiedSinceChange = true;
