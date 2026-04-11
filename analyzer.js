@@ -7,7 +7,7 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-analyzer-v4-fullwidth";
+  const STYLE_ID = "siteapps-analyzer-v5-toggles";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -23,7 +23,7 @@
       }
 
       [data-app="analyzer"] .section {
-        margin-bottom: 30px;
+        margin-bottom: 20px;
         width: 100%;
       }
 
@@ -36,7 +36,7 @@
 
       [data-app="analyzer"] textarea {
         width: 100%;
-        min-height: 300px;
+        min-height: 250px;
         border: none;
         padding: 15px;
         font-family: ui-monospace, monospace;
@@ -47,16 +47,46 @@
         display: block;
       }
 
+      /* Options Bar Styling */
+      [data-app="analyzer"] .options-bar {
+        display: flex;
+        gap: 20px;
+        padding: 15px;
+        background: #f9f9f9;
+        border: 2px solid #000;
+        border-bottom: none;
+        border-radius: 4px 4px 0 0;
+        flex-wrap: wrap;
+      }
+
+      [data-app="analyzer"] .option-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      [data-app="analyzer"] .option-item input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+
       [data-app="analyzer"] .btn-refresh {
         background: #000;
         color: #fff;
         border: 2px solid #000;
-        padding: 12px 24px;
+        padding: 15px 30px;
         font-weight: 900;
         font-size: 16px;
         cursor: pointer;
         text-transform: uppercase;
-        margin-bottom: 20px;
+        width: 100%;
+        border-radius: 0 0 4px 4px;
+        margin-bottom: 30px;
       }
 
       [data-app="analyzer"] .btn-refresh:hover {
@@ -64,7 +94,6 @@
         color: #000;
       }
 
-      /* Issue Summary List */
       [data-app="analyzer"] .issue-summary {
         background: #000;
         color: #fff;
@@ -73,47 +102,35 @@
       }
 
       [data-app="analyzer"] .issue-item {
-        color: #ffff00; /* High Contrast Yellow */
+        color: #ffff00;
         font-family: ui-monospace, monospace;
         margin-bottom: 4px;
         font-weight: bold;
       }
 
-      [data-app="analyzer"] .issue-line-ref {
-        color: #fff;
-        margin-right: 10px;
-        border: 1px solid #444;
-        padding: 0 4px;
-      }
-
-      /* Results Text View */
-      [data-app="analyzer"] .results-display {
-        background: #fff;
-        padding: 20px;
-        font-family: ui-monospace, monospace;
-        font-size: 15px;
-        line-height: 1.6;
-        color: #111;
-      }
-
       [data-app="analyzer"] .line-container {
         display: flex;
         border-bottom: 1px solid #eee;
+        background: #fff;
       }
 
       [data-app="analyzer"] .line-number {
-        width: 40px;
-        color: #999;
+        width: 50px;
+        color: #888;
         text-align: right;
         padding-right: 15px;
         user-select: none;
         border-right: 1px solid #ddd;
         margin-right: 15px;
+        font-family: monospace;
+        background: #fafafa;
       }
 
       [data-app="analyzer"] .line-content {
         flex: 1;
         white-space: pre-wrap;
+        padding: 2px 0;
+        font-family: ui-monospace, monospace;
       }
 
       [data-app="analyzer"] mark.highlight {
@@ -128,7 +145,6 @@
         gap: 20px;
         margin-bottom: 10px;
         font-weight: 900;
-        text-transform: uppercase;
         font-size: 13px;
       }
 
@@ -136,37 +152,37 @@
         font-size: 18px;
         text-transform: uppercase;
         margin-bottom: 10px;
-        border-left: 5px solid #000;
+        border-left: 8px solid #000;
         padding-left: 10px;
       }
     `;
     document.head.appendChild(style);
   }
 
-  const FILTERS = new Set([
-    "just", "very", "really", "felt", "feel", "started to", "began to", "seemed", "actually", "suddenly"
+  const FILTER_WORDS = new Set([
+    "just", "very", "really", "felt", "feel", "think", "thought", "maybe", 
+    "actually", "suddenly", "seemed", "began to", "started to", "looked", "saw"
   ]);
 
-  function runAnalysis(text) {
+  function runAnalysis(text, options) {
     const lines = text.split('\n');
     const issues = [];
     const lastSeen = new Map();
     const proximity = 15;
     let globalWordIdx = 0;
 
-    // Analysis Logic
     lines.forEach((line, lIdx) => {
       const words = line.match(/\b[\w'-]+\b/g) || [];
       words.forEach(word => {
         const clean = word.toLowerCase();
         
-        // Check Filter Words
-        if (FILTERS.has(clean)) {
+        // 1. Filter Word Check
+        if (options.showFilters && FILTER_WORDS.has(clean)) {
           issues.push({ line: lIdx + 1, word: word, type: "Filter" });
         }
 
-        // Check Repetition Proximity
-        if (clean.length > 3) {
+        // 2. Repetition Check
+        if (options.showRepeats && clean.length > 3) {
           if (lastSeen.has(clean)) {
             const prevIdx = lastSeen.get(clean);
             if (globalWordIdx - prevIdx <= proximity) {
@@ -179,7 +195,6 @@
       });
     });
 
-    // Stats
     const wordCount = text.trim().split(/\s+/).length || 0;
     const charCount = text.replace(/\s/g, '').length;
     const sentences = text.split(/[.!?]+/).filter(Boolean).length || 1;
@@ -201,20 +216,28 @@
       <div class="section">
         <h2>Input Text</h2>
         <div class="frame">
-          <textarea id="input-text" placeholder="Paste your text fragment here..."></textarea>
+          <textarea id="input-text" placeholder="Paste text here..."></textarea>
         </div>
       </div>
 
-      <button class="btn-refresh" id="refresh-btn">Refresh & Analyze</button>
+      <div class="options-bar">
+        <label class="option-item">
+          <input type="checkbox" id="check-filters" checked> Filter Words
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="check-repeats" checked> Word Repetition
+        </label>
+      </div>
+      <button class="btn-refresh" id="refresh-btn">Update Report</button>
 
       <div class="section" id="results-section" style="display:none;">
-        <h2>Analysis Results</h2>
+        <h2>Report View</h2>
         <div id="stats" class="stats-bar"></div>
         
         <div class="issue-summary" id="issue-list"></div>
 
         <div class="frame">
-          <div class="results-display" id="annotated-text"></div>
+          <div id="annotated-text"></div>
         </div>
       </div>
     `;
@@ -226,35 +249,38 @@
     const issueList = container.querySelector("#issue-list");
     const annotatedText = container.querySelector("#annotated-text");
 
+    // Toggles
+    const filterChk = container.querySelector("#check-filters");
+    const repeatChk = container.querySelector("#check-repeats");
+
     refreshBtn.addEventListener("click", () => {
       const text = input.value;
       if (!text.trim()) return;
 
-      const data = runAnalysis(text);
+      const options = {
+        showFilters: filterChk.checked,
+        showRepeats: repeatChk.checked
+      };
+
+      const data = runAnalysis(text, options);
       resultsSection.style.display = "block";
 
-      // 1. Stats
       statsBar.innerHTML = `
-        <span>Words: ${data.wordCount}</span>
-        <span>Reading Time: ~${data.readingTime} min</span>
-        <span>ARI Grade: ${data.grade}</span>
+        <span>Words: ${data.wordCount}</span> | 
+        <span>Time: ~${data.readingTime}m</span> | 
+        <span>Readability Grade: ${data.grade}</span>
       `;
 
-      // 2. Issue Summary (Listed First)
       issueList.innerHTML = `<h3>Issues Identified (${data.issues.length})</h3>`;
-      if (data.issues.length === 0) {
-        issueList.innerHTML += `<div class="issue-item">No issues found.</div>`;
-      } else {
-        data.issues.forEach(iss => {
-          issueList.innerHTML += `
-            <div class="issue-item">
-              <span class="issue-line-ref">Line ${iss.line}</span> [${iss.type}] "${iss.word}"
-            </div>
-          `;
-        });
-      }
+      data.issues.forEach(iss => {
+        issueList.innerHTML += `
+          <div class="issue-item">
+            <span style="color:#fff; border:1px solid #444; padding:0 4px; margin-right:8px;">L${iss.line}</span>
+            [${iss.type}] "${iss.word}"
+          </div>
+        `;
+      });
 
-      // 3. Whole Text with Line Numbers & Highlights
       const issueWords = new Set(data.issues.map(i => i.word.toLowerCase()));
       const lines = text.split('\n');
       
@@ -270,7 +296,6 @@
         const content = document.createElement("div");
         content.className = "line-content";
         
-        // Highlight logic
         const tokens = line.split(/(\b\w+\b)/g);
         tokens.forEach(token => {
           if (issueWords.has(token.toLowerCase().trim())) {
@@ -288,7 +313,6 @@
         annotatedText.appendChild(lineRow);
       });
 
-      // Scroll to results
       resultsSection.scrollIntoView({ behavior: 'smooth' });
     });
   });
