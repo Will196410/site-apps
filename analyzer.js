@@ -1,14 +1,13 @@
 (() => {
   "use strict";
 
-  // SiteApps Registry Setup
   window.SiteApps = window.SiteApps || {};
   window.SiteApps.registry = window.SiteApps.registry || {};
   window.SiteApps.register = window.SiteApps.register || function (name, initFn) {
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-analyzer-final-v3";
+  const STYLE_ID = "siteapps-analyzer-v4-fullwidth";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -16,264 +15,281 @@
     style.id = STYLE_ID;
     style.textContent = `
       [data-app="analyzer"] {
-        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        font-family: ui-sans-serif, system-ui, sans-serif;
         background: #fff;
         padding: 20px;
         color: #000;
+        max-width: 100%;
       }
 
-      [data-app="analyzer"] .app-container {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        max-width: 1300px;
-        margin: 0 auto;
+      [data-app="analyzer"] .section {
+        margin-bottom: 30px;
+        width: 100%;
       }
 
-      /* Nested Box Aesthetic (from your image) */
-      [data-app="analyzer"] .nested-frame {
-        background: #000;
-        padding: 4px;
+      [data-app="analyzer"] .frame {
         border: 2px solid #000;
-        box-shadow: 12px 12px 0px #000;
-        border-radius: 4px;
-      }
-
-      [data-app="analyzer"] .content-area {
         background: #fff;
-        border: 2px solid #000;
-        height: 650px;
-        overflow-y: auto;
-        padding: 15px;
-        position: relative;
+        border-radius: 4px;
+        overflow: hidden;
       }
 
       [data-app="analyzer"] textarea {
         width: 100%;
-        height: 100%;
+        min-height: 300px;
         border: none;
+        padding: 15px;
         font-family: ui-monospace, monospace;
         font-size: 16px;
         line-height: 1.5;
         outline: none;
-        color: #000;
-        background: transparent;
+        box-sizing: border-box;
+        display: block;
       }
 
       [data-app="analyzer"] .btn-refresh {
-        grid-column: 1 / -1;
         background: #000;
         color: #fff;
-        border: 4px solid #000;
-        padding: 15px;
+        border: 2px solid #000;
+        padding: 12px 24px;
         font-weight: 900;
-        font-size: 20px;
+        font-size: 16px;
         cursor: pointer;
         text-transform: uppercase;
-        margin-top: 20px;
-        transition: transform 0.1s;
-      }
-
-      [data-app="analyzer"] .btn-refresh:active {
-        transform: translateY(4px);
-      }
-
-      /* High Contrast Issue List */
-      [data-app="analyzer"] .issue-box {
-        background: #000;
-        color: #ffff00; /* Neon Yellow */
-        padding: 10px;
-        margin-bottom: 10px;
-        font-weight: 800;
-        border-left: 10px solid #fff;
-        font-size: 14px;
-      }
-
-      [data-app="analyzer"] .line-tag {
-        background: #fff;
-        color: #000;
-        padding: 2px 6px;
-        margin-right: 10px;
-        font-family: monospace;
-      }
-
-      [data-app="analyzer"] .stat-row {
-        display: flex;
-        gap: 10px;
         margin-bottom: 20px;
-        flex-wrap: wrap;
       }
 
-      [data-app="analyzer"] .badge {
+      [data-app="analyzer"] .btn-refresh:hover {
+        background: #ffff00;
+        color: #000;
+      }
+
+      /* Issue Summary List */
+      [data-app="analyzer"] .issue-summary {
         background: #000;
         color: #fff;
-        padding: 8px 12px;
-        font-weight: 900;
-        text-transform: uppercase;
-        font-size: 12px;
+        padding: 15px;
+        margin-bottom: 20px;
       }
 
-      /* Annotations */
-      [data-app="analyzer"] mark.issue {
+      [data-app="analyzer"] .issue-item {
+        color: #ffff00; /* High Contrast Yellow */
+        font-family: ui-monospace, monospace;
+        margin-bottom: 4px;
+        font-weight: bold;
+      }
+
+      [data-app="analyzer"] .issue-line-ref {
+        color: #fff;
+        margin-right: 10px;
+        border: 1px solid #444;
+        padding: 0 4px;
+      }
+
+      /* Results Text View */
+      [data-app="analyzer"] .results-display {
+        background: #fff;
+        padding: 20px;
+        font-family: ui-monospace, monospace;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #111;
+      }
+
+      [data-app="analyzer"] .line-container {
+        display: flex;
+        border-bottom: 1px solid #eee;
+      }
+
+      [data-app="analyzer"] .line-number {
+        width: 40px;
+        color: #999;
+        text-align: right;
+        padding-right: 15px;
+        user-select: none;
+        border-right: 1px solid #ddd;
+        margin-right: 15px;
+      }
+
+      [data-app="analyzer"] .line-content {
+        flex: 1;
+        white-space: pre-wrap;
+      }
+
+      [data-app="analyzer"] mark.highlight {
         background: #000;
         color: #ffff00;
-        font-weight: bold;
         padding: 0 2px;
-        text-decoration: underline;
+        font-weight: bold;
       }
 
-      [data-app="analyzer"] h2 { margin-top: 0; text-transform: uppercase; border-bottom: 6px solid #000; display: inline-block; }
+      [data-app="analyzer"] .stats-bar {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 13px;
+      }
 
-      @media (max-width: 900px) {
-        [data-app="analyzer"] .app-container { grid-template-columns: 1fr; }
+      [data-app="analyzer"] h2 {
+        font-size: 18px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        border-left: 5px solid #000;
+        padding-left: 10px;
       }
     `;
     document.head.appendChild(style);
   }
 
-  const FILTER_WORDS = new Set([
-    "just", "really", "very", "felt", "feel", "think", "thought", "knew", "know", 
-    "realized", "noticed", "decided", "started", "began", "seemed", "heard", "saw"
+  const FILTERS = new Set([
+    "just", "very", "really", "felt", "feel", "started to", "began to", "seemed", "actually", "suddenly"
   ]);
 
-  function getAnalysis(text) {
+  function runAnalysis(text) {
     const lines = text.split('\n');
-    const allWordsWithMetadata = [];
     const issues = [];
-    const proximityWindow = 15;
     const lastSeen = new Map();
+    const proximity = 15;
+    let globalWordIdx = 0;
 
-    // Process text for issues
-    let wordCount = 0;
+    // Analysis Logic
     lines.forEach((line, lIdx) => {
-      const tokens = line.split(/(\b\w+\b)/g);
-      tokens.forEach(token => {
-        const clean = token.toLowerCase().trim();
-        const isWord = /^\w+$/.test(clean);
+      const words = line.match(/\b[\w'-]+\b/g) || [];
+      words.forEach(word => {
+        const clean = word.toLowerCase();
         
-        if (isWord) {
-          wordCount++;
-          let issueFound = false;
-
-          // 1. Check Filter Words
-          if (FILTER_WORDS.has(clean)) {
-            issues.push({ line: lIdx + 1, type: "Filter Word", word: token });
-            issueFound = true;
-          }
-
-          // 2. Check Proximity (Echoes)
-          if (clean.length > 3) {
-            if (lastSeen.has(clean)) {
-              const prevIdx = lastSeen.get(clean);
-              if (wordCount - prevIdx <= proximityWindow) {
-                issues.push({ line: lIdx + 1, type: "Repeated", word: token });
-                issueFound = true;
-              }
-            }
-            lastSeen.set(clean, wordCount);
-          }
+        // Check Filter Words
+        if (FILTERS.has(clean)) {
+          issues.push({ line: lIdx + 1, word: word, type: "Filter" });
         }
+
+        // Check Repetition Proximity
+        if (clean.length > 3) {
+          if (lastSeen.has(clean)) {
+            const prevIdx = lastSeen.get(clean);
+            if (globalWordIdx - prevIdx <= proximity) {
+              issues.push({ line: lIdx + 1, word: word, type: "Repeat" });
+            }
+          }
+          lastSeen.set(clean, globalWordIdx);
+        }
+        globalWordIdx++;
       });
     });
 
-    // Readability (ARI)
+    // Stats
+    const wordCount = text.trim().split(/\s+/).length || 0;
     const charCount = text.replace(/\s/g, '').length;
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim()).length || 1;
-    const ari = 4.71 * (charCount / (wordCount || 1)) + 0.5 * ((wordCount || 1) / sentences) - 21.43;
-    const readingTime = Math.ceil(wordCount / 225);
+    const sentences = text.split(/[.!?]+/).filter(Boolean).length || 1;
+    const ari = 4.71 * (charCount / wordCount) + 0.5 * (wordCount / sentences) - 21.43;
 
     return { 
       issues, 
       wordCount, 
-      readingTime, 
-      grade: Math.max(1, Math.round(ari)),
-      tokens: text.split(/(\b\w+\b)/g) 
+      readingTime: Math.ceil(wordCount / 225), 
+      grade: Math.max(1, Math.round(ari)) 
     };
   }
 
   window.SiteApps.register("analyzer", (container) => {
     ensureStyle();
     container.setAttribute("data-app", "analyzer");
-    
+
     container.innerHTML = `
-      <div class="app-container">
-        <div>
-          <h2>Input Text</h2>
-          <div class="nested-frame">
-            <div class="content-area">
-              <textarea id="source-input" placeholder="Paste your text here..."></textarea>
-            </div>
-          </div>
+      <div class="section">
+        <h2>Input Text</h2>
+        <div class="frame">
+          <textarea id="input-text" placeholder="Paste your text fragment here..."></textarea>
         </div>
+      </div>
 
-        <div>
-          <h2>Analysis View</h2>
-          <div class="nested-frame">
-            <div class="content-area" id="report-view">
-              <p style="text-align:center; padding-top:100px;">Paste text and press Refresh to analyze.</p>
-            </div>
-          </div>
+      <button class="btn-refresh" id="refresh-btn">Refresh & Analyze</button>
+
+      <div class="section" id="results-section" style="display:none;">
+        <h2>Analysis Results</h2>
+        <div id="stats" class="stats-bar"></div>
+        
+        <div class="issue-summary" id="issue-list"></div>
+
+        <div class="frame">
+          <div class="results-display" id="annotated-text"></div>
         </div>
-
-        <button class="btn-refresh" id="refresh-btn">Refresh Analysis</button>
       </div>
     `;
 
-    const input = container.querySelector("#source-input");
-    const report = container.querySelector("#report-view");
-    const btn = container.querySelector("#refresh-btn");
+    const input = container.querySelector("#input-text");
+    const refreshBtn = container.querySelector("#refresh-btn");
+    const resultsSection = container.querySelector("#results-section");
+    const statsBar = container.querySelector("#stats");
+    const issueList = container.querySelector("#issue-list");
+    const annotatedText = container.querySelector("#annotated-text");
 
-    btn.addEventListener("click", () => {
+    refreshBtn.addEventListener("click", () => {
       const text = input.value;
       if (!text.trim()) return;
 
-      const data = getAnalysis(text);
+      const data = runAnalysis(text);
+      resultsSection.style.display = "block";
 
-      // Header Stats
-      let html = `
-        <div class="stat-row">
-          <div class="badge">Words: ${data.wordCount}</div>
-          <div class="badge">Read Time: ${data.readingTime}m</div>
-          <div class="badge">ARI Grade: ${data.grade}</div>
-        </div>
-        <hr style="border: 2px solid #000; margin-bottom: 20px;">
-        <h3>Issues Found (${data.issues.length})</h3>
+      // 1. Stats
+      statsBar.innerHTML = `
+        <span>Words: ${data.wordCount}</span>
+        <span>Reading Time: ~${data.readingTime} min</span>
+        <span>ARI Grade: ${data.grade}</span>
       `;
 
-      // 1. Issues List (First)
+      // 2. Issue Summary (Listed First)
+      issueList.innerHTML = `<h3>Issues Identified (${data.issues.length})</h3>`;
       if (data.issues.length === 0) {
-        html += `<p>No issues detected.</p>`;
+        issueList.innerHTML += `<div class="issue-item">No issues found.</div>`;
       } else {
         data.issues.forEach(iss => {
-          html += `
-            <div class="issue-box">
-              <span class="line-tag">Line ${iss.line}</span>
-              [${iss.type}] : "${iss.word}"
+          issueList.innerHTML += `
+            <div class="issue-item">
+              <span class="issue-line-ref">Line ${iss.line}</span> [${iss.type}] "${iss.word}"
             </div>
           `;
         });
       }
 
-      // 2. Annotated View (Second)
-      html += `
-        <hr style="border: 2px solid #000; margin: 30px 0;">
-        <h3>Annotated Text</h3>
-        <div style="white-space: pre-wrap; line-height: 1.8; font-family: serif; font-size: 18px;">
-      `;
-
-      // Highlight logic for the view
+      // 3. Whole Text with Line Numbers & Highlights
       const issueWords = new Set(data.issues.map(i => i.word.toLowerCase()));
-      data.tokens.forEach(t => {
-        if (issueWords.has(t.toLowerCase().trim())) {
-          html += `<mark class="issue">${t}</mark>`;
-        } else {
-          html += t;
-        }
+      const lines = text.split('\n');
+      
+      annotatedText.innerHTML = "";
+      lines.forEach((line, idx) => {
+        const lineRow = document.createElement("div");
+        lineRow.className = "line-container";
+        
+        const num = document.createElement("div");
+        num.className = "line-number";
+        num.textContent = idx + 1;
+
+        const content = document.createElement("div");
+        content.className = "line-content";
+        
+        // Highlight logic
+        const tokens = line.split(/(\b\w+\b)/g);
+        tokens.forEach(token => {
+          if (issueWords.has(token.toLowerCase().trim())) {
+            const m = document.createElement("mark");
+            m.className = "highlight";
+            m.textContent = token;
+            content.appendChild(m);
+          } else {
+            content.appendChild(document.createTextNode(token));
+          }
+        });
+
+        lineRow.appendChild(num);
+        lineRow.appendChild(content);
+        annotatedText.appendChild(lineRow);
       });
 
-      html += `</div>`;
-      report.innerHTML = html;
-      report.scrollTop = 0; // Reset scroll to top
+      // Scroll to results
+      resultsSection.scrollIntoView({ behavior: 'smooth' });
     });
   });
 })();
