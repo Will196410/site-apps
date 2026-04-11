@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-prosecheck-style-v1";
-  const BUILD_STAMP = "11 Apr 2026 20:42 BST";
+  const BUILD_STAMP = "11 Apr 2026 21:04 BST";
   const CHATGPT_VERSION = "GPT-5.4 Thinking";
 
   const FILTER_WORDS = new Set([
@@ -494,7 +494,7 @@
     if (!w) return 0;
     if (w.length <= 3) return 1;
 
-    let stripped = w
+    const stripped = w
       .replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, "")
       .replace(/^y/, "");
 
@@ -505,12 +505,12 @@
   function tokenizeTextWithLines(text) {
     const lines = normalizeLineEndings(text).split("\n");
     const tokens = [];
-    const lineWordMap = new Map();
-
     const wordRe = /[A-Za-z][A-Za-z'’-]*/g;
 
     lines.forEach((line, lineIndex) => {
       const lineNo = lineIndex + 1;
+      wordRe.lastIndex = 0;
+
       let m;
       while ((m = wordRe.exec(line))) {
         const raw = m[0];
@@ -519,22 +519,18 @@
           .replace(/[’]/g, "'")
           .replace(/^'+|'+$/g, "");
 
-        const token = {
+        tokens.push({
           raw,
           norm,
           line: lineNo,
           start: m.index,
           end: m.index + raw.length,
           index: tokens.length
-        };
-        tokens.push(token);
-
-        if (!lineWordMap.has(lineNo)) lineWordMap.set(lineNo, []);
-        lineWordMap.get(lineNo).push(token);
+        });
       }
     });
 
-    return { lines, tokens, lineWordMap };
+    return { lines, tokens };
   }
 
   function analyseText(text) {
@@ -559,14 +555,8 @@
     function addIssue(issue) {
       issue.id = `pc-issue-${issueCounter++}`;
       issues.push(issue);
-      if (issue.mark && issue.mark.line > 0) {
-        addMark(
-          issue.type,
-          issue.mark.line,
-          issue.mark.start,
-          issue.mark.end,
-          issue.labelShort
-        );
+      if (issue.mark) {
+        addMark(issue.type, issue.mark.line, issue.mark.start, issue.mark.end, issue.labelShort);
       }
     }
 
@@ -588,7 +578,6 @@
       ? ((0.39 * avgSentenceLength) + (11.8 * avgSyllablesPerWord) - 15.59)
       : 0;
 
-    // Filter words
     tokens.forEach((token) => {
       if (!FILTER_WORDS.has(token.norm)) return;
 
@@ -597,8 +586,7 @@
         label: "Filter word",
         labelShort: "FILTER",
         line: token.line,
-        message: `Filter word “${token.raw}”. Consider whether the sentence would be stronger if the reader experienced the moment directly.`,
-        excerpt: token.raw,
+        message: `Filter word “${token.raw}”. Consider whether the sentence would be stronger if the moment were rendered more directly.`,
         mark: {
           line: token.line,
           start: token.start,
@@ -607,22 +595,21 @@
       });
     });
 
-    // Filter phrases
-    const lowerText = src.toLowerCase();
     FILTER_PHRASES.forEach((phrase) => {
       const phraseRe = new RegExp(`\\b${phrase.replace(/\s+/g, "\\s+")}\\b`, "gi");
-      const linesLocal = lines.slice();
 
-      linesLocal.forEach((line, idx) => {
+      lines.forEach((line, idx) => {
+        const lineLower = line.toLowerCase();
+        phraseRe.lastIndex = 0;
+
         let m;
-        while ((m = phraseRe.exec(line.toLowerCase()))) {
+        while ((m = phraseRe.exec(lineLower))) {
           addIssue({
             type: "filter",
             label: "Filter phrase",
             labelShort: "FILTER",
             line: idx + 1,
-            message: `Filter phrase “${line.slice(m.index, m.index + m[0].length)}”. This may be adding distance or drag.`,
-            excerpt: line.slice(m.index, m.index + m[0].length),
+            message: `Filter phrase “${line.slice(m.index, m.index + m[0].length)}”. This may add distance or drag.`,
             mark: {
               line: idx + 1,
               start: m.index,
@@ -633,7 +620,6 @@
       });
     });
 
-    // Repeated words in close proximity
     const lastSeenWord = new Map();
     tokens.forEach((token) => {
       if (!token.norm || token.norm.length < 4) return;
@@ -647,7 +633,6 @@
           labelShort: "REPEAT",
           line: token.line,
           message: `Word repeated in close proximity: “${token.raw}”. Previous use was on line ${prev.line}.`,
-          excerpt: token.raw,
           mark: {
             line: token.line,
             start: token.start,
@@ -658,7 +643,6 @@
       lastSeenWord.set(token.norm, token);
     });
 
-    // Repeated phrases in close proximity
     const phraseMap = new Map();
 
     for (let n = 2; n <= 3; n += 1) {
@@ -679,8 +663,7 @@
           phrase,
           display,
           startToken: slice[0],
-          endToken: slice[slice.length - 1],
-          index: i
+          endToken: slice[slice.length - 1]
         };
 
         const prev = phraseMap.get(phrase);
@@ -691,7 +674,6 @@
             labelShort: "PHRASE",
             line: current.startToken.line,
             message: `Phrase repeated in close proximity: “${display}”. Previous use was on line ${prev.startToken.line}.`,
-            excerpt: display,
             mark: {
               line: current.startToken.line,
               start: current.startToken.start,
@@ -706,20 +688,13 @@
       }
     }
 
-    // Sort issues by line, then by type, then by start position
     issues.sort((a, b) => {
       if (a.line !== b.line) return a.line - b.line;
-      const typeOrder = {
-        "filter": 1,
-        "repeat-word": 2,
-        "repeat-phrase": 3
-      };
+      const typeOrder = { "filter": 1, "repeat-word": 2, "repeat-phrase": 3 };
       if ((typeOrder[a.type] || 9) !== (typeOrder[b.type] || 9)) {
         return (typeOrder[a.type] || 9) - (typeOrder[b.type] || 9);
       }
-      const as = a.mark ? a.mark.start : 0;
-      const bs = b.mark ? b.mark.start : 0;
-      return as - bs;
+      return (a.mark?.start || 0) - (b.mark?.start || 0);
     });
 
     return {
@@ -737,7 +712,6 @@
         avgSentenceLength,
         fleschReadingEase,
         fleschKincaidGrade,
-        silentRead130: wordCount / 130,
         silentRead180: wordCount / 180,
         aloudRead130: wordCount / 130
       }
@@ -766,19 +740,18 @@
     const escapedLine = escapeHtml(lineText);
     if (!marks || !marks.length) return escapedLine;
 
-    const sorted = marks
-      .slice()
-      .sort((a, b) => {
-        if (a.start !== b.start) return a.start - b.start;
-        return (b.end - b.start) - (a.end - a.start);
-      });
+    const sorted = marks.slice().sort((a, b) => {
+      if (a.start !== b.start) return a.start - b.start;
+      return (b.end - b.start) - (a.end - a.start);
+    });
 
     const kept = [];
-    let cursor = -1;
+    let furthestEnd = -1;
+
     sorted.forEach((m) => {
-      if (m.start < cursor) return;
+      if (m.start < furthestEnd) return;
       kept.push(m);
-      cursor = m.end;
+      furthestEnd = m.end;
     });
 
     let out = "";
@@ -789,10 +762,7 @@
       const end = Math.max(start, Math.min(lineText.length, m.end));
 
       out += escapeHtml(lineText.slice(pos, start));
-
-      const inner = escapeHtml(lineText.slice(start, end));
-      out += `<span class="mark ${m.type}" id="line-${m.line}-pos-${m.start}"><span class="mark-label">[${escapeHtml(m.label)}]</span>${inner}</span>`;
-
+      out += `<span class="mark ${m.type}" id="line-${m.line}-pos-${m.start}"><span class="mark-label">[${escapeHtml(m.label)}]</span>${escapeHtml(lineText.slice(start, end))}</span>`;
       pos = end;
     });
 
@@ -801,6 +771,9 @@
   }
 
   window.SiteApps.register("prosecheck", (container) => {
+    if (!container || container.__siteAppProseCheckInit) return;
+    container.__siteAppProseCheckInit = true;
+
     ensureStyle();
 
     const storageKey = makeStorageKey(container);
@@ -830,14 +803,14 @@
 
     const saveBadge = document.createElement("span");
     saveBadge.className = "badge dim";
-    saveBadge.textContent = "Saved ✓";
+    saveBadge.textContent = "";
 
     statusRow.append(issueBadge, wordsBadge, saveBadge);
     topRow.append(title, statusRow);
 
     const help = document.createElement("p");
     help.className = "help";
-    help.textContent = "Paste prose into Source. Press Refresh report after making edits. The report flags filter words, repeated words and phrases nearby, then estimates reading time and readability.";
+    help.textContent = "Paste prose into Source. Press Refresh report after editing. The report flags filter words, repeated words and repeated short phrases nearby, then estimates reading time and readability.";
 
     const tabs = document.createElement("div");
     tabs.className = "tabs";
@@ -983,12 +956,10 @@
 
     function switchTab(nextTab) {
       activeTab = nextTab;
-
       sourceTabBtn.classList.toggle("active", nextTab === "source");
       reportTabBtn.classList.toggle("active", nextTab === "report");
       sourcePanel.classList.toggle("active", nextTab === "source");
       reportPanel.classList.toggle("active", nextTab === "report");
-
       saveStateDebounced();
     }
 
@@ -1017,12 +988,12 @@
         {
           title: "Reading time",
           big: minutesLabel(stats.silentRead180),
-          small: `Approx. silent reading at 180 wpm`
+          small: "Approx. silent reading at 180 wpm"
         },
         {
           title: "Reading aloud",
           big: minutesLabel(stats.aloudRead130),
-          small: `Approx. aloud pace at 130 wpm`
+          small: "Approx. aloud pace at 130 wpm"
         },
         {
           title: "Flesch reading ease",
@@ -1037,7 +1008,7 @@
         {
           title: "Average sentence",
           big: Number.isFinite(stats.avgSentenceLength) ? `${stats.avgSentenceLength.toFixed(1)} words` : "—",
-          small: `Longer sentences usually lower readability`
+          small: "Longer sentences usually lower readability"
         }
       ];
 
@@ -1074,9 +1045,7 @@
         const item = document.createElement("div");
         item.className = `issue-item ${issue.type}`;
 
-        const jumpId = issue.mark
-          ? `line-${issue.mark.line}-pos-${issue.mark.start}`
-          : "";
+        const jumpId = issue.mark ? `line-${issue.mark.line}-pos-${issue.mark.start}` : "";
 
         item.innerHTML = `
           <div class="issue-top">
@@ -1092,9 +1061,7 @@
           link.addEventListener("click", (ev) => {
             ev.preventDefault();
             const target = document.getElementById(jumpId);
-            if (target) {
-              target.scrollIntoView({ block: "center", behavior: "smooth" });
-            }
+            if (target) target.scrollIntoView({ block: "center", behavior: "smooth" });
           });
         }
 
@@ -1104,7 +1071,6 @@
 
     function renderAnnotatedText() {
       annotatedWrap.innerHTML = "";
-
       if (!analysis.source.trim()) return;
 
       analysis.lines.forEach((line, idx) => {
@@ -1149,6 +1115,7 @@
     clearBtn.addEventListener("click", () => {
       if (!inputTA.value.trim()) return;
       if (!confirm("Clear the source text and report?")) return;
+
       inputTA.value = "";
       analysis = analyseText("");
       renderSummary();
