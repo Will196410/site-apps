@@ -7,7 +7,8 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-analyzer-v5-toggles";
+  const STYLE_ID = "siteapps-analyzer-v6-pro";
+  const STORAGE_KEY = "siteapps:analyzer:v6:state";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -22,190 +23,112 @@
         max-width: 100%;
       }
 
-      [data-app="analyzer"] .section {
-        margin-bottom: 20px;
+      [data-app="analyzer"] .section { margin-bottom: 25px; }
+      [data-app="analyzer"] .frame { border: 2px solid #000; background: #fff; border-radius: 4px; overflow: hidden; }
+      
+      [data-app="analyzer"] textarea, 
+      [data-app="analyzer"] input[type="text"] {
         width: 100%;
-      }
-
-      [data-app="analyzer"] .frame {
-        border: 2px solid #000;
-        background: #fff;
-        border-radius: 4px;
-        overflow: hidden;
-      }
-
-      [data-app="analyzer"] textarea {
-        width: 100%;
-        min-height: 250px;
         border: none;
         padding: 15px;
         font-family: ui-monospace, monospace;
         font-size: 16px;
-        line-height: 1.5;
         outline: none;
         box-sizing: border-box;
-        display: block;
       }
 
-      /* Options Bar Styling */
-      [data-app="analyzer"] .options-bar {
-        display: flex;
-        gap: 20px;
+      [data-app="analyzer"] .options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
         padding: 15px;
-        background: #f9f9f9;
+        background: #f0f0f0;
         border: 2px solid #000;
         border-bottom: none;
-        border-radius: 4px 4px 0 0;
-        flex-wrap: wrap;
       }
 
-      [data-app="analyzer"] .option-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-weight: 900;
-        text-transform: uppercase;
-        font-size: 13px;
-        cursor: pointer;
-      }
-
-      [data-app="analyzer"] .option-item input {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-      }
+      [data-app="analyzer"] .option-item { font-weight: 900; text-transform: uppercase; font-size: 12px; display: flex; align-items: center; gap: 8px; }
 
       [data-app="analyzer"] .btn-refresh {
-        background: #000;
-        color: #fff;
-        border: 2px solid #000;
-        padding: 15px 30px;
-        font-weight: 900;
-        font-size: 16px;
-        cursor: pointer;
-        text-transform: uppercase;
-        width: 100%;
-        border-radius: 0 0 4px 4px;
-        margin-bottom: 30px;
+        background: #000; color: #fff; border: 2px solid #000;
+        padding: 15px; font-weight: 900; font-size: 18px;
+        cursor: pointer; text-transform: uppercase; width: 100%;
       }
+      [data-app="analyzer"] .btn-refresh:hover { background: #ffff00; color: #000; }
 
-      [data-app="analyzer"] .btn-refresh:hover {
-        background: #ffff00;
-        color: #000;
-      }
+      /* Tables & Lists */
+      [data-app="analyzer"] table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      [data-app="analyzer"] th { background: #000; color: #fff; text-align: left; padding: 10px; cursor: pointer; text-transform: uppercase; font-size: 12px; }
+      [data-app="analyzer"] td { padding: 8px 10px; border-bottom: 1px solid #ddd; font-family: monospace; }
+      [data-app="analyzer"] .freq-row:hover { background: #ffff00; color: #000; }
 
-      [data-app="analyzer"] .issue-summary {
-        background: #000;
-        color: #fff;
-        padding: 15px;
-        margin-bottom: 20px;
-      }
-
-      [data-app="analyzer"] .issue-item {
-        color: #ffff00;
-        font-family: ui-monospace, monospace;
-        margin-bottom: 4px;
-        font-weight: bold;
-      }
-
-      [data-app="analyzer"] .line-container {
-        display: flex;
-        border-bottom: 1px solid #eee;
-        background: #fff;
-      }
-
-      [data-app="analyzer"] .line-number {
-        width: 50px;
-        color: #888;
-        text-align: right;
-        padding-right: 15px;
-        user-select: none;
-        border-right: 1px solid #ddd;
-        margin-right: 15px;
-        font-family: monospace;
-        background: #fafafa;
-      }
-
-      [data-app="analyzer"] .line-content {
-        flex: 1;
-        white-space: pre-wrap;
-        padding: 2px 0;
-        font-family: ui-monospace, monospace;
-      }
-
-      [data-app="analyzer"] mark.highlight {
-        background: #000;
-        color: #ffff00;
-        padding: 0 2px;
-        font-weight: bold;
-      }
-
-      [data-app="analyzer"] .stats-bar {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 10px;
-        font-weight: 900;
-        font-size: 13px;
-      }
-
-      [data-app="analyzer"] h2 {
-        font-size: 18px;
-        text-transform: uppercase;
-        margin-bottom: 10px;
-        border-left: 8px solid #000;
-        padding-left: 10px;
-      }
+      [data-app="analyzer"] .issue-summary { background: #000; color: #fff; padding: 15px; margin-bottom: 20px; }
+      [data-app="analyzer"] .issue-item { color: #ffff00; font-family: monospace; margin-bottom: 4px; font-weight: bold; }
+      
+      [data-app="analyzer"] .line-container { display: flex; border-bottom: 1px solid #eee; }
+      [data-app="analyzer"] .line-number { width: 50px; color: #888; text-align: right; padding-right: 15px; border-right: 1px solid #ddd; margin-right: 15px; background: #fafafa; }
+      [data-app="analyzer"] .line-content { flex: 1; white-space: pre-wrap; padding: 2px 0; font-family: ui-monospace, monospace; }
+      
+      [data-app="analyzer"] mark.highlight { background: #000; color: #ffff00; padding: 0 2px; font-weight: bold; }
+      [data-app="analyzer"] .ari-guide { font-size: 12px; background: #eee; padding: 10px; margin-top: 10px; border-radius: 4px; }
     `;
     document.head.appendChild(style);
   }
 
-  const FILTER_WORDS = new Set([
-    "just", "very", "really", "felt", "feel", "think", "thought", "maybe", 
-    "actually", "suddenly", "seemed", "began to", "started to", "looked", "saw"
-  ]);
+  const DEFAULT_FILTERS = ["just", "very", "really", "felt", "feel", "think", "thought", "actually", "suddenly", "started to", "began to"];
 
   function runAnalysis(text, options) {
     const lines = text.split('\n');
     const issues = [];
+    const freqMap = {};
     const lastSeen = new Map();
-    const proximity = 15;
-    let globalWordIdx = 0;
+    const customWords = options.customFilters.split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+    const filterSet = new Set([...DEFAULT_FILTERS, ...customWords]);
 
+    let wordCount = 0;
+    let charCount = 0;
+    
     lines.forEach((line, lIdx) => {
       const words = line.match(/\b[\w'-]+\b/g) || [];
       words.forEach(word => {
         const clean = word.toLowerCase();
-        
-        // 1. Filter Word Check
-        if (options.showFilters && FILTER_WORDS.has(clean)) {
+        wordCount++;
+        charCount += clean.length;
+        freqMap[clean] = (freqMap[clean] || 0) + 1;
+
+        if (options.showFilters && filterSet.has(clean)) {
           issues.push({ line: lIdx + 1, word: word, type: "Filter" });
         }
 
-        // 2. Repetition Check
         if (options.showRepeats && clean.length > 3) {
           if (lastSeen.has(clean)) {
             const prevIdx = lastSeen.get(clean);
-            if (globalWordIdx - prevIdx <= proximity) {
-              issues.push({ line: lIdx + 1, word: word, type: "Repeat" });
-            }
+            if (wordCount - prevIdx <= 15) issues.push({ line: lIdx + 1, word: word, type: "Repeat" });
           }
-          lastSeen.set(clean, globalWordIdx);
+          lastSeen.set(clean, wordCount);
         }
-        globalWordIdx++;
       });
     });
 
-    const wordCount = text.trim().split(/\s+/).length || 0;
-    const charCount = text.replace(/\s/g, '').length;
     const sentences = text.split(/[.!?]+/).filter(Boolean).length || 1;
-    const ari = 4.71 * (charCount / wordCount) + 0.5 * (wordCount / sentences) - 21.43;
+    const ari = 4.71 * (charCount / (wordCount || 1)) + 0.5 * (wordCount / sentences) - 21.43;
 
     return { 
       issues, 
       wordCount, 
-      readingTime: Math.ceil(wordCount / 225), 
+      freqMap,
+      silentTime: Math.ceil(wordCount / 225),
+      spokenTime: Math.ceil(wordCount / 140),
       grade: Math.max(1, Math.round(ari)) 
     };
+  }
+
+  function getGradeMeaning(grade) {
+    if (grade <= 6) return "Elementary (Easy to read)";
+    if (grade <= 8) return "Middle School (Conversational)";
+    if (grade <= 12) return "High School (Standard Prose)";
+    if (grade <= 14) return "College (Academic/Technical)";
+    return "Professor/Doctorate (Complex/Dense)";
   }
 
   window.SiteApps.register("analyzer", (container) => {
@@ -214,106 +137,115 @@
 
     container.innerHTML = `
       <div class="section">
-        <h2>Input Text</h2>
-        <div class="frame">
-          <textarea id="input-text" placeholder="Paste text here..."></textarea>
+        <h2>Drafting Area</h2>
+        <div class="frame"><textarea id="input-text" placeholder="Paste text here..."></textarea></div>
+      </div>
+
+      <div class="options-grid">
+        <label class="option-item"><input type="checkbox" id="check-filters" checked> Filter Words</label>
+        <label class="option-item"><input type="checkbox" id="check-repeats" checked> Repetitions</label>
+        <div style="grid-column: 1 / -1;">
+          <label class="option-item" style="margin-bottom:5px;">Custom Filter Words (comma separated)</label>
+          <div class="frame"><input type="text" id="custom-filters" placeholder="e.g. atmospheric, definitely, basically"></div>
         </div>
       </div>
+      <button class="btn-refresh" id="refresh-btn">Update Analysis & Save</button>
 
-      <div class="options-bar">
-        <label class="option-item">
-          <input type="checkbox" id="check-filters" checked> Filter Words
-        </label>
-        <label class="option-item">
-          <input type="checkbox" id="check-repeats" checked> Word Repetition
-        </label>
-      </div>
-      <button class="btn-refresh" id="refresh-btn">Update Report</button>
+      <div id="results-section" style="display:none;">
+        <div class="section">
+          <h2>Reading Stats</h2>
+          <div id="stats" style="font-weight:900; margin-bottom:10px; display:flex; gap:20px; flex-wrap:wrap;"></div>
+          <div class="ari-guide" id="ari-guide"></div>
+        </div>
 
-      <div class="section" id="results-section" style="display:none;">
-        <h2>Report View</h2>
-        <div id="stats" class="stats-bar"></div>
-        
+        <div class="section">
+          <h2>Word Frequency</h2>
+          <div class="frame" style="max-height:200px; overflow-y:auto;">
+            <table id="freq-table">
+              <thead><tr><th data-sort="word">Word</th><th data-sort="count">Count</th></tr></thead>
+              <tbody id="freq-body"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="issue-summary" id="issue-list"></div>
 
-        <div class="frame">
-          <div id="annotated-text"></div>
+        <div class="section">
+          <h2>Annotated Inspector</h2>
+          <div class="frame"><div id="annotated-text"></div></div>
         </div>
       </div>
     `;
 
-    const input = container.querySelector("#input-text");
-    const refreshBtn = container.querySelector("#refresh-btn");
-    const resultsSection = container.querySelector("#results-section");
-    const statsBar = container.querySelector("#stats");
-    const issueList = container.querySelector("#issue-list");
-    const annotatedText = container.querySelector("#annotated-text");
+    const els = {
+      input: container.querySelector("#input-text"),
+      refresh: container.querySelector("#refresh-btn"),
+      results: container.querySelector("#results-section"),
+      stats: container.querySelector("#stats"),
+      guide: container.querySelector("#ari-guide"),
+      issueList: container.querySelector("#issue-list"),
+      annotated: container.querySelector("#annotated-text"),
+      freqBody: container.querySelector("#freq-body"),
+      filterChk: container.querySelector("#check-filters"),
+      repeatChk: container.querySelector("#check-repeats"),
+      customInp: container.querySelector("#custom-filters")
+    };
 
-    // Toggles
-    const filterChk = container.querySelector("#check-filters");
-    const repeatChk = container.querySelector("#check-repeats");
+    // Load State
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    if (saved.text) {
+      els.input.value = saved.text;
+      els.filterChk.checked = saved.filters;
+      els.repeatChk.checked = saved.repeats;
+      els.customInp.value = saved.custom || "";
+    }
 
-    refreshBtn.addEventListener("click", () => {
-      const text = input.value;
-      if (!text.trim()) return;
-
+    function update() {
+      const text = els.input.value;
       const options = {
-        showFilters: filterChk.checked,
-        showRepeats: repeatChk.checked
+        showFilters: els.filterChk.checked,
+        showRepeats: els.repeatChk.checked,
+        customFilters: els.customInp.value
       };
 
-      const data = runAnalysis(text, options);
-      resultsSection.style.display = "block";
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        text, filters: options.showFilters, repeats: options.showRepeats, custom: options.customFilters
+      }));
 
-      statsBar.innerHTML = `
-        <span>Words: ${data.wordCount}</span> | 
-        <span>Time: ~${data.readingTime}m</span> | 
-        <span>Readability Grade: ${data.grade}</span>
+      const data = runAnalysis(text, options);
+      els.results.style.display = "block";
+
+      els.stats.innerHTML = `
+        <span>WORDS: ${data.wordCount}</span>
+        <span>SILENT: ~${data.silentTime}m</span>
+        <span>SPOKEN: ~${data.spokenTime}m</span>
+        <span>ARI GRADE: ${data.grade}</span>
       `;
 
-      issueList.innerHTML = `<h3>Issues Identified (${data.issues.length})</h3>`;
+      els.guide.innerHTML = `<strong>Grade ${data.grade} Meaning:</strong> ${getGradeMeaning(data.grade)}<br>
+        <small>The Automated Readability Index (ARI) uses the formula: $4.71 \times (\frac{\text{chars}}{\text{words}}) + 0.5 \times (\frac{\text{words}}{\text{sentences}}) - 21.43$</small>`;
+
+      // Frequency Table
+      const freqArray = Object.entries(data.freqMap).sort((a, b) => b[1] - a[1]);
+      els.freqBody.innerHTML = freqArray.slice(0, 50).map(([w, c]) => `<tr class="freq-row"><td>${w}</td><td>${c}</td></tr>`).join('');
+
+      // Issues
+      els.issueList.innerHTML = `<h3>Issues (${data.issues.length})</h3>`;
       data.issues.forEach(iss => {
-        issueList.innerHTML += `
-          <div class="issue-item">
-            <span style="color:#fff; border:1px solid #444; padding:0 4px; margin-right:8px;">L${iss.line}</span>
-            [${iss.type}] "${iss.word}"
-          </div>
-        `;
+        els.issueList.innerHTML += `<div class="issue-item">L${iss.line} [${iss.type}] "${iss.word}"</div>`;
       });
 
+      // Annotations
       const issueWords = new Set(data.issues.map(i => i.word.toLowerCase()));
-      const lines = text.split('\n');
-      
-      annotatedText.innerHTML = "";
-      lines.forEach((line, idx) => {
-        const lineRow = document.createElement("div");
-        lineRow.className = "line-container";
-        
-        const num = document.createElement("div");
-        num.className = "line-number";
-        num.textContent = idx + 1;
+      els.annotated.innerHTML = text.split('\n').map((line, idx) => {
+        const content = line.split(/(\b\w+\b)/g).map(t => 
+          issueWords.has(t.toLowerCase().trim()) ? `<mark class="highlight">${t}</mark>` : t
+        ).join('');
+        return `<div class="line-container"><div class="line-number">${idx+1}</div><div class="line-content">${content}</div></div>`;
+      }).join('');
+    }
 
-        const content = document.createElement("div");
-        content.className = "line-content";
-        
-        const tokens = line.split(/(\b\w+\b)/g);
-        tokens.forEach(token => {
-          if (issueWords.has(token.toLowerCase().trim())) {
-            const m = document.createElement("mark");
-            m.className = "highlight";
-            m.textContent = token;
-            content.appendChild(m);
-          } else {
-            content.appendChild(document.createTextNode(token));
-          }
-        });
-
-        lineRow.appendChild(num);
-        lineRow.appendChild(content);
-        annotatedText.appendChild(lineRow);
-      });
-
-      resultsSection.scrollIntoView({ behavior: 'smooth' });
-    });
+    els.refresh.addEventListener("click", update);
+    if (els.input.value) update();
   });
 })();
