@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_CREATED_STAMP = "07 Apr 2026 12:05 BST · GPT-5.4 Thinking";
+  const BUILD_CREATED_STAMP = "12 Apr 2026 20:37 BST · GPT-5.4 Thinking";
 
   function formatBrowserRunStamp() {
     try {
@@ -172,6 +172,35 @@
       .mdse-wrapper .nodeTitleWrap {
         flex: 1 1 100%;
         width: 100%;
+      }
+      .mdse-wrapper .nodeTitleMeta {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 0 0 8px;
+      }
+      .mdse-wrapper .nodeNumber {
+        display: inline-block;
+        font-size: 13px;
+        line-height: 1.2;
+        font-weight: 900;
+        color: #555;
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        padding: 3px 8px;
+        background: #fff;
+      }
+      .mdse-wrapper .tocNumber {
+        display: inline-block;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 900;
+        color: #555;
+        border: 2px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: #fff;
       }
       .mdse-wrapper .titleInput {
         display: block;
@@ -1138,6 +1167,7 @@
       const metricWords = nodeEl.querySelector(".nodeMetricWords");
       const directMetric = nodeEl.querySelector(".nodeMetricDirect");
       const indirectMetric = nodeEl.querySelector(".nodeMetricIndirect");
+      const numberEl = nodeEl.querySelector(".nodeNumber");
 
       const ownWords = countWords(nodes[idx].title) + countWords(nodes[idx].body);
       const direct = getDirectChildCount(idx);
@@ -1146,6 +1176,7 @@
       if (metricWords) metricWords.textContent = `${ownWords}w`;
       if (directMetric) directMetric.textContent = `${direct} direct`;
       if (indirectMetric) indirectMetric.textContent = `${indirect} indirect`;
+      if (numberEl) numberEl.textContent = getNodeNumber(idx);
     }
 
     function canDropPinnedAfter(targetId) {
@@ -1162,6 +1193,35 @@
       if (idx < 0) return "";
       const [start, end] = getFamilyRange(idx);
       return nodesToMarkdown("", nodes.slice(start, end));
+    }
+
+    function getParentIndex(idx) {
+      if (idx <= 0 || idx >= nodes.length) return -1;
+      const level = nodes[idx].level;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (nodes[i].level < level) return i;
+      }
+      return -1;
+    }
+
+    function getSiblingOrdinal(idx) {
+      if (idx < 0 || idx >= nodes.length) return 0;
+      const level = nodes[idx].level;
+      const parentIdx = getParentIndex(idx);
+      let count = 0;
+
+      for (let i = 0; i <= idx; i++) {
+        if (nodes[i].level !== level) continue;
+        if (getParentIndex(i) === parentIdx) count += 1;
+      }
+
+      return count;
+    }
+
+    function getNodeNumber(idx) {
+      if (idx < 0 || idx >= nodes.length) return "";
+      const chain = getAncestorIndices(idx).concat(idx);
+      return chain.map((i) => getSiblingOrdinal(i)).join(".");
     }
 
     async function copyTextToClipboard(text) {
@@ -1221,6 +1281,7 @@
         const canDropPinned = canDropPinnedAfter(n.id);
         const pinIsActive = pinnedRootId === n.id;
         const pinIsTarget = !!pinnedRootId && !pinIsActive && canDropPinned;
+        const nodeNumber = getNodeNumber(idx);
 
         const pinTitle = !pinnedRootId
           ? "Pin this branch to move it"
@@ -1260,6 +1321,9 @@
               <button class="miniBtn" data-action="indent">→</button>
             </div>
             <div class="nodeTitleWrap">
+              <div class="nodeTitleMeta">
+                <div class="nodeNumber">${escapeHtml(nodeNumber)}</div>
+              </div>
               <textarea class="titleInput" data-type="title" placeholder="Heading text..."></textarea>
             </div>
           </div>
@@ -1324,7 +1388,8 @@
         const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
         const indent = "  ".repeat(Math.max(0, n.level - 1));
         const title = String(n.title || "").trim() || "(untitled heading)";
-        return `${indent}${marker} ${title} [H${n.level}]`;
+        const number = getNodeNumber(idx);
+        return `${indent}${marker} ${number} ${title} [H${n.level}]`;
       }).join("\n");
     }
 
@@ -1345,6 +1410,7 @@
         const n = nodes[idx];
         const hasChildren = idx + 1 < nodes.length && nodes[idx + 1].level > n.level;
         const marker = hasChildren ? (n.isCollapsed ? "▶" : "▼") : "•";
+        const nodeNumber = getNodeNumber(idx);
 
         const row = document.createElement("div");
         row.className = "tocItem";
@@ -1363,6 +1429,7 @@
 
             <button class="tocJumpBody" data-jump-id="${escapeHtml(n.id)}">
               <div class="tocTitleRow">
+                <div class="tocNumber">${escapeHtml(nodeNumber)}</div>
                 <div class="tocItemTitle">${escapeHtml(n.title || "(untitled heading)")}</div>
                 <div class="tocLevel">H${n.level}</div>
               </div>
