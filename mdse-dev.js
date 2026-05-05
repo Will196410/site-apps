@@ -809,16 +809,6 @@
     return out.join("\n");
   }
 
-  function applyNumberSequencesToDocument() {
-    const counters = {};
-
-    docPreamble = applyNumberSequencesToText(docPreamble, counters);
-
-    nodes.forEach((n) => {
-      n.body = applyNumberSequencesToText(n.body, counters);
-    });
-  }
-
   function normalizePastedNodesForPeerLevel(pastedNodes, peerLevel) {
     const list = cloneNodes(pastedNodes);
     if (!list.length) return list;
@@ -851,6 +841,20 @@
     let undoStack = [];
     let pendingTextHistory = null;
 
+    let nodes = [];
+    let docPreamble = "";
+    let activeNodeId = "";
+
+  function applyNumberSequencesToDocument() {
+      const counters = {};
+
+      docPreamble = applyNumberSequencesToText(docPreamble, counters);
+
+      nodes.forEach((n) => {
+        n.body = applyNumberSequencesToText(n.body, counters);
+      });
+    }
+    
     container.innerHTML = `
       <div class="mdse-wrapper">
         <div class="topMeta">
