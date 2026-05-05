@@ -11,7 +11,7 @@
     };
 
   const STYLE_ID = "siteapps-mdse-style-v4";
-  const BUILD_CREATED_STAMP = "12 Apr 2026 20:37 BST · GPT-5.4 Thinking";
+  const BUILD_CREATED_STAMP = "05 May 2026 13:30 BST · GPT-5.5 Thinking · sequence numbering";
 
   function formatBrowserRunStamp() {
     try {
@@ -697,6 +697,128 @@
     return src ? `${line}\n${src}` : line;
   }
 
+  // ------------------------------------------------------------------------
+  // NUMBER SEQUENCES
+  //
+  // Format:
+  //   <!-- $seq: Chapter,#,The Village -->
+  //
+  // Produces or updates the next line:
+  //   # Chapter 1 The Village
+  //
+  // The first value is the sequence name.
+  // The second value is the line prefix / preamble.
+  // The third value is the postamble / title text.
+  // Each sequence name counts independently.
+  // ------------------------------------------------------------------------
+
+  function escapeRegExp(str) {
+    return String(str || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function normalizeSeqTextPart(str) {
+    return String(str || "").replace(/\s+/g, " ").trim();
+  }
+
+  function buildSeqOutputLine(seqName, preamble, postamble, number) {
+    const name = normalizeSeqTextPart(seqName);
+    const pre = normalizeSeqTextPart(preamble);
+    const post = normalizeSeqTextPart(postamble);
+
+    const parts = [];
+    if (pre) parts.push(pre);
+    if (name) parts.push(name);
+    parts.push(String(number));
+    if (post) parts.push(post);
+
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  function parseSeqCommentLine(line) {
+    const m = String(line || "").match(/^\s*<!--\s*\$seq\s*:\s*([\s\S]*?)\s*-->\s*$/i);
+    if (!m) return null;
+
+    const raw = String(m[1] || "").trim();
+    const parts = raw.split(",").map((part) => part.trim());
+
+    if (!parts[0]) return null;
+
+    return {
+      name: parts[0],
+      preamble: parts.length > 1 ? parts[1] : "",
+      postamble: parts.length > 2 ? parts.slice(2).join(",").trim() : ""
+    };
+  }
+
+  function looksLikeGeneratedSeqLine(line, seqName, preamble) {
+    const name = normalizeSeqTextPart(seqName);
+    const pre = normalizeSeqTextPart(preamble);
+    const src = normalizeSeqTextPart(line);
+
+    if (!src || !name) return false;
+
+    const expectedStart = normalizeSeqTextPart(`${pre} ${name}`);
+    if (!expectedStart) return false;
+
+    const rx = new RegExp(
+      "^" + escapeRegExp(expectedStart) + "\\s+\\d+\\b",
+      "i"
+    );
+
+    return rx.test(src);
+  }
+
+  function applyNumberSequencesToText(text, counters) {
+    const src = String(text || "").replace(/\r\n?/g, "\n");
+    if (!src) return src;
+
+    const lines = src.split("\n");
+    const out = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const seq = parseSeqCommentLine(line);
+
+      if (!seq) {
+        out.push(line);
+        continue;
+      }
+
+      const key = normalizeSeqTextPart(seq.name).toLowerCase();
+      counters[key] = (counters[key] || 0) + 1;
+
+      const wantedLine = buildSeqOutputLine(
+        seq.name,
+        seq.preamble,
+        seq.postamble,
+        counters[key]
+      );
+
+      out.push(line);
+
+      const nextLine = i + 1 < lines.length ? lines[i + 1] : null;
+
+      if (nextLine !== null && looksLikeGeneratedSeqLine(nextLine, seq.name, seq.preamble)) {
+        out.push(wantedLine);
+        i += 1;
+      } else {
+        out.push(wantedLine);
+      }
+    }
+
+    return out.join("\n");
+  }
+
+  function applyNumberSequencesToDocument() {
+    const counters = {};
+
+    docPreamble = applyNumberSequencesToText(docPreamble, counters);
+
+    nodes.forEach((n) => {
+      n.body = applyNumberSequencesToText(n.body, counters);
+    });
+  }
+
   function normalizePastedNodesForPeerLevel(pastedNodes, peerLevel) {
     const list = cloneNodes(pastedNodes);
     if (!list.length) return list;
@@ -748,6 +870,7 @@
           <textarea class="mdInput" placeholder="Paste Markdown here..."></textarea>
           <div class="btnrow">
             <button class="primary btnLoad">Load Markdown</button>
+            <button class="ghost btnSeq">Update sequences</button>
             <button class="ghost btnUndo" disabled>Undo</button>
             <button class="ghost btnCopy">Copy Result</button>
             <button class="ghost btnReset">Reset App</button>
@@ -796,6 +919,7 @@
     const root = container.querySelector(".mdse-wrapper");
     const taInput = root.querySelector(".mdInput");
     const btnLoad = root.querySelector(".btnLoad");
+    const btnSeq = root.querySelector(".btnSeq");
     const btnUndo = root.querySelector(".btnUndo");
     const btnCopy = root.querySelector(".btnCopy");
     const btnReset = root.querySelector(".btnReset");
@@ -1847,6 +1971,22 @@
       markDocChanged();
     }
 
+    function updateSequencesFromButton() {
+      if (!nodes.length && !docPreamble.trim()) return;
+
+      pushUndoSnapshot("update sequences");
+      applyNumberSequencesToDocument();
+
+      taInput.value = nodesToMarkdown(docPreamble, nodes);
+
+      renderStructure();
+      if (activeTab === "toc") renderTOC();
+      if (activeTab === "search") renderSearch();
+      if (activeTab === "tags") renderTags();
+
+      markDocChanged();
+    }
+
     const scheduleSearchRender = makeRafScheduler(renderSearch);
 
     root.querySelectorAll(".tabbtn").forEach((btn) => {
@@ -1875,12 +2015,27 @@
       markDocChanged();
     });
 
+    btnSeq.addEventListener("click", () => {
+      updateSequencesFromButton();
+    });
+
     btnUndo.addEventListener("click", () => {
       undoLast();
     });
 
     btnCopy.addEventListener("click", async () => {
+      pushUndoSnapshot("copy with updated sequences");
+      applyNumberSequencesToDocument();
+
       const text = nodesToMarkdown(docPreamble, nodes);
+      taInput.value = text;
+
+      renderStructure();
+      if (activeTab === "toc") renderTOC();
+      if (activeTab === "search") renderSearch();
+      if (activeTab === "tags") renderTags();
+
+      markDocChanged();
       await copyTextToClipboard(text);
     });
 
