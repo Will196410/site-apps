@@ -7,8 +7,8 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-analyzer-v8-pos";
-  const STORAGE_KEY = "siteapps:analyzer:v8:config";
+  const STYLE_ID = "siteapps-analyzer-v9-pos-phrases";
+  const STORAGE_KEY = "siteapps:analyzer:v9:config";
 
   const DEFAULT_FILTERS = [
     "just", "very", "really", "felt", "feel", "think", "thought",
@@ -401,9 +401,70 @@
       .replaceAll("'", "&#039;");
   }
 
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
   function getARI(chars, words, sentences) {
     if (words === 0 || sentences === 0) return 0;
     return 4.71 * (chars / words) + 0.5 * (words / sentences) - 21.43;
+  }
+
+  function findFilterMatches(line, filters) {
+    const matches = [];
+
+    filters.forEach(filter => {
+      const cleanFilter = String(filter || "").trim();
+      if (!cleanFilter) return;
+
+      const escaped = escapeRegExp(cleanFilter);
+
+      /*
+        Boundary handling:
+        - prevents "just" matching inside "adjust"
+        - allows phrase filters such as "started to"
+        - works case-insensitively
+      */
+      const pattern = new RegExp(`(^|[^\\w'-])(${escaped})(?=$|[^\\w'-])`, "gi");
+
+      let match;
+      while ((match = pattern.exec(line)) !== null) {
+        const prefixLength = match[1] ? match[1].length : 0;
+        const start = match.index + prefixLength;
+        const end = start + match[2].length;
+
+        matches.push({
+          text: match[2],
+          filter: cleanFilter.toLowerCase(),
+          start,
+          end
+        });
+      }
+    });
+
+    /*
+      Prefer longer matches over shorter overlapping matches.
+      Example: if filters include both "started" and "started to",
+      "started to" wins.
+    */
+    matches.sort((a, b) => {
+      const lengthDiff = (b.end - b.start) - (a.end - a.start);
+      if (lengthDiff !== 0) return lengthDiff;
+      return a.start - b.start;
+    });
+
+    const accepted = [];
+
+    matches.forEach(candidate => {
+      const overlaps = accepted.some(existing => {
+        return candidate.start < existing.end && candidate.end > existing.start;
+      });
+
+      if (!overlaps) accepted.push(candidate);
+    });
+
+    accepted.sort((a, b) => a.start - b.start);
+    return accepted;
   }
 
   function classifyPOS(word, prevWord, nextWord) {
@@ -413,7 +474,14 @@
 
     if (!clean || clean.length < 2) return null;
 
-    if (clean.endsWith("ly")) return "adverb";
+    const lyExceptions = new Set([
+      "family", "friendly", "lovely", "lonely", "early", "silly",
+      "holy", "ugly", "woolly", "jelly", "belly", "likely"
+    ]);
+
+    if (clean.endsWith("ly") && !lyExceptions.has(clean)) {
+      return "adverb";
+    }
 
     if (
       COMMON_VERBS.has(clean) ||
@@ -496,7 +564,13 @@
   window.SiteApps.register("analyzer", (container) => {
     ensureStyle();
 
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    let saved = null;
+
+    try {
+      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    } catch {
+      saved = null;
+    }
 
     let config = saved || {
       text: "",
@@ -555,14 +629,14 @@
 
           <p style="font-size:10px; margin-top:10px; opacity:0.7">
             Sentence Check flags &gt;30 words as Long or &lt;5 words as Choppy.
-            Parts of speech are estimated using lightweight rules, so treat them as writing clues rather than grammar-law.
+            Parts of speech are estimated using lightweight rules.
           </p>
         </div>
 
         <div class="panel">
           <h3>Filter Management</h3>
           <div class="filter-input-group">
-            <input type="text" id="new-filter" placeholder="Add word...">
+            <input type="text" id="new-filter" placeholder="Add word or phrase...">
             <button class="btn-small" id="add-filter">Add</button>
             <button class="btn-small" id="reset-filters">Reset Defaults</button>
           </div>
@@ -570,7 +644,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>Word</th>
+                  <th>Word / Phrase</th>
                   <th style="width:40px"></th>
                 </tr>
               </thead>
@@ -693,8 +767,12 @@
 
       const lines = text.split("\n");
       const issues = [];
-      const filterSet = new Set(config.filters.map(f => f.toLowerCase()));
+      const filterList = config.filters
+        .map(f => String(f || "").trim().toLowerCase())
+        .filter(Boolean);
+
       const lastSeen = new Map();
+
       const posCounts = {
         adverb: 0,
         verb: 0,
@@ -706,11 +784,31 @@
       let charTotal = 0;
 
       const selectedPOS = selectedPOSTypes(config.switches);
+      const filterMatchesByLine = new Map();
 
       lines.forEach((line, lIdx) => {
+        const lineNumber = lIdx + 1;
         const words = line.match(/\b[\w'-]+\b/g) || [];
         const lowerWords = words.map(w => w.toLowerCase());
         const sentences = line.split(/[.!?]+/).filter(s => s.trim().length > 0);
+
+        if (config.switches.filterWords) {
+          const filterMatches = findFilterMatches(line, filterList);
+
+          if (filterMatches.length) {
+            filterMatchesByLine.set(lineNumber, filterMatches);
+
+            filterMatches.forEach(match => {
+              issues.push({
+                line: lineNumber,
+                type: "Filter",
+                word: match.text,
+                start: match.start,
+                end: match.end
+              });
+            });
+          }
+        }
 
         if (config.switches.sentenceLen) {
           sentences.forEach(s => {
@@ -718,7 +816,7 @@
 
             if (sWords.length > 30) {
               issues.push({
-                line: lIdx + 1,
+                line: lineNumber,
                 type: "Long Sentence",
                 word: `(${sWords.length} words)`
               });
@@ -726,7 +824,7 @@
 
             if (sWords.length > 0 && sWords.length < 5) {
               issues.push({
-                line: lIdx + 1,
+                line: lineNumber,
                 type: "Choppy",
                 word: `(${sWords.length} words)`
               });
@@ -742,14 +840,10 @@
           wordTotal++;
           charTotal += clean.length;
 
-          if (config.switches.filterWords && filterSet.has(clean)) {
-            issues.push({ line: lIdx + 1, type: "Filter", word });
-          }
-
           if (config.switches.repeats && clean.length > 3) {
             if (lastSeen.has(clean)) {
               if (wordTotal - lastSeen.get(clean) <= 15) {
-                issues.push({ line: lIdx + 1, type: "Repeat", word });
+                issues.push({ line: lineNumber, type: "Repeat", word });
               }
             }
 
@@ -797,43 +891,51 @@
         </div>
       ` : "";
 
-      const issueWords = new Set(
-        issues
-          .filter(i => i.type !== "Long Sentence" && i.type !== "Choppy")
-          .map(i => i.word.toLowerCase())
-      );
+      const isInsideFilterMatch = (lineNumber, start, end) => {
+        const matches = filterMatchesByLine.get(lineNumber) || [];
+        return matches.some(match => start >= match.start && end <= match.end);
+      };
 
       els.annotated.innerHTML = lines.map((line, idx) => {
+        const lineNumber = idx + 1;
         const wordsForContext = line.match(/\b[\w'-]+\b/g) || [];
         let contextIndex = 0;
+        let output = "";
+        let lastIndex = 0;
 
-        const content = line.split(/(\b[\w'-]+\b)/g).map(part => {
-          if (!part.match(/^\b[\w'-]+\b$/)) {
-            return escapeHTML(part);
-          }
+        const tokenPattern = /\b[\w'-]+\b/g;
+        let match;
 
-          const clean = part.toLowerCase();
+        while ((match = tokenPattern.exec(line)) !== null) {
+          const part = match[0];
+          const start = match.index;
+          const end = start + part.length;
+
+          output += escapeHTML(line.slice(lastIndex, start));
+
           const prev = wordsForContext[contextIndex - 1] || "";
           const next = wordsForContext[contextIndex + 1] || "";
           const pos = classifyPOS(part, prev, next);
 
           contextIndex++;
 
-          if (issueWords.has(clean)) {
-            return `<mark class="hl">${escapeHTML(part)}</mark>`;
+          if (isInsideFilterMatch(lineNumber, start, end)) {
+            output += `<mark class="hl">${escapeHTML(part)}</mark>`;
+          } else if (pos && selectedPOS.has(pos)) {
+            output += `<mark class="pos pos-${pos}" title="${posLabel(pos)}">${escapeHTML(part)}</mark>`;
+          } else {
+            output += escapeHTML(part);
           }
 
-          if (pos && selectedPOS.has(pos)) {
-            return `<mark class="pos pos-${pos}" title="${posLabel(pos)}">${escapeHTML(part)}</mark>`;
-          }
+          lastIndex = end;
+        }
 
-          return escapeHTML(part);
-        }).join("");
+        output += escapeHTML(line.slice(lastIndex));
 
         return `
           <div class="line-container">
-            <div class="line-num">${idx + 1}</div>
-            <div class="line-txt">${content}</div>
+            <div class="line-num">${lineNumber}</div>
+            <div class="line-txt">${output}</div>
           </div>
         `;
       }).join("");
