@@ -7,8 +7,8 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-analyzer-v9-pos-phrases";
-  const STORAGE_KEY = "siteapps:analyzer:v9:config";
+  const STYLE_ID = "siteapps-analyzer-v10-hybrid-parser";
+  const STORAGE_KEY = "siteapps:analyzer:v10:config";
 
   const DEFAULT_FILTERS = [
     "just", "very", "really", "felt", "feel", "think", "thought",
@@ -20,6 +20,7 @@
     sentenceLen: true,
     repeats: true,
     filterWords: true,
+    rememberText: false,
     posAdverbs: false,
     posVerbs: false,
     posNouns: false,
@@ -79,6 +80,11 @@
     "under", "over", "through", "across", "behind", "before", "after",
     "between", "among", "around", "near", "beside", "inside", "outside",
     "of", "for", "about"
+  ]);
+
+  const LY_EXCEPTIONS = new Set([
+    "family", "friendly", "lovely", "lonely", "early", "silly",
+    "holy", "ugly", "woolly", "jelly", "belly", "likely"
   ]);
 
   function ensureStyle() {
@@ -313,6 +319,14 @@
         font-weight: bold;
       }
 
+      [data-app="analyzer"] mark.hl-phrase {
+        background: #000;
+        color: #ffff00;
+        padding: 0 2px;
+        font-weight: bold;
+        box-shadow: inset 0 -3px 0 #ffff00;
+      }
+
       [data-app="analyzer"] mark.pos {
         background: #fff;
         color: #000;
@@ -410,46 +424,159 @@
     return 4.71 * (chars / words) + 0.5 * (words / sentences) - 21.43;
   }
 
-  function findFilterMatches(line, filters) {
+  function isWordText(value) {
+    return /^[A-Za-z0-9_’'-]+$/.test(value);
+  }
+
+  function normalizeWord(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[’]/g, "'");
+  }
+
+  function tokenizeLine(line, lineNumber) {
+    const tokens = [];
+    const tokenPattern = /[A-Za-z0-9_]+(?:[’'][A-Za-z0-9_]+)?(?:-[A-Za-z0-9_]+)*|[^\sA-Za-z0-9_]/g;
+    let match;
+
+    while ((match = tokenPattern.exec(line)) !== null) {
+      const text = match[0];
+      const start = match.index;
+      const end = start + text.length;
+      const kind = isWordText(text) ? "word" : "punct";
+
+      tokens.push({
+        text,
+        clean: kind === "word" ? normalizeWord(text) : text,
+        kind,
+        line: lineNumber,
+        start,
+        end
+      });
+    }
+
+    return tokens;
+  }
+
+  function splitSentences(tokens) {
+    const sentences = [];
+    let current = [];
+
+    tokens.forEach(token => {
+      current.push(token);
+
+      if (token.kind === "punct" && /[.!?]/.test(token.text)) {
+        const words = current.filter(t => t.kind === "word");
+
+        if (words.length) {
+          sentences.push({
+            tokens: current,
+            wordCount: words.length,
+            start: current[0].start,
+            end: current[current.length - 1].end
+          });
+        }
+
+        current = [];
+      }
+    });
+
+    const trailingWords = current.filter(t => t.kind === "word");
+
+    if (trailingWords.length) {
+      sentences.push({
+        tokens: current,
+        wordCount: trailingWords.length,
+        start: current[0].start,
+        end: current[current.length - 1].end
+      });
+    }
+
+    return sentences;
+  }
+
+  function parseProse(text) {
+    const lines = text.split("\n");
+
+    return lines.map((lineText, index) => {
+      const lineNumber = index + 1;
+      const tokens = tokenizeLine(lineText, lineNumber);
+      const wordTokens = tokens.filter(t => t.kind === "word");
+      const sentences = splitSentences(tokens);
+
+      return {
+        lineNumber,
+        text: lineText,
+        tokens,
+        wordTokens,
+        sentences
+      };
+    });
+  }
+
+  function compileFilter(filter) {
+    const raw = String(filter || "").trim();
+    const normalized = normalizeWord(raw);
+
+    if (!normalized) return null;
+
+    const parts = normalized
+      .split(/\s+/)
+      .map(part => part.trim())
+      .filter(Boolean);
+
+    if (!parts.length) return null;
+
+    return {
+      raw,
+      normalized,
+      parts,
+      length: parts.length
+    };
+  }
+
+  function findFilterMatchesInLine(lineModel, compiledFilters) {
     const matches = [];
+    const words = lineModel.wordTokens;
 
-    filters.forEach(filter => {
-      const cleanFilter = String(filter || "").trim();
-      if (!cleanFilter) return;
+    if (!words.length) return matches;
 
-      const escaped = escapeRegExp(cleanFilter);
+    compiledFilters.forEach(filter => {
+      if (!filter || !filter.parts.length) return;
 
-      /*
-        Boundary handling:
-        - prevents "just" matching inside "adjust"
-        - allows phrase filters such as "started to"
-        - works case-insensitively
-      */
-      const pattern = new RegExp(`(^|[^\\w'-])(${escaped})(?=$|[^\\w'-])`, "gi");
+      for (let i = 0; i <= words.length - filter.parts.length; i++) {
+        let ok = true;
 
-      let match;
-      while ((match = pattern.exec(line)) !== null) {
-        const prefixLength = match[1] ? match[1].length : 0;
-        const start = match.index + prefixLength;
-        const end = start + match[2].length;
+        for (let j = 0; j < filter.parts.length; j++) {
+          if (words[i + j].clean !== filter.parts[j]) {
+            ok = false;
+            break;
+          }
+        }
+
+        if (!ok) continue;
+
+        const first = words[i];
+        const last = words[i + filter.parts.length - 1];
 
         matches.push({
-          text: match[2],
-          filter: cleanFilter.toLowerCase(),
-          start,
-          end
+          line: lineModel.lineNumber,
+          type: "Filter",
+          word: lineModel.text.slice(first.start, last.end),
+          filter: filter.raw,
+          start: first.start,
+          end: last.end,
+          tokenStart: i,
+          tokenEnd: i + filter.parts.length,
+          length: last.end - first.start,
+          partCount: filter.parts.length
         });
       }
     });
 
-    /*
-      Prefer longer matches over shorter overlapping matches.
-      Example: if filters include both "started" and "started to",
-      "started to" wins.
-    */
     matches.sort((a, b) => {
-      const lengthDiff = (b.end - b.start) - (a.end - a.start);
-      if (lengthDiff !== 0) return lengthDiff;
+      if (b.partCount !== a.partCount) return b.partCount - a.partCount;
+      if (b.length !== a.length) return b.length - a.length;
       return a.start - b.start;
     });
 
@@ -464,22 +591,18 @@
     });
 
     accepted.sort((a, b) => a.start - b.start);
+
     return accepted;
   }
 
   function classifyPOS(word, prevWord, nextWord) {
-    const clean = word.toLowerCase();
-    const prev = (prevWord || "").toLowerCase();
-    const next = (nextWord || "").toLowerCase();
+    const clean = normalizeWord(word);
+    const prev = normalizeWord(prevWord);
+    const next = normalizeWord(nextWord);
 
     if (!clean || clean.length < 2) return null;
 
-    const lyExceptions = new Set([
-      "family", "friendly", "lovely", "lonely", "early", "silly",
-      "holy", "ugly", "woolly", "jelly", "belly", "likely"
-    ]);
-
-    if (clean.endsWith("ly") && !lyExceptions.has(clean)) {
+    if (clean.endsWith("ly") && !LY_EXCEPTIONS.has(clean)) {
       return "adverb";
     }
 
@@ -561,6 +684,84 @@
     return "";
   }
 
+  function buildHighlightSpans(lineModel, filterMatches, selectedPOS) {
+    const spans = [];
+
+    filterMatches.forEach(match => {
+      spans.push({
+        start: match.start,
+        end: match.end,
+        priority: 100,
+        className: match.partCount > 1 ? "hl hl-phrase" : "hl",
+        title: `Filter: ${match.filter || match.word}`
+      });
+    });
+
+    const words = lineModel.wordTokens;
+
+    words.forEach((token, index) => {
+      const prev = words[index - 1] ? words[index - 1].text : "";
+      const next = words[index + 1] ? words[index + 1].text : "";
+      const pos = classifyPOS(token.text, prev, next);
+
+      if (pos && selectedPOS.has(pos)) {
+        spans.push({
+          start: token.start,
+          end: token.end,
+          priority: 20,
+          className: `pos pos-${pos}`,
+          title: posLabel(pos)
+        });
+      }
+    });
+
+    spans.sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      if ((b.end - b.start) !== (a.end - a.start)) {
+        return (b.end - b.start) - (a.end - a.start);
+      }
+      return a.start - b.start;
+    });
+
+    const accepted = [];
+
+    spans.forEach(candidate => {
+      const overlaps = accepted.some(existing => {
+        return candidate.start < existing.end && candidate.end > existing.start;
+      });
+
+      if (!overlaps) accepted.push(candidate);
+    });
+
+    accepted.sort((a, b) => a.start - b.start);
+
+    return accepted;
+  }
+
+  function renderLineWithSpans(lineText, spans) {
+    if (!spans.length) return escapeHTML(lineText);
+
+    let output = "";
+    let pos = 0;
+
+    spans.forEach(span => {
+      if (span.start > pos) {
+        output += escapeHTML(lineText.slice(pos, span.start));
+      }
+
+      const marked = lineText.slice(span.start, span.end);
+      output += `<mark class="${span.className}" title="${escapeHTML(span.title)}">${escapeHTML(marked)}</mark>`;
+
+      pos = span.end;
+    });
+
+    if (pos < lineText.length) {
+      output += escapeHTML(lineText.slice(pos));
+    }
+
+    return output;
+  }
+
   window.SiteApps.register("analyzer", (container) => {
     ensureStyle();
 
@@ -581,7 +782,15 @@
     config.filters = Array.isArray(config.filters) ? config.filters : [...DEFAULT_FILTERS];
     config.switches = { ...DEFAULT_SWITCHES, ...(config.switches || {}) };
 
-    const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    const save = () => {
+      const toSave = {
+        filters: config.filters,
+        switches: config.switches,
+        text: config.switches.rememberText ? config.text : ""
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    };
 
     container.innerHTML = `
       <div class="section">
@@ -608,6 +817,9 @@
             <label class="switch-item">
               <input type="checkbox" id="sw-sentenceLen"> Check Sentence Length
             </label>
+            <label class="switch-item">
+              <input type="checkbox" id="sw-rememberText"> Remember Text On This Device
+            </label>
           </div>
 
           <h3 style="margin-top:18px;">Parts of Speech</h3>
@@ -629,7 +841,7 @@
 
           <p style="font-size:10px; margin-top:10px; opacity:0.7">
             Sentence Check flags &gt;30 words as Long or &lt;5 words as Choppy.
-            Parts of speech are estimated using lightweight rules.
+            Parts of speech are estimated using lightweight rules. Filter phrases are matched using the hybrid span parser.
           </p>
         </div>
 
@@ -685,6 +897,7 @@
       swFilters: container.querySelector("#sw-filterWords"),
       swRepeats: container.querySelector("#sw-repeats"),
       swSent: container.querySelector("#sw-sentenceLen"),
+      swRememberText: container.querySelector("#sw-rememberText"),
 
       swPosAdverbs: container.querySelector("#sw-posAdverbs"),
       swPosVerbs: container.querySelector("#sw-posVerbs"),
@@ -701,12 +914,13 @@
       `).join("");
     };
 
-    els.input.value = config.text || "";
+    els.input.value = config.switches.rememberText ? (config.text || "") : "";
 
     els.swSummary.checked = config.switches.summary;
     els.swFilters.checked = config.switches.filterWords;
     els.swRepeats.checked = config.switches.repeats;
     els.swSent.checked = config.switches.sentenceLen;
+    els.swRememberText.checked = config.switches.rememberText;
 
     els.swPosAdverbs.checked = config.switches.posAdverbs;
     els.swPosVerbs.checked = config.switches.posVerbs;
@@ -716,9 +930,9 @@
     renderFilters();
 
     els.addBtn.onclick = () => {
-      const val = els.newFilter.value.trim().toLowerCase();
+      const val = normalizeWord(els.newFilter.value.trim());
 
-      if (val && !config.filters.includes(val)) {
+      if (val && !config.filters.map(normalizeWord).includes(val)) {
         config.filters.push(val);
         els.newFilter.value = "";
         renderFilters();
@@ -757,6 +971,7 @@
         filterWords: els.swFilters.checked,
         repeats: els.swRepeats.checked,
         sentenceLen: els.swSent.checked,
+        rememberText: els.swRememberText.checked,
         posAdverbs: els.swPosAdverbs.checked,
         posVerbs: els.swPosVerbs.checked,
         posNouns: els.swPosNouns.checked,
@@ -765,12 +980,12 @@
 
       save();
 
-      const lines = text.split("\n");
-      const issues = [];
-      const filterList = config.filters
-        .map(f => String(f || "").trim().toLowerCase())
-        .filter(Boolean);
+      const prose = parseProse(text);
+      const compiledFilters = config.filters.map(compileFilter).filter(Boolean);
+      const selectedPOS = selectedPOSTypes(config.switches);
 
+      const issues = [];
+      const filterMatchesByLine = new Map();
       const lastSeen = new Map();
 
       const posCounts = {
@@ -782,27 +997,22 @@
 
       let wordTotal = 0;
       let charTotal = 0;
+      let sentenceTotal = 0;
 
-      const selectedPOS = selectedPOSTypes(config.switches);
-      const filterMatchesByLine = new Map();
-
-      lines.forEach((line, lIdx) => {
-        const lineNumber = lIdx + 1;
-        const words = line.match(/\b[\w'-]+\b/g) || [];
-        const lowerWords = words.map(w => w.toLowerCase());
-        const sentences = line.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      prose.forEach(lineModel => {
+        const lineNumber = lineModel.lineNumber;
 
         if (config.switches.filterWords) {
-          const filterMatches = findFilterMatches(line, filterList);
+          const matches = findFilterMatchesInLine(lineModel, compiledFilters);
 
-          if (filterMatches.length) {
-            filterMatchesByLine.set(lineNumber, filterMatches);
+          if (matches.length) {
+            filterMatchesByLine.set(lineNumber, matches);
 
-            filterMatches.forEach(match => {
+            matches.forEach(match => {
               issues.push({
                 line: lineNumber,
                 type: "Filter",
-                word: match.text,
+                word: match.word,
                 start: match.start,
                 end: match.end
               });
@@ -811,31 +1021,33 @@
         }
 
         if (config.switches.sentenceLen) {
-          sentences.forEach(s => {
-            const sWords = s.match(/\b[\w'-]+\b/g) || [];
+          lineModel.sentences.forEach(sentence => {
+            sentenceTotal++;
 
-            if (sWords.length > 30) {
+            if (sentence.wordCount > 30) {
               issues.push({
                 line: lineNumber,
                 type: "Long Sentence",
-                word: `(${sWords.length} words)`
+                word: `(${sentence.wordCount} words)`
               });
             }
 
-            if (sWords.length > 0 && sWords.length < 5) {
+            if (sentence.wordCount > 0 && sentence.wordCount < 5) {
               issues.push({
                 line: lineNumber,
                 type: "Choppy",
-                word: `(${sWords.length} words)`
+                word: `(${sentence.wordCount} words)`
               });
             }
           });
+        } else {
+          sentenceTotal += lineModel.sentences.length;
         }
 
-        words.forEach((word, wIdx) => {
-          const clean = word.toLowerCase();
-          const prev = lowerWords[wIdx - 1] || "";
-          const next = lowerWords[wIdx + 1] || "";
+        lineModel.wordTokens.forEach((token, index) => {
+          const clean = token.clean;
+          const prev = lineModel.wordTokens[index - 1] ? lineModel.wordTokens[index - 1].text : "";
+          const next = lineModel.wordTokens[index + 1] ? lineModel.wordTokens[index + 1].text : "";
 
           wordTotal++;
           charTotal += clean.length;
@@ -843,27 +1055,34 @@
           if (config.switches.repeats && clean.length > 3) {
             if (lastSeen.has(clean)) {
               if (wordTotal - lastSeen.get(clean) <= 15) {
-                issues.push({ line: lineNumber, type: "Repeat", word });
+                issues.push({
+                  line: lineNumber,
+                  type: "Repeat",
+                  word: token.text
+                });
               }
             }
 
             lastSeen.set(clean, wordTotal);
           }
 
-          const pos = classifyPOS(word, prev, next);
+          const pos = classifyPOS(token.text, prev, next);
+
           if (pos && posCounts[pos] !== undefined) {
             posCounts[pos]++;
           }
         });
       });
 
-      const sentenceCount = text.split(/[.!?]+/).filter(Boolean).length || 1;
-      const ari = Math.round(getARI(charTotal, wordTotal, sentenceCount));
+      if (sentenceTotal < 1) sentenceTotal = 1;
+
+      const ari = Math.round(getARI(charTotal, wordTotal, sentenceTotal));
 
       els.results.style.display = "block";
 
       els.stats.innerHTML = `
         <span>WORDS: ${wordTotal}</span>
+        <span>SENTENCES: ${sentenceTotal}</span>
         <span>READ TIME: ~${Math.ceil(wordTotal / 225)}M</span>
         <span>SPOKEN: ~${Math.ceil(wordTotal / 140)}M</span>
         <span>ARI GRADE: ${ari}</span>
@@ -891,51 +1110,15 @@
         </div>
       ` : "";
 
-      const isInsideFilterMatch = (lineNumber, start, end) => {
-        const matches = filterMatchesByLine.get(lineNumber) || [];
-        return matches.some(match => start >= match.start && end <= match.end);
-      };
-
-      els.annotated.innerHTML = lines.map((line, idx) => {
-        const lineNumber = idx + 1;
-        const wordsForContext = line.match(/\b[\w'-]+\b/g) || [];
-        let contextIndex = 0;
-        let output = "";
-        let lastIndex = 0;
-
-        const tokenPattern = /\b[\w'-]+\b/g;
-        let match;
-
-        while ((match = tokenPattern.exec(line)) !== null) {
-          const part = match[0];
-          const start = match.index;
-          const end = start + part.length;
-
-          output += escapeHTML(line.slice(lastIndex, start));
-
-          const prev = wordsForContext[contextIndex - 1] || "";
-          const next = wordsForContext[contextIndex + 1] || "";
-          const pos = classifyPOS(part, prev, next);
-
-          contextIndex++;
-
-          if (isInsideFilterMatch(lineNumber, start, end)) {
-            output += `<mark class="hl">${escapeHTML(part)}</mark>`;
-          } else if (pos && selectedPOS.has(pos)) {
-            output += `<mark class="pos pos-${pos}" title="${posLabel(pos)}">${escapeHTML(part)}</mark>`;
-          } else {
-            output += escapeHTML(part);
-          }
-
-          lastIndex = end;
-        }
-
-        output += escapeHTML(line.slice(lastIndex));
+      els.annotated.innerHTML = prose.map(lineModel => {
+        const filterMatches = filterMatchesByLine.get(lineModel.lineNumber) || [];
+        const spans = buildHighlightSpans(lineModel, filterMatches, selectedPOS);
+        const content = renderLineWithSpans(lineModel.text, spans);
 
         return `
           <div class="line-container">
-            <div class="line-num">${lineNumber}</div>
-            <div class="line-txt">${output}</div>
+            <div class="line-num">${lineModel.lineNumber}</div>
+            <div class="line-txt">${content}</div>
           </div>
         `;
       }).join("");
@@ -943,6 +1126,8 @@
       els.results.scrollIntoView({ behavior: "smooth" });
     };
 
-    if (config.text) els.refresh.click();
+    if (config.switches.rememberText && config.text) {
+      els.refresh.click();
+    }
   });
 })();
