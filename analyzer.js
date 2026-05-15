@@ -7,8 +7,8 @@
     window.SiteApps.registry[name] = initFn;
   };
 
-  const STYLE_ID = "siteapps-analyzer-v10-hybrid-parser";
-  const STORAGE_KEY = "siteapps:analyzer:v10:config";
+  const STYLE_ID = "siteapps-analyzer-v11-tense-parser";
+  const STORAGE_KEY = "siteapps:analyzer:v11:config";
 
   const DEFAULT_FILTERS = [
     "just", "very", "really", "felt", "feel", "think", "thought",
@@ -20,6 +20,7 @@
     sentenceLen: true,
     repeats: true,
     filterWords: true,
+    tenseCheck: true,
     rememberText: false,
     posAdverbs: false,
     posVerbs: false,
@@ -85,6 +86,44 @@
   const LY_EXCEPTIONS = new Set([
     "family", "friendly", "lovely", "lonely", "early", "silly",
     "holy", "ugly", "woolly", "jelly", "belly", "likely"
+  ]);
+
+  const PAST_VERBS = new Set([
+    "was", "were", "had", "did",
+    "said", "went", "made", "took", "saw", "felt", "thought",
+    "knew", "came", "gave", "got", "found", "told", "asked",
+    "wanted", "needed", "tried", "turned", "moved", "stood",
+    "sat", "walked", "ran", "held", "kept", "left", "heard",
+    "watched", "pulled", "pushed", "opened", "closed", "killed",
+    "lived", "died", "became", "began", "broke", "brought",
+    "built", "caught", "chose", "cut", "drew", "drove", "fell",
+    "fought", "grew", "hid", "lost", "met", "paid", "put",
+    "read", "rose", "sent", "slept", "spoke", "struck", "swore",
+    "threw", "wore", "won", "wrote"
+  ]);
+
+  const PRESENT_AUX = new Set([
+    "am", "are", "is", "do", "does", "have", "has"
+  ]);
+
+  const PAST_AUX = new Set([
+    "was", "were", "did", "had"
+  ]);
+
+  const FUTURE_MARKERS = new Set([
+    "will", "shall", "won't", "shan't"
+  ]);
+
+  const MODAL_MARKERS = new Set([
+    "would", "could", "should", "might", "may", "must", "can"
+  ]);
+
+  const PERFECT_PARTICIPLES = new Set([
+    "been", "gone", "seen", "known", "given", "taken", "made",
+    "found", "told", "left", "heard", "held", "kept", "felt",
+    "thought", "said", "done", "come", "become", "written",
+    "spoken", "broken", "chosen", "fallen", "forgotten", "hidden",
+    "lost", "met", "sent", "slept", "worn", "won"
   ]);
 
   function ensureStyle() {
@@ -351,6 +390,30 @@
         border-style: dotted;
       }
 
+      [data-app="analyzer"] mark.tense {
+        background: #ffff00;
+        color: #000;
+        padding: 0 2px;
+        border: 3px solid #000;
+        font-weight: bold;
+      }
+
+      [data-app="analyzer"] mark.tense-past {
+        box-shadow: inset 0 -4px 0 #000;
+      }
+
+      [data-app="analyzer"] mark.tense-future {
+        outline: 3px dashed #000;
+        outline-offset: 1px;
+      }
+
+      [data-app="analyzer"] mark.tense-modal,
+      [data-app="analyzer"] mark.tense-perfect,
+      [data-app="analyzer"] mark.tense-unknown {
+        outline: 2px dotted #000;
+        outline-offset: 1px;
+      }
+
       [data-app="analyzer"] .summary-box {
         background: #000;
         color: #ffff00;
@@ -415,10 +478,6 @@
       .replaceAll("'", "&#039;");
   }
 
-  function escapeRegExp(value) {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
   function getARI(chars, words, sentences) {
     if (words === 0 || sentences === 0) return 0;
     return 4.71 * (chars / words) + 0.5 * (words / sentences) - 21.43;
@@ -450,6 +509,7 @@
         clean: kind === "word" ? normalizeWord(text) : text,
         kind,
         line: lineNumber,
+        lineText: line,
         start,
         end
       });
@@ -684,6 +744,182 @@
     return "";
   }
 
+  function looksPastParticiple(clean) {
+    if (!clean) return false;
+    if (PERFECT_PARTICIPLES.has(clean)) return true;
+    if (clean.endsWith("ed") && clean.length > 3) return true;
+    if (clean.endsWith("en") && clean.length > 4) return true;
+    return false;
+  }
+
+  function looksPastSimple(clean) {
+    if (!clean) return false;
+    if (PAST_VERBS.has(clean)) return true;
+    if (clean.endsWith("ed") && clean.length > 3) return true;
+    return false;
+  }
+
+  function classifySentenceTense(sentence) {
+    const words = sentence.tokens
+      .filter(t => t.kind === "word")
+      .map(t => ({
+        text: t.text,
+        clean: normalizeWord(t.text),
+        start: t.start,
+        end: t.end
+      }));
+
+    if (!words.length) {
+      return {
+        tense: "unknown",
+        label: "Unknown",
+        reason: "No words found",
+        severity: 0
+      };
+    }
+
+    let hasPresent = false;
+    let hasPast = false;
+    let hasFuture = false;
+    let hasModal = false;
+    let hasPerfect = false;
+    let hasProgressive = false;
+
+    const evidence = [];
+
+    for (let i = 0; i < words.length; i++) {
+      const clean = words[i].clean;
+      const next = words[i + 1] ? words[i + 1].clean : "";
+      const prev = words[i - 1] ? words[i - 1].clean : "";
+
+      if (FUTURE_MARKERS.has(clean)) {
+        hasFuture = true;
+        evidence.push(words[i].text);
+      }
+
+      if (MODAL_MARKERS.has(clean)) {
+        hasModal = true;
+        evidence.push(words[i].text);
+      }
+
+      if (PAST_AUX.has(clean)) {
+        hasPast = true;
+        evidence.push(words[i].text);
+      }
+
+      if (PRESENT_AUX.has(clean)) {
+        hasPresent = true;
+      }
+
+      if ((clean === "has" || clean === "have" || clean === "had") && looksPastParticiple(next)) {
+        hasPerfect = true;
+        if (words[i + 1]) evidence.push(`${words[i].text} ${words[i + 1].text}`);
+      }
+
+      if ((clean === "is" || clean === "are" || clean === "am") && next.endsWith("ing")) {
+        hasPresent = true;
+        hasProgressive = true;
+      }
+
+      if ((clean === "was" || clean === "were") && next.endsWith("ing")) {
+        hasPast = true;
+        hasProgressive = true;
+        if (words[i + 1]) evidence.push(`${words[i].text} ${words[i + 1].text}`);
+      }
+
+      if (looksPastSimple(clean)) {
+        const followsPresentPerfect =
+          (prev === "has" || prev === "have") && looksPastParticiple(clean);
+
+        if (!followsPresentPerfect) {
+          hasPast = true;
+          evidence.push(words[i].text);
+        }
+      }
+
+      if (
+        COMMON_VERBS.has(clean) &&
+        !PAST_VERBS.has(clean) &&
+        !PAST_AUX.has(clean) &&
+        !FUTURE_MARKERS.has(clean) &&
+        !MODAL_MARKERS.has(clean)
+      ) {
+        hasPresent = true;
+      }
+
+      if (
+        clean.endsWith("s") &&
+        clean.length > 3 &&
+        !clean.endsWith("ss") &&
+        !COMMON_NOUNS.has(clean)
+      ) {
+        hasPresent = true;
+      }
+    }
+
+    if (hasFuture) {
+      return {
+        tense: "future",
+        label: "Future / Non-present",
+        reason: `Future marker: ${evidence.slice(0, 3).join(", ")}`,
+        severity: 3
+      };
+    }
+
+    if (hasPast) {
+      return {
+        tense: "past",
+        label: "Past / Non-present",
+        reason: `Past-tense evidence: ${evidence.slice(0, 3).join(", ")}`,
+        severity: 3
+      };
+    }
+
+    if (hasModal) {
+      return {
+        tense: "modal",
+        label: "Modal / Conditional",
+        reason: `Modal marker: ${evidence.slice(0, 3).join(", ")}`,
+        severity: 2
+      };
+    }
+
+    if (hasPerfect) {
+      return {
+        tense: "perfect",
+        label: "Perfect aspect",
+        reason: `Perfect construction: ${evidence.slice(0, 3).join(", ")}`,
+        severity: 2
+      };
+    }
+
+    if (hasPresent || hasProgressive) {
+      return {
+        tense: "present",
+        label: "Present",
+        reason: "Likely present tense",
+        severity: 0
+      };
+    }
+
+    return {
+      tense: "unknown",
+      label: "Unclear tense",
+      reason: "No clear finite verb detected",
+      severity: 1
+    };
+  }
+
+  function buildTenseSpans(tenseMatches) {
+    return tenseMatches.map(match => ({
+      start: match.start,
+      end: match.end,
+      priority: 80,
+      className: `tense tense-${match.tense}`,
+      title: `${match.label}: ${match.reason}`
+    }));
+  }
+
   function buildHighlightSpans(lineModel, filterMatches, selectedPOS) {
     const spans = [];
 
@@ -715,6 +951,10 @@
       }
     });
 
+    return spans;
+  }
+
+  function acceptNonOverlappingSpans(spans) {
     spans.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
       if ((b.end - b.start) !== (a.end - a.start)) {
@@ -734,7 +974,6 @@
     });
 
     accepted.sort((a, b) => a.start - b.start);
-
     return accepted;
   }
 
@@ -812,6 +1051,9 @@
               <input type="checkbox" id="sw-filterWords"> Check Filter Words
             </label>
             <label class="switch-item">
+              <input type="checkbox" id="sw-tenseCheck"> Flag Non-Present Tense
+            </label>
+            <label class="switch-item">
               <input type="checkbox" id="sw-repeats"> Check Repetitions
             </label>
             <label class="switch-item">
@@ -841,6 +1083,7 @@
 
           <p style="font-size:10px; margin-top:10px; opacity:0.7">
             Sentence Check flags &gt;30 words as Long or &lt;5 words as Choppy.
+            Tense detection flags likely past, future, perfect, modal, or unclear sentences.
             Parts of speech are estimated using lightweight rules. Filter phrases are matched using the hybrid span parser.
           </p>
         </div>
@@ -895,6 +1138,7 @@
 
       swSummary: container.querySelector("#sw-summary"),
       swFilters: container.querySelector("#sw-filterWords"),
+      swTense: container.querySelector("#sw-tenseCheck"),
       swRepeats: container.querySelector("#sw-repeats"),
       swSent: container.querySelector("#sw-sentenceLen"),
       swRememberText: container.querySelector("#sw-rememberText"),
@@ -918,6 +1162,7 @@
 
     els.swSummary.checked = config.switches.summary;
     els.swFilters.checked = config.switches.filterWords;
+    els.swTense.checked = config.switches.tenseCheck;
     els.swRepeats.checked = config.switches.repeats;
     els.swSent.checked = config.switches.sentenceLen;
     els.swRememberText.checked = config.switches.rememberText;
@@ -969,6 +1214,7 @@
       config.switches = {
         summary: els.swSummary.checked,
         filterWords: els.swFilters.checked,
+        tenseCheck: els.swTense.checked,
         repeats: els.swRepeats.checked,
         sentenceLen: els.swSent.checked,
         rememberText: els.swRememberText.checked,
@@ -986,7 +1232,17 @@
 
       const issues = [];
       const filterMatchesByLine = new Map();
+      const tenseMatchesByLine = new Map();
       const lastSeen = new Map();
+
+      const tenseCounts = {
+        present: 0,
+        past: 0,
+        future: 0,
+        modal: 0,
+        perfect: 0,
+        unknown: 0
+      };
 
       const posCounts = {
         adverb: 0,
@@ -1020,10 +1276,41 @@
           }
         }
 
-        if (config.switches.sentenceLen) {
-          lineModel.sentences.forEach(sentence => {
-            sentenceTotal++;
+        lineModel.sentences.forEach(sentence => {
+          sentenceTotal++;
 
+          const tense = classifySentenceTense(sentence);
+
+          if (tenseCounts[tense.tense] !== undefined) {
+            tenseCounts[tense.tense]++;
+          }
+
+          if (config.switches.tenseCheck && tense.tense !== "present") {
+            const match = {
+              line: lineNumber,
+              type: "Tense",
+              word: tense.label,
+              start: sentence.start,
+              end: sentence.end,
+              tense: tense.tense,
+              label: tense.label,
+              reason: tense.reason
+            };
+
+            if (!tenseMatchesByLine.has(lineNumber)) {
+              tenseMatchesByLine.set(lineNumber, []);
+            }
+
+            tenseMatchesByLine.get(lineNumber).push(match);
+
+            issues.push({
+              line: lineNumber,
+              type: tense.label,
+              word: tense.reason
+            });
+          }
+
+          if (config.switches.sentenceLen) {
             if (sentence.wordCount > 30) {
               issues.push({
                 line: lineNumber,
@@ -1039,10 +1326,8 @@
                 word: `(${sentence.wordCount} words)`
               });
             }
-          });
-        } else {
-          sentenceTotal += lineModel.sentences.length;
-        }
+          }
+        });
 
         lineModel.wordTokens.forEach((token, index) => {
           const clean = token.clean;
@@ -1077,12 +1362,14 @@
       if (sentenceTotal < 1) sentenceTotal = 1;
 
       const ari = Math.round(getARI(charTotal, wordTotal, sentenceTotal));
+      const nonPresentTotal = tenseCounts.past + tenseCounts.future + tenseCounts.modal + tenseCounts.perfect + tenseCounts.unknown;
 
       els.results.style.display = "block";
 
       els.stats.innerHTML = `
         <span>WORDS: ${wordTotal}</span>
         <span>SENTENCES: ${sentenceTotal}</span>
+        <span>NON-PRESENT: ${nonPresentTotal}</span>
         <span>READ TIME: ~${Math.ceil(wordTotal / 225)}M</span>
         <span>SPOKEN: ~${Math.ceil(wordTotal / 140)}M</span>
         <span>ARI GRADE: ${ari}</span>
@@ -1095,13 +1382,24 @@
 
       const anyPOS = selectedPOS.size > 0;
 
-      els.posBanner.innerHTML = anyPOS ? `
+      const tenseBanner = config.switches.tenseCheck ? `
+        <span class="pos-pill">Present: ${tenseCounts.present}</span>
+        <span class="pos-pill">Past: ${tenseCounts.past}</span>
+        <span class="pos-pill">Future: ${tenseCounts.future}</span>
+        <span class="pos-pill">Modal: ${tenseCounts.modal}</span>
+        <span class="pos-pill">Perfect / Unclear: ${tenseCounts.perfect + tenseCounts.unknown}</span>
+        <span class="pos-pill">Tense legend: heavy yellow mark = probably not present tense</span>
+      ` : "";
+
+      const posBanner = anyPOS ? `
         <span class="pos-pill">Adverbs: ${posCounts.adverb}</span>
         <span class="pos-pill">Verbs: ${posCounts.verb}</span>
         <span class="pos-pill">Nouns: ${posCounts.noun}</span>
         <span class="pos-pill">Adjectives: ${posCounts.adjective}</span>
-        <span class="pos-pill">Legend: dashed = adverb, solid = verb, double = noun, dotted = adjective</span>
+        <span class="pos-pill">POS legend: dashed = adverb, solid = verb, double = noun, dotted = adjective</span>
       ` : "";
+
+      els.posBanner.innerHTML = `${tenseBanner}${posBanner}`;
 
       els.summary.innerHTML = (config.switches.summary && issues.length) ? `
         <div class="summary-box">
@@ -1112,22 +1410,4 @@
 
       els.annotated.innerHTML = prose.map(lineModel => {
         const filterMatches = filterMatchesByLine.get(lineModel.lineNumber) || [];
-        const spans = buildHighlightSpans(lineModel, filterMatches, selectedPOS);
-        const content = renderLineWithSpans(lineModel.text, spans);
-
-        return `
-          <div class="line-container">
-            <div class="line-num">${lineModel.lineNumber}</div>
-            <div class="line-txt">${content}</div>
-          </div>
-        `;
-      }).join("");
-
-      els.results.scrollIntoView({ behavior: "smooth" });
-    };
-
-    if (config.switches.rememberText && config.text) {
-      els.refresh.click();
-    }
-  });
-})();
+        const tenseMatches = tenseMatchesByL
