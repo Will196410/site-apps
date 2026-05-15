@@ -1411,3 +1411,6 @@
       els.annotated.innerHTML = prose.map(lineModel => {
         const filterMatches = filterMatchesByLine.get(lineModel.lineNumber) || [];
         const tenseMatches = tenseMatchesByL
+            }
+  });
+})();
