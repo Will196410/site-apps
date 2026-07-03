@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deep Sector</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="game">
+    <header class="topbar">
+      <div>
+        <h1>Deep Sector</h1>
+        <p class="subtitle">Frontier command simulation</p>
+      </div>
+
+      <div class="buttons">
+        <button id="newGameBtn">New Game</button>
+        <button id="saveBtn">Save</button>
+        <button id="loadBtn">Load</button>
+      </div>
+    </header>
+
+    <section class="layout">
+      <section class="panel">
+        <h2>Galaxy</h2>
+        <div id="galaxyMap" class="grid galaxy"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Sector View</h2>
+        <div id="sectorMap" class="grid sector"></div>
+      </section>
+
+      <section class="panel status">
+        <h2>Ship Status</h2>
+        <p><strong>Quadrant:</strong> <span id="quadrantReadout"></span></p>
+        <p><strong>Energy:</strong> <span id="energyReadout"></span></p>
+        <p><strong>Shields:</strong> <span id="shieldReadout"></span></p>
+        <p><strong>Torpedoes:</strong> <span id="torpedoReadout"></span></p>
+        <p><strong>Raiders left:</strong> <span id="enemyReadout"></span></p>
+
+        <div class="actions">
+          <button id="scanBtn">Long Scan</button>
+          <button id="phaserBtn">Fire Phasers</button>
+          <button id="torpedoBtn">Fire Torpedo</button>
+          <button id="dockBtn">Dock / Repair</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel logPanel">
+      <h2>Command Log</h2>
+      <div id="log"></div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+</body>
+</html>
