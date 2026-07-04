@@ -1,6 +1,6 @@
 const SAVE_KEY = "deepSectorSave_v1";
 const SIZE = 8;
-
+ 
 let game = null;
 
 const el = {
