@@ -34,11 +34,30 @@
 
       <section class="panel status">
         <h2>Ship Status</h2>
+        <p><strong>Alert:</strong> <span id="alertReadout"></span></p>
+        <p><strong>Stardate:</strong> <span id="stardateReadout"></span></p>
         <p><strong>Quadrant:</strong> <span id="quadrantReadout"></span></p>
-        <p><strong>Energy:</strong> <span id="energyReadout"></span></p>
+        <div class="meterRow">
+          <div class="meterLabel">
+            <strong>Energy:</strong>
+            <span id="energyReadout"></span>
+          </div>
+          <div class="meter">
+            <div id="energyMeter" class="meterFill energyFill"></div>
+          </div>
+        </div>
         <p><strong>Shields:</strong> <span id="shieldReadout"></span></p>
         <p><strong>Torpedoes:</strong> <span id="torpedoReadout"></span></p>
         <p><strong>Raiders left:</strong> <span id="enemyReadout"></span></p>
+        <p><strong>Outposts:</strong> <span id="baseReadout"></span></p>
+
+        <label class="controlGroup" for="phaserEnergyInput">
+          <span class="controlLabel">
+            <strong>Phaser Energy:</strong>
+            <span id="phaserEnergyReadout"></span>
+          </span>
+          <input id="phaserEnergyInput" type="range" min="100" max="900" step="25" value="450" />
+        </label>
 
         <div class="actions">
           <button id="scanBtn">Long Scan</button>
