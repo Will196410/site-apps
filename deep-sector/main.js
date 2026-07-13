@@ -1,10 +1,19 @@
 const SAVE_KEY = "deepSectorSave_v1";
 const SIZE = 8;
 const STARTING_STARDATE = 4200;
-const MISSION_DAYS = 42;
+const MISSION_DAYS = 168;
 const MAX_ENERGY = 3000;
 const MAX_SHIELDS = 1000;
 const MAX_TORPEDOES = 8;
+const STARBASE_COUNT = 4;
+const STARBASE_MAX_HEALTH = 240;
+const STARBASE_REPAIR_PER_DAY = 14;
+const STARBASE_DISTRESS_COOLDOWN = 4;
+const DIFFICULTY_SETTINGS = {
+  light: { label: "Light", raiders: 4 },
+  standard: { label: "Standard", raiders: 7 },
+  heavy: { label: "Heavy", raiders: 10 }
+};
 const SECTOR_MOVE_COST = 25;
 const DEFAULT_PHASER_ENERGY = 450;
 const MIN_PHASER_ENERGY = 100;
@@ -26,23 +35,28 @@ let targetingMode = null;
 let torpedoTrailTimer = null;
 let explosionTimer = null;
 let phaserBeamTimer = null;
+let distressTimer = null;
 
 const el = {
   galaxyMap: document.getElementById("galaxyMap"),
   sectorMap: document.getElementById("sectorMap"),
   log: document.getElementById("log"),
+  distressBeacon: document.getElementById("distressBeacon"),
   alertReadout: document.getElementById("alertReadout"),
   stardateReadout: document.getElementById("stardateReadout"),
+  timePie: document.getElementById("timePie"),
   quadrantReadout: document.getElementById("quadrantReadout"),
   energyReadout: document.getElementById("energyReadout"),
   shieldReadout: document.getElementById("shieldReadout"),
   torpedoReadout: document.getElementById("torpedoReadout"),
   enemyReadout: document.getElementById("enemyReadout"),
   baseReadout: document.getElementById("baseReadout"),
+  baseHealthReadout: document.getElementById("baseHealthReadout"),
   energyMeter: document.getElementById("energyMeter"),
   phaserEnergyInput: document.getElementById("phaserEnergyInput"),
   phaserEnergyReadout: document.getElementById("phaserEnergyReadout"),
   newGameBtn: document.getElementById("newGameBtn"),
+  difficultySelect: document.getElementById("difficultySelect"),
   saveBtn: document.getElementById("saveBtn"),
   loadBtn: document.getElementById("loadBtn"),
   scanBtn: document.getElementById("scanBtn"),
@@ -99,25 +113,48 @@ function createSectorLayout(q, player = null) {
 
 function createGame() {
   const galaxy = makeEmptyGrid();
-  let totalEnemies = 0;
-  let totalBases = 0;
+  const difficulty = el.difficultySelect.value || "standard";
+  const targetEnemies = DIFFICULTY_SETTINGS[difficulty].raiders;
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      const enemies = Math.random() < 0.32 ? randomInt(3) + 1 : 0;
-      const base = Math.random() < 0.08 ? 1 : 0;
       const stars = randomInt(6);
 
       galaxy[y][x] = {
-        enemies,
-        base,
+        enemies: 0,
+        base: 0,
+        baseHealth: 0,
+        lastDistress: STARTING_STARDATE - STARBASE_DISTRESS_COOLDOWN,
         stars,
         scanned: false,
         sector: null
       };
 
-      totalEnemies += enemies;
-      totalBases += base;
+    }
+  }
+
+  let placedEnemies = 0;
+  while (placedEnemies < targetEnemies) {
+    const x = randomInt(SIZE);
+    const y = randomInt(SIZE);
+    const q = galaxy[y][x];
+
+    if (q.enemies < 4) {
+      q.enemies += 1;
+      placedEnemies++;
+    }
+  }
+
+  let placedBases = 0;
+  while (placedBases < STARBASE_COUNT) {
+    const x = randomInt(SIZE);
+    const y = randomInt(SIZE);
+    const q = galaxy[y][x];
+
+    if (!q.base) {
+      q.base = 1;
+      q.baseHealth = STARBASE_MAX_HEALTH;
+      placedBases++;
     }
   }
 
@@ -144,8 +181,9 @@ function createGame() {
       torpedoes: MAX_TORPEDOES
     },
     galaxy,
-    enemiesRemaining: totalEnemies,
-    basesRemaining: totalBases,
+    difficulty,
+    enemiesRemaining: targetEnemies,
+    basesRemaining: STARBASE_COUNT,
     phaserEnergy: DEFAULT_PHASER_ENERGY,
     lastTorpedoTrack: null,
     phaserBeam: null,
@@ -228,6 +266,19 @@ function removeEnemyAt(x, y) {
   return true;
 }
 
+function removeBaseFromSector(q) {
+  if (!q.sector) return;
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (q.sector[y][x] === "B") {
+        q.sector[y][x] = null;
+        return;
+      }
+    }
+  }
+}
+
 function findSectorCells(value) {
   const sector = ensureCurrentSector();
   const cells = [];
@@ -286,6 +337,51 @@ function moveRaidersTowardPlayer() {
   }
 
   return moved;
+}
+
+function updateStarbases(days) {
+  if (days <= 0 || game.status !== "active") return;
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const q = game.galaxy[y][x];
+
+      if (!q.base) continue;
+
+      if (q.enemies > 0) {
+        const damage = days * q.enemies * (randomInt(8) + 6);
+        q.baseHealth = Math.max(0, q.baseHealth - damage);
+
+        if (q.baseHealth <= 0) {
+          destroyStarbase(x, y);
+          if (game.status !== "active") return;
+          continue;
+        }
+
+        if (game.stardate - q.lastDistress >= STARBASE_DISTRESS_COOLDOWN || q.baseHealth < STARBASE_MAX_HEALTH * 0.35) {
+          q.lastDistress = game.stardate;
+          flashDistressBeacon();
+          log(`Distress signal: starbase ${x + 1},${y + 1} under attack. Integrity ${Math.ceil((q.baseHealth / STARBASE_MAX_HEALTH) * 100)}%.`, false);
+        }
+      } else if (q.baseHealth < STARBASE_MAX_HEALTH) {
+        q.baseHealth = Math.min(STARBASE_MAX_HEALTH, q.baseHealth + days * STARBASE_REPAIR_PER_DAY);
+      }
+    }
+  }
+}
+
+function destroyStarbase(x, y) {
+  const q = game.galaxy[y][x];
+
+  q.base = 0;
+  q.baseHealth = 0;
+  game.basesRemaining = Math.max(0, game.basesRemaining - 1);
+  removeBaseFromSector(q);
+  log(`Starbase ${x + 1},${y + 1} destroyed by raiders. ${game.basesRemaining} outposts remain.`, false);
+
+  if (game.basesRemaining <= 0) {
+    endGame("failed", "All starbases have been destroyed. Frontier support collapsed.");
+  }
 }
 
 function isStraightLine(x1, y1, x2, y2) {
@@ -437,9 +533,15 @@ function advanceTime(days, reason) {
   if (game.status !== "active") return;
 
   game.stardate += days;
+  updateStarbases(days);
 
   if (reason) {
     log(`${reason} Stardate advanced by ${days}.`, false);
+  }
+
+  if (game.status !== "active") {
+    render();
+    return;
   }
 
   if (game.stardate > game.deadline && game.enemiesRemaining > 0) {
@@ -496,6 +598,19 @@ function showPhaserBeam(cells) {
   }, PHASER_BEAM_DURATION_MS);
 }
 
+function flashDistressBeacon() {
+  el.distressBeacon.classList.add("active");
+
+  if (distressTimer) {
+    clearTimeout(distressTimer);
+  }
+
+  distressTimer = setTimeout(() => {
+    el.distressBeacon.classList.remove("active");
+    distressTimer = null;
+  }, 2000);
+}
+
 function log(message, shouldRender = true) {
   game.log.push(message);
   if (game.log.length > 80) game.log.shift();
@@ -517,7 +632,8 @@ function renderGalaxy() {
       if (q.scanned || isCurrent) {
         cell.textContent = `${q.enemies}${q.base}${q.stars}`;
       } else {
-        cell.textContent = "?";
+        cell.textContent = "";
+        cell.classList.add("unscanned");
       }
 
       cell.title = `Quadrant ${x + 1}, ${y + 1}`;
@@ -602,6 +718,9 @@ function renderStatus() {
 
   el.alertReadout.textContent = alert.label;
   el.alertReadout.className = alert.className;
+  const timePercent = Math.max(0, Math.min(100, (daysRemaining / MISSION_DAYS) * 100));
+  el.timePie.style.setProperty("--time-left", `${timePercent}%`);
+  el.timePie.classList.toggle("low", daysRemaining <= 8);
   el.stardateReadout.textContent = `${game.stardate}.${daysRemaining} days left`;
   el.quadrantReadout.textContent = `${p.qx + 1}, ${p.qy + 1}`;
   el.energyReadout.textContent = p.energy;
@@ -617,6 +736,9 @@ function renderStatus() {
   el.torpedoReadout.textContent = p.torpedoes;
   el.enemyReadout.textContent = game.enemiesRemaining;
   el.baseReadout.textContent = game.basesRemaining;
+  el.baseHealthReadout.textContent = q.base
+    ? `${Math.ceil((q.baseHealth / STARBASE_MAX_HEALTH) * 100)}%`
+    : "none";
 
   const disabled = game.status !== "active";
   el.scanBtn.disabled = disabled;
@@ -851,6 +973,11 @@ function fireTorpedoAt(targetX, targetY) {
       advanceTime(1, "Torpedo track resolved.");
 
       if (value === "B") {
+        const q = getCurrentQuadrant();
+        q.base = 0;
+        q.baseHealth = 0;
+        game.basesRemaining = Math.max(0, game.basesRemaining - 1);
+        removeBaseFromSector(q);
         endGame("failed", `Torpedo destroyed the starbase at sector ${point.x + 1}, ${point.y + 1}. Mission failed.`);
         return;
       }
@@ -958,12 +1085,14 @@ function loadGame() {
   clearTorpedoTrail();
   clearExplosion();
   game = normalizeGame(JSON.parse(raw));
+  el.difficultySelect.value = game.difficulty || "standard";
   log("Saved game loaded.");
   render();
 }
 
 function normalizeGame(savedGame) {
   savedGame.status = savedGame.status || "active";
+  savedGame.difficulty = savedGame.difficulty || "standard";
   savedGame.stardate = savedGame.stardate || STARTING_STARDATE;
   savedGame.deadline = savedGame.deadline || STARTING_STARDATE + MISSION_DAYS;
   savedGame.player.heading = savedGame.player.heading || "N";
@@ -978,8 +1107,16 @@ function normalizeGame(savedGame) {
   for (const row of savedGame.galaxy) {
     for (const q of row) {
       if (!Object.prototype.hasOwnProperty.call(q, "sector")) q.sector = null;
+      if (!Object.prototype.hasOwnProperty.call(q, "baseHealth")) {
+        q.baseHealth = q.base ? STARBASE_MAX_HEALTH : 0;
+      }
+      if (!Object.prototype.hasOwnProperty.call(q, "lastDistress")) {
+        q.lastDistress = savedGame.stardate - STARBASE_DISTRESS_COOLDOWN;
+      }
     }
   }
+
+  savedGame.basesRemaining = savedGame.galaxy.flat().reduce((total, q) => total + (q.base ? 1 : 0), 0);
 
   return savedGame;
 }
