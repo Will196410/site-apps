@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deep Sector</title>
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
   <main id="game">
@@ -15,6 +15,14 @@
       </div>
 
       <div class="buttons">
+        <label class="topControl" for="difficultySelect">
+          <span>Raiders</span>
+          <select id="difficultySelect">
+            <option value="light">Light</option>
+            <option value="standard" selected>Standard</option>
+            <option value="heavy">Heavy</option>
+          </select>
+        </label>
         <button id="newGameBtn">New Game</button>
         <button id="saveBtn">Save</button>
         <button id="loadBtn">Load</button>
@@ -34,8 +42,12 @@
 
       <section class="panel status">
         <h2>Ship Status</h2>
+        <div id="distressBeacon" class="distressBeacon">DISTRESS</div>
         <p><strong>Alert:</strong> <span id="alertReadout"></span></p>
-        <p><strong>Stardate:</strong> <span id="stardateReadout"></span></p>
+        <div class="timeRow">
+          <div id="timePie" class="timePie"></div>
+          <p><strong>Stardate:</strong> <span id="stardateReadout"></span></p>
+        </div>
         <p><strong>Quadrant:</strong> <span id="quadrantReadout"></span></p>
         <div class="meterRow">
           <div class="meterLabel">
@@ -50,6 +62,7 @@
         <p><strong>Torpedoes:</strong> <span id="torpedoReadout"></span></p>
         <p><strong>Raiders left:</strong> <span id="enemyReadout"></span></p>
         <p><strong>Outposts:</strong> <span id="baseReadout"></span></p>
+        <p><strong>Local base:</strong> <span id="baseHealthReadout"></span></p>
 
         <label class="controlGroup" for="phaserEnergyInput">
           <span class="controlLabel">
@@ -74,6 +87,6 @@
     </section>
   </main>
 
-  <script src="main.js?v=2"></script>
+  <script src="main.js?v=7"></script>
 </body>
 </html>
