@@ -76,6 +76,24 @@ h1 {
   gap: 8px;
 }
 
+.topControl {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  font-weight: 700;
+}
+
+select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
 .controlGroup {
   display: grid;
   gap: 8px;
@@ -177,6 +195,11 @@ button:disabled {
 
 .galaxy .cell {
   font-size: clamp(0.75rem, 1.2vw, 1rem);
+}
+
+.galaxy .cell.unscanned {
+  background: rgba(4, 10, 13, 0.42);
+  border-color: rgba(49, 80, 90, 0.38);
 }
 
 .sector .cell:hover {
@@ -357,6 +380,67 @@ button.armed {
 
 .status strong {
   color: var(--text);
+}
+
+.distressBeacon {
+  background: rgba(255, 93, 93, 0.08);
+  border: 1px solid rgba(255, 93, 93, 0.24);
+  border-radius: 6px;
+  color: rgba(255, 93, 93, 0.38);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  padding: 7px 8px;
+  text-align: center;
+}
+
+.distressBeacon.active {
+  animation: distress-pulse 400ms steps(2, end) infinite;
+  background: rgba(255, 93, 93, 0.3);
+  border-color: var(--danger);
+  color: #ffffff;
+  box-shadow: 0 0 22px rgba(255, 93, 93, 0.55);
+}
+
+@keyframes distress-pulse {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.28;
+  }
+}
+
+.timeRow {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.timeRow p {
+  margin-bottom: 0;
+}
+
+.timePie {
+  --time-left: 100%;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle, var(--panel) 0 48%, transparent 50%),
+    conic-gradient(var(--accent) 0 var(--time-left), rgba(49, 80, 90, 0.55) var(--time-left) 100%);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 0 16px rgba(95, 216, 198, 0.18);
+  flex: 0 0 34px;
+}
+
+.timePie.low {
+  background:
+    radial-gradient(circle, var(--panel) 0 48%, transparent 50%),
+    conic-gradient(var(--warning) 0 var(--time-left), rgba(49, 80, 90, 0.55) var(--time-left) 100%);
+  box-shadow: 0 0 16px rgba(255, 200, 87, 0.24);
 }
 
 .meterRow {
