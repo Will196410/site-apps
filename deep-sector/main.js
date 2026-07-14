@@ -1,4 +1,5 @@
 const SAVE_KEY = "deepSectorSave_v1";
+const SCORE_KEY = "deepSectorScores_v1";
 const SIZE = 8;
 const STARTING_STARDATE = 4200;
 const MISSION_DAYS = 168;
@@ -12,7 +13,8 @@ const STARBASE_DISTRESS_COOLDOWN = 4;
 const DIFFICULTY_SETTINGS = {
   light: { label: "Light", raiders: 4 },
   standard: { label: "Standard", raiders: 7 },
-  heavy: { label: "Heavy", raiders: 10 }
+  heavy: { label: "Heavy", raiders: 10 },
+  extreme: { label: "Extreme", raiders: 14 }
 };
 const SECTOR_MOVE_COST = 25;
 const DEFAULT_PHASER_ENERGY = 450;
@@ -21,7 +23,11 @@ const MAX_PHASER_ENERGY = 900;
 const TORPEDO_RANGE = 5;
 const TORPEDO_HIT_CHANCE = 0.72;
 const EXPLOSION_DURATION_MS = 950;
+const SUPERNOVA_EXPLOSION_DURATION_MS = 2200;
 const PHASER_BEAM_DURATION_MS = 550;
+const SUPERNOVA_CHANCE = 0.08;
+const SUPERNOVA_MIN = 3;
+const SUPERNOVA_MAX = 4;
 const HEADING_ORDER = ["N", "E", "S", "W"];
 const HEADING_DATA = {
   N: { dx: 0, dy: -1, glyph: "▲" },
@@ -42,6 +48,11 @@ const el = {
   sectorMap: document.getElementById("sectorMap"),
   log: document.getElementById("log"),
   distressBeacon: document.getElementById("distressBeacon"),
+  victoryCelebration: document.getElementById("victoryCelebration"),
+  scoreDialog: document.getElementById("scoreDialog"),
+  scoreSummary: document.getElementById("scoreSummary"),
+  scoreList: document.getElementById("scoreList"),
+  scoreboardGrid: document.getElementById("scoreboardGrid"),
   alertReadout: document.getElementById("alertReadout"),
   stardateReadout: document.getElementById("stardateReadout"),
   timePie: document.getElementById("timePie"),
@@ -182,12 +193,16 @@ function createGame() {
     },
     galaxy,
     difficulty,
+    initialEnemies: targetEnemies,
     enemiesRemaining: targetEnemies,
     basesRemaining: STARBASE_COUNT,
     phaserEnergy: DEFAULT_PHASER_ENERGY,
     lastTorpedoTrack: null,
     phaserBeam: null,
-    explosion: null,
+    explosions: [],
+    supernovaeUsed: 0,
+    supernovaeMax: SUPERNOVA_MIN + randomInt(SUPERNOVA_MAX - SUPERNOVA_MIN + 1),
+    ratingLogged: false,
     log: [
       "Command vessel launched.",
       "Mission: clear raiders from the frontier before the sector collapses."
@@ -290,6 +305,74 @@ function findSectorCells(value) {
   }
 
   return cells;
+}
+
+function maybeTriggerSupernova() {
+  const q = getCurrentQuadrant();
+
+  if (
+    game.supernovaeUsed >= game.supernovaeMax ||
+    q.stars <= 0 ||
+    Math.random() >= SUPERNOVA_CHANCE
+  ) {
+    return;
+  }
+
+  const sector = ensureCurrentSector();
+  const stars = findSectorCells("*");
+
+  if (stars.length === 0) return;
+
+  const star = stars[randomInt(stars.length)];
+  const affected = [];
+  let raidersDestroyed = 0;
+  let starsDestroyed = 0;
+  let shipDestroyed = false;
+  let baseDestroyed = false;
+
+  game.supernovaeUsed += 1;
+
+  for (let y = star.y - 1; y <= star.y + 1; y++) {
+    for (let x = star.x - 1; x <= star.x + 1; x++) {
+      if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) continue;
+
+      const value = sector[y][x];
+      affected.push({ x, y });
+
+      if (value === "E") {
+        raidersDestroyed += 1;
+      } else if (value === "*") {
+        starsDestroyed += 1;
+      } else if (value === "B") {
+        baseDestroyed = true;
+      } else if (value === "P") {
+        shipDestroyed = true;
+      }
+
+      sector[y][x] = null;
+    }
+  }
+
+  q.stars = Math.max(0, q.stars - starsDestroyed);
+
+  if (raidersDestroyed > 0) {
+    q.enemies = Math.max(0, q.enemies - raidersDestroyed);
+    game.enemiesRemaining = Math.max(0, game.enemiesRemaining - raidersDestroyed);
+  }
+
+  showExplosions(affected, SUPERNOVA_EXPLOSION_DURATION_MS);
+  log(`Supernova in sector ${star.x + 1},${star.y + 1}. Blast radius consumed ${affected.length} cells.`, false);
+
+  if (baseDestroyed) {
+    destroyStarbase(game.player.qx, game.player.qy);
+  }
+
+  if (shipDestroyed) {
+    endGame("failed", "Command vessel lost in supernova blast.");
+    return;
+  }
+
+  checkVictory();
 }
 
 function moveRaidersTowardPlayer() {
@@ -539,6 +622,10 @@ function advanceTime(days, reason) {
     log(`${reason} Stardate advanced by ${days}.`, false);
   }
 
+  if (game.status === "active" && days > 0) {
+    maybeTriggerSupernova();
+  }
+
   if (game.status !== "active") {
     render();
     return;
@@ -567,17 +654,23 @@ function showTorpedoTrail(track) {
 }
 
 function showExplosion(x, y) {
-  game.explosion = { x, y };
+  showExplosions([{ x, y }]);
+}
+
+function showExplosions(cells, duration = EXPLOSION_DURATION_MS) {
+  game.explosions = cells;
+  game.explosionDuration = duration;
 
   if (explosionTimer) {
     clearTimeout(explosionTimer);
   }
 
   explosionTimer = setTimeout(() => {
-    game.explosion = null;
+    game.explosions = [];
+    game.explosionDuration = EXPLOSION_DURATION_MS;
     explosionTimer = null;
     render();
-  }, EXPLOSION_DURATION_MS);
+  }, duration);
 }
 
 function showPhaserBeam(cells) {
@@ -649,7 +742,7 @@ function renderSector() {
   const sector = ensureCurrentSector();
   const trackKeys = new Set((game.lastTorpedoTrack || []).map(({ x, y }) => `${x},${y}`));
   const beamByKey = new Map((game.phaserBeam || []).map((cell) => [`${cell.x},${cell.y}`, cell]));
-  const explosionKey = game.explosion ? `${game.explosion.x},${game.explosion.y}` : null;
+  const explosionKeys = new Set((game.explosions || []).map(({ x, y }) => `${x},${y}`));
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
@@ -688,8 +781,9 @@ function renderSector() {
         cell.classList.add("phaser-beam", `beam-${intensity}`, directionClass);
       }
 
-      if (explosionKey === `${x},${y}`) {
+      if (explosionKeys.has(`${x},${y}`)) {
         cell.classList.add("explosion");
+        cell.style.setProperty("--explosion-duration", `${game.explosionDuration || EXPLOSION_DURATION_MS}ms`);
       }
 
       if (
@@ -761,11 +855,45 @@ function renderLog() {
   }
 }
 
+function renderScoreboards() {
+  const scoreboards = getAllScores();
+  el.scoreboardGrid.innerHTML = "";
+
+  for (const [difficulty, setting] of Object.entries(DIFFICULTY_SETTINGS)) {
+    const board = document.createElement("section");
+    const title = document.createElement("h3");
+    const list = document.createElement("ol");
+    const scores = scoreboards[difficulty] || [];
+
+    board.className = "scoreboard";
+    title.textContent = setting.label;
+    list.className = "scoreboardList";
+
+    if (scores.length === 0) {
+      const empty = document.createElement("li");
+      empty.textContent = "No scores yet";
+      empty.className = "emptyScore";
+      list.appendChild(empty);
+    } else {
+      for (const score of scores) {
+        const item = document.createElement("li");
+        item.textContent = `${score.score} ${score.label} - ${score.raidersDestroyed}/${score.totalRaiders} raiders, ${score.basesRemaining}/${STARBASE_COUNT} bases`;
+        list.appendChild(item);
+      }
+    }
+
+    board.appendChild(title);
+    board.appendChild(list);
+    el.scoreboardGrid.appendChild(board);
+  }
+}
+
 function render() {
   renderGalaxy();
   renderSector();
   renderStatus();
   renderLog();
+  renderScoreboards();
 }
 
 function getAlertState(q, daysRemaining) {
@@ -973,12 +1101,10 @@ function fireTorpedoAt(targetX, targetY) {
       advanceTime(1, "Torpedo track resolved.");
 
       if (value === "B") {
-        const q = getCurrentQuadrant();
-        q.base = 0;
-        q.baseHealth = 0;
-        game.basesRemaining = Math.max(0, game.basesRemaining - 1);
-        removeBaseFromSector(q);
-        endGame("failed", `Torpedo destroyed the starbase at sector ${point.x + 1}, ${point.y + 1}. Mission failed.`);
+        destroyStarbase(game.player.qx, game.player.qy);
+        if (game.status === "active") {
+          log(`Torpedo destroyed the starbase at sector ${point.x + 1}, ${point.y + 1}.`);
+        }
         return;
       }
 
@@ -1059,13 +1185,153 @@ function enemyCounterAttack(exposure = 1) {
 
 function checkVictory() {
   if (game.enemiesRemaining <= 0) {
+    triggerVictoryCelebration();
     endGame("won", "All raiders cleared. Frontier secured.");
   }
+}
+
+function triggerVictoryCelebration() {
+  el.victoryCelebration.innerHTML = "";
+  el.victoryCelebration.classList.add("active");
+
+  for (let i = 0; i < 18; i++) {
+    const burst = document.createElement("div");
+    burst.className = "firework";
+    burst.style.left = `${10 + randomInt(80)}%`;
+    burst.style.top = `${12 + randomInt(58)}%`;
+    burst.style.animationDelay = `${i * 90}ms`;
+    burst.style.setProperty("--spark-color", ["#5fd8c6", "#ffc857", "#ff5d5d", "#7bea8f"][randomInt(4)]);
+    el.victoryCelebration.appendChild(burst);
+  }
+
+  setTimeout(() => {
+    el.victoryCelebration.classList.remove("active");
+    el.victoryCelebration.innerHTML = "";
+  }, 3600);
 }
 
 function endGame(status, message) {
   game.status = status;
   log(message);
+  finishGameReport();
+}
+
+function getGameRating(score) {
+  if (score >= 95) return "Legendary";
+  if (score >= 80) return "Decorated";
+  if (score >= 60) return "Successful";
+  if (score >= 40) return "Costly";
+  return "Failed";
+}
+
+function getGameScore() {
+  const raidersDestroyed = Math.max(0, (game.initialEnemies || 0) - game.enemiesRemaining);
+  const raiderScore = game.initialEnemies ? (raidersDestroyed / game.initialEnemies) * 70 : 0;
+  const baseScore = (game.basesRemaining / STARBASE_COUNT) * 30;
+  const score = Math.round(raiderScore + baseScore);
+
+  return {
+    basesRemaining: game.basesRemaining,
+    difficulty: game.difficulty,
+    label: getGameRating(score),
+    raidersDestroyed,
+    score,
+    stardate: game.stardate,
+    totalRaiders: game.initialEnemies,
+    when: new Date().toLocaleDateString()
+  };
+}
+
+function finishGameReport() {
+  if (game.ratingLogged) return;
+
+  const result = getGameScore();
+  game.ratingLogged = true;
+  saveScore(result);
+  log(`Final rating: ${result.label} (${result.score}). Raiders destroyed: ${result.raidersDestroyed}/${result.totalRaiders}. Starbases surviving: ${result.basesRemaining}/${STARBASE_COUNT}.`);
+  showScoreDialog(result);
+}
+
+function sortScores(scores) {
+  return scores
+    .sort((a, b) => b.score - a.score || b.basesRemaining - a.basesRemaining || b.raidersDestroyed - a.raidersDestroyed)
+    .slice(0, 5);
+}
+
+function getAllScores() {
+  const raw = localStorage.getItem(SCORE_KEY);
+
+  if (!raw) return createEmptyScoreboards();
+
+  try {
+    const stored = JSON.parse(raw);
+
+    if (Array.isArray(stored)) {
+      return groupScoresByDifficulty(stored);
+    }
+
+    return {
+      ...createEmptyScoreboards(),
+      ...Object.fromEntries(
+        Object.keys(DIFFICULTY_SETTINGS).map((difficulty) => [
+          difficulty,
+          sortScores(Array.isArray(stored[difficulty]) ? stored[difficulty] : [])
+        ])
+      )
+    };
+  } catch {
+    return createEmptyScoreboards();
+  }
+}
+
+function createEmptyScoreboards() {
+  return Object.fromEntries(Object.keys(DIFFICULTY_SETTINGS).map((difficulty) => [difficulty, []]));
+}
+
+function groupScoresByDifficulty(scores) {
+  const grouped = createEmptyScoreboards();
+
+  for (const score of scores) {
+    const difficulty = score.difficulty && grouped[score.difficulty] ? score.difficulty : "standard";
+    grouped[difficulty].push(score);
+  }
+
+  for (const difficulty of Object.keys(grouped)) {
+    grouped[difficulty] = sortScores(grouped[difficulty]);
+  }
+
+  return grouped;
+}
+
+function getScores(difficulty) {
+  return getAllScores()[difficulty] || [];
+}
+
+function saveScore(result) {
+  const scoreboards = getAllScores();
+  scoreboards[result.difficulty] = sortScores([...(scoreboards[result.difficulty] || []), result]);
+
+  localStorage.setItem(SCORE_KEY, JSON.stringify(scoreboards));
+  renderScoreboards();
+}
+
+function showScoreDialog(result) {
+  const scores = getScores(result.difficulty);
+
+  el.scoreSummary.textContent = `${result.label} (${result.score}) - Raiders ${result.raidersDestroyed}/${result.totalRaiders}, starbases ${result.basesRemaining}/${STARBASE_COUNT}.`;
+  el.scoreList.innerHTML = "";
+
+  for (const score of scores) {
+    const item = document.createElement("li");
+    item.textContent = `${score.score} ${score.label} - ${DIFFICULTY_SETTINGS[score.difficulty]?.label || score.difficulty}, ${score.raidersDestroyed}/${score.totalRaiders} raiders, ${score.basesRemaining}/${STARBASE_COUNT} bases`;
+    el.scoreList.appendChild(item);
+  }
+
+  if (typeof el.scoreDialog.showModal === "function") {
+    el.scoreDialog.showModal();
+  } else {
+    el.scoreDialog.setAttribute("open", "");
+  }
 }
 
 function saveGame() {
@@ -1093,16 +1359,21 @@ function loadGame() {
 function normalizeGame(savedGame) {
   savedGame.status = savedGame.status || "active";
   savedGame.difficulty = savedGame.difficulty || "standard";
+  savedGame.initialEnemies = savedGame.initialEnemies || savedGame.enemiesRemaining || DIFFICULTY_SETTINGS[savedGame.difficulty].raiders;
   savedGame.stardate = savedGame.stardate || STARTING_STARDATE;
   savedGame.deadline = savedGame.deadline || STARTING_STARDATE + MISSION_DAYS;
   savedGame.player.heading = savedGame.player.heading || "N";
   savedGame.phaserEnergy = savedGame.phaserEnergy || DEFAULT_PHASER_ENERGY;
+  savedGame.supernovaeUsed = savedGame.supernovaeUsed || 0;
+  savedGame.supernovaeMax = savedGame.supernovaeMax || SUPERNOVA_MIN + randomInt(SUPERNOVA_MAX - SUPERNOVA_MIN + 1);
+  savedGame.ratingLogged = Boolean(savedGame.ratingLogged);
   if (typeof savedGame.basesRemaining !== "number") {
     savedGame.basesRemaining = savedGame.galaxy.flat().reduce((total, q) => total + q.base, 0);
   }
   savedGame.lastTorpedoTrack = savedGame.lastTorpedoTrack || null;
   savedGame.phaserBeam = null;
-  savedGame.explosion = null;
+  savedGame.explosions = [];
+  savedGame.explosionDuration = EXPLOSION_DURATION_MS;
 
   for (const row of savedGame.galaxy) {
     for (const q of row) {
@@ -1159,7 +1430,8 @@ function clearExplosion() {
   }
 
   if (game) {
-    game.explosion = null;
+    game.explosions = [];
+    game.explosionDuration = EXPLOSION_DURATION_MS;
   }
 }
 
