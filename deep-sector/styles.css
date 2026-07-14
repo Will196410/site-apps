@@ -44,6 +44,144 @@ body::before {
   max-width: 1180px;
   margin: 0 auto;
   padding: 24px;
+  position: relative;
+}
+
+.victoryCelebration {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  z-index: 20;
+}
+
+.victoryCelebration:not(.active) {
+  display: none;
+}
+
+.firework {
+  --spark-color: var(--accent);
+  height: 10px;
+  left: 50%;
+  position: absolute;
+  top: 35%;
+  width: 10px;
+}
+
+.firework::before,
+.firework::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, var(--spark-color) 0 16%, transparent 18%),
+    radial-gradient(circle, var(--spark-color) 0 16%, transparent 18%),
+    radial-gradient(circle, var(--spark-color) 0 16%, transparent 18%),
+    radial-gradient(circle, var(--spark-color) 0 16%, transparent 18%);
+  background-position: 0 -28px, 28px 0, 0 28px, -28px 0;
+  background-repeat: no-repeat;
+  background-size: 10px 10px;
+  filter: drop-shadow(0 0 8px var(--spark-color));
+  opacity: 0;
+  transform: scale(0.2);
+  animation: firework-pop 1100ms ease-out both;
+}
+
+.firework::after {
+  transform: rotate(45deg) scale(0.2);
+}
+
+@keyframes firework-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.1);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+.scoreDialog {
+  background: linear-gradient(180deg, rgba(12, 21, 28, 0.98), rgba(7, 14, 19, 0.98));
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58), 0 0 28px rgba(95, 216, 198, 0.2);
+  color: var(--text);
+  max-width: 420px;
+  width: min(92vw, 420px);
+}
+
+.scoreDialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.scoreDialog h2 {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scoreSummary {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.scoreList {
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.scoreDialog form {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.scoreboardPanel {
+  margin-top: 16px;
+}
+
+.scoreboardGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.scoreboard {
+  background: rgba(4, 10, 13, 0.48);
+  border: 1px solid rgba(49, 80, 90, 0.65);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.scoreboard h3 {
+  color: var(--accent);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.scoreboardList {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.86rem;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.emptyScore {
+  color: #5f7173;
 }
 
 .topbar {
@@ -327,7 +465,7 @@ button:disabled {
 }
 
 .cell.explosion {
-  animation: impact-flash 950ms ease-out both;
+  animation: impact-flash var(--explosion-duration, 950ms) ease-out both;
   color: #ffffff;
 }
 
@@ -338,7 +476,7 @@ button:disabled {
   border-radius: 999px;
   background: radial-gradient(circle, #fff 0 12%, var(--warning) 28%, var(--danger) 58%, transparent 72%);
   box-shadow: 0 0 26px rgba(255, 93, 93, 0.85);
-  animation: blast-ring 950ms ease-out both;
+  animation: blast-ring var(--explosion-duration, 950ms) ease-out both;
 }
 
 @keyframes impact-flash {
@@ -527,8 +665,18 @@ button.armed {
     grid-template-columns: 1fr;
   }
 
+  .scoreboardGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .scoreboardGrid {
+    grid-template-columns: 1fr;
   }
 }
