@@ -4,10 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deep Sector</title>
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
   <main id="game">
+    <div id="victoryCelebration" class="victoryCelebration" aria-hidden="true"></div>
+    <dialog id="scoreDialog" class="scoreDialog">
+      <h2>Mission Report</h2>
+      <p id="scoreSummary" class="scoreSummary"></p>
+      <ol id="scoreList" class="scoreList"></ol>
+      <form method="dialog">
+        <button id="scoreCloseBtn">Close</button>
+      </form>
+    </dialog>
     <header class="topbar">
       <div>
         <h1>Deep Sector</h1>
@@ -21,6 +30,7 @@
             <option value="light">Light</option>
             <option value="standard" selected>Standard</option>
             <option value="heavy">Heavy</option>
+            <option value="extreme">Extreme</option>
           </select>
         </label>
         <button id="newGameBtn">New Game</button>
@@ -85,8 +95,13 @@
       <h2>Command Log</h2>
       <div id="log"></div>
     </section>
+
+    <section class="panel scoreboardPanel">
+      <h2>Scoreboards</h2>
+      <div id="scoreboardGrid" class="scoreboardGrid"></div>
+    </section>
   </main>
 
-  <script src="main.js?v=7"></script>
+  <script src="main.js?v=13"></script>
 </body>
 </html>
