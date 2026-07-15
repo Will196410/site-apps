@@ -10,6 +10,13 @@ const STARBASE_COUNT = 4;
 const STARBASE_MAX_HEALTH = 240;
 const STARBASE_REPAIR_PER_DAY = 14;
 const STARBASE_DISTRESS_COOLDOWN = 4;
+const TRANSPORT_COUNT = 3;
+const TRANSPORT_MAX_HEALTH = 100;
+const TRANSPORT_DISTRESS_COOLDOWN = 3;
+const TRANSPORT_RESCUE_ENERGY = 900;
+const TRANSPORT_RESCUE_SHIELDS = 200;
+const TRANSPORT_MOVE_INTERVAL = 2;
+const TRANSPORT_LINGER_DAYS = 4;
 const DIFFICULTY_SETTINGS = {
   light: { label: "Light", raiders: 4 },
   standard: { label: "Standard", raiders: 7 },
@@ -28,6 +35,8 @@ const PHASER_BEAM_DURATION_MS = 550;
 const SUPERNOVA_CHANCE = 0.08;
 const SUPERNOVA_MIN = 3;
 const SUPERNOVA_MAX = 4;
+const METEOR_SHOWER_CHANCE = 0.06;
+const DEBRIS_DAYS = 10;
 const HEADING_ORDER = ["N", "E", "S", "W"];
 const HEADING_DATA = {
   N: { dx: 0, dy: -1, glyph: "▲" },
@@ -62,6 +71,7 @@ const el = {
   torpedoReadout: document.getElementById("torpedoReadout"),
   enemyReadout: document.getElementById("enemyReadout"),
   baseReadout: document.getElementById("baseReadout"),
+  transportReadout: document.getElementById("transportReadout"),
   baseHealthReadout: document.getElementById("baseHealthReadout"),
   energyMeter: document.getElementById("energyMeter"),
   phaserEnergyInput: document.getElementById("phaserEnergyInput"),
@@ -73,7 +83,8 @@ const el = {
   scanBtn: document.getElementById("scanBtn"),
   phaserBtn: document.getElementById("phaserBtn"),
   torpedoBtn: document.getElementById("torpedoBtn"),
-  dockBtn: document.getElementById("dockBtn")
+  dockBtn: document.getElementById("dockBtn"),
+  waitBtn: document.getElementById("waitBtn")
 };
 
 function randomInt(max) {
@@ -137,6 +148,7 @@ function createGame() {
         baseHealth: 0,
         lastDistress: STARTING_STARDATE - STARBASE_DISTRESS_COOLDOWN,
         stars,
+        debris: [],
         scanned: false,
         sector: null
       };
@@ -157,6 +169,7 @@ function createGame() {
   }
 
   let placedBases = 0;
+  const baseCoords = [];
   while (placedBases < STARBASE_COUNT) {
     const x = randomInt(SIZE);
     const y = randomInt(SIZE);
@@ -165,6 +178,7 @@ function createGame() {
     if (!q.base) {
       q.base = 1;
       q.baseHealth = STARBASE_MAX_HEALTH;
+      baseCoords.push({ x, y });
       placedBases++;
     }
   }
@@ -189,13 +203,16 @@ function createGame() {
       heading: "N",
       energy: MAX_ENERGY,
       shields: MAX_SHIELDS,
-      torpedoes: MAX_TORPEDOES
+      torpedoes: MAX_TORPEDOES,
+      destroyed: false
     },
     galaxy,
     difficulty,
     initialEnemies: targetEnemies,
     enemiesRemaining: targetEnemies,
     basesRemaining: STARBASE_COUNT,
+    transports: createTransports(baseCoords),
+    awaitingRescue: false,
     phaserEnergy: DEFAULT_PHASER_ENERGY,
     lastTorpedoTrack: null,
     phaserBeam: null,
@@ -227,21 +244,36 @@ function ensureCurrentSector() {
 
   for (const row of q.sector) {
     for (let x = 0; x < row.length; x++) {
-      if (row[x] === "P") row[x] = null;
+      if (row[x] === "P" || row[x] === "T") row[x] = null;
     }
   }
 
   game.player.sx = Math.min(game.player.sx, SIZE - 1);
   game.player.sy = Math.min(game.player.sy, SIZE - 1);
 
-  if (q.sector[game.player.sy][game.player.sx]) {
+  if (!game.player.destroyed && q.sector[game.player.sy][game.player.sx]) {
     const empty = findEmptyCell(q.sector);
     game.player.sx = empty.x;
     game.player.sy = empty.y;
   }
 
-  q.sector[game.player.sy][game.player.sx] = "P";
+  if (!game.player.destroyed) {
+    q.sector[game.player.sy][game.player.sx] = "P";
+  }
+  placeCurrentTransports(q.sector);
   return q.sector;
+}
+
+function placeCurrentTransports(sector) {
+  for (const transport of getTransportsInCurrentQuadrant()) {
+    if (sector[transport.sy]?.[transport.sx]) {
+      const empty = findEmptyCell(sector);
+      transport.sx = empty.x;
+      transport.sy = empty.y;
+    }
+
+    sector[transport.sy][transport.sx] = "T";
+  }
 }
 
 function findEmptyCell(grid) {
@@ -252,6 +284,47 @@ function findEmptyCell(grid) {
   }
 
   return { x: 0, y: 0 };
+}
+
+function createTransports(baseCoords) {
+  return Array.from({ length: TRANSPORT_COUNT }, (_, index) => {
+    const origin = baseCoords[index % baseCoords.length];
+    const destination = baseCoords[(index + 1) % baseCoords.length];
+
+    return {
+      id: index + 1,
+      qx: origin.x,
+      qy: origin.y,
+      sx: randomInt(SIZE),
+      sy: randomInt(SIZE),
+      destination,
+      rescueActive: false,
+      nextMoveStardate: STARTING_STARDATE + randomInt(TRANSPORT_LINGER_DAYS + 1),
+      health: TRANSPORT_MAX_HEALTH,
+      alive: true,
+      lastDistress: STARTING_STARDATE - TRANSPORT_DISTRESS_COOLDOWN
+    };
+  });
+}
+
+function getTransportsInCurrentQuadrant() {
+  return (game.transports || []).filter((transport) => (
+    transport.alive &&
+    transport.qx === game.player.qx &&
+    transport.qy === game.player.qy
+  ));
+}
+
+function getTransportSurvivors() {
+  return (game.transports || []).filter((transport) => transport.alive).length;
+}
+
+function getTransportCountInQuadrant(qx, qy) {
+  return (game.transports || []).filter((transport) => (
+    transport.alive &&
+    transport.qx === qx &&
+    transport.qy === qy
+  )).length;
 }
 
 function removeOneEnemyFromSector() {
@@ -307,6 +380,43 @@ function findSectorCells(value) {
   return cells;
 }
 
+function addTemporaryDebris(q, cells, days = DEBRIS_DAYS) {
+  if (!q.debris) q.debris = [];
+
+  for (const { x, y } of cells) {
+    if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) continue;
+    if (q.sector?.[y]?.[x] === "B" || q.sector?.[y]?.[x] === "*") continue;
+
+    if (q.sector) q.sector[y][x] = ".";
+
+    const existing = q.debris.find((cell) => cell.x === x && cell.y === y);
+    const clearAt = game.stardate + days;
+    if (existing) {
+      existing.clearAt = Math.max(existing.clearAt, clearAt);
+    } else {
+      q.debris.push({ x, y, clearAt });
+    }
+  }
+}
+
+function clearExpiredDebris() {
+  for (const row of game.galaxy) {
+    for (const q of row) {
+      if (!Array.isArray(q.debris) || q.debris.length === 0) continue;
+
+      q.debris = q.debris.filter((cell) => {
+        if (cell.clearAt > game.stardate) return true;
+
+        if (q.sector?.[cell.y]?.[cell.x] === ".") {
+          q.sector[cell.y][cell.x] = null;
+        }
+
+        return false;
+      });
+    }
+  }
+}
+
 function maybeTriggerSupernova() {
   const q = getCurrentQuadrant();
 
@@ -345,6 +455,8 @@ function maybeTriggerSupernova() {
         starsDestroyed += 1;
       } else if (value === "B") {
         baseDestroyed = true;
+      } else if (value === "T") {
+        destroyTransportAtCell(x, y);
       } else if (value === "P") {
         shipDestroyed = true;
       }
@@ -360,15 +472,108 @@ function maybeTriggerSupernova() {
     game.enemiesRemaining = Math.max(0, game.enemiesRemaining - raidersDestroyed);
   }
 
+  addTemporaryDebris(q, affected, DEBRIS_DAYS);
   showExplosions(affected, SUPERNOVA_EXPLOSION_DURATION_MS);
-  log(`Supernova in sector ${star.x + 1},${star.y + 1}. Blast radius consumed ${affected.length} cells.`, false);
+  log(`Supernova in quadrant ${game.player.qx + 1},${game.player.qy + 1}, sector ${star.x + 1},${star.y + 1}. Blast left debris across ${affected.length} cells.`, false);
+
+  if (raidersDestroyed > 0) {
+    log(`Supernova destroyed ${raidersDestroyed} raider${raidersDestroyed === 1 ? "" : "s"}.`, false);
+  }
+
+  if (baseDestroyed) {
+    log("Supernova blast engulfed the local starbase.", false);
+  }
 
   if (baseDestroyed) {
     destroyStarbase(game.player.qx, game.player.qy);
   }
 
   if (shipDestroyed) {
-    endGame("failed", "Command vessel lost in supernova blast.");
+    game.player.destroyed = true;
+    endGame("failed", `Mission failed: command vessel destroyed by supernova in quadrant ${game.player.qx + 1},${game.player.qy + 1}, sector ${star.x + 1},${star.y + 1}.`);
+    return;
+  }
+
+  checkVictory();
+}
+
+function maybeTriggerMeteorShower() {
+  if (Math.random() >= METEOR_SHOWER_CHANCE) return;
+
+  const q = getCurrentQuadrant();
+  const sector = ensureCurrentSector();
+  const directions = [
+    { name: "north", dx: 0, dy: -1 },
+    { name: "east", dx: 1, dy: 0 },
+    { name: "south", dx: 0, dy: 1 },
+    { name: "west", dx: -1, dy: 0 }
+  ];
+  const direction = directions[randomInt(directions.length)];
+  const lateralHorizontal = direction.dx === 0;
+  const offset = randomInt(SIZE - 1);
+  const steps = [];
+  let shipDestroyed = false;
+  let raidersDestroyed = 0;
+  let transportsDestroyed = 0;
+  const debris = [];
+  const explosions = [];
+
+  for (let step = 0; step < SIZE; step++) {
+    const front = lateralHorizontal
+      ? [
+        { x: offset, y: direction.dy > 0 ? step : SIZE - 1 - step },
+        { x: offset + 1, y: direction.dy > 0 ? step : SIZE - 1 - step }
+      ]
+      : [
+        { x: direction.dx > 0 ? step : SIZE - 1 - step, y: offset },
+        { x: direction.dx > 0 ? step : SIZE - 1 - step, y: offset + 1 }
+      ];
+    steps.push(front);
+  }
+
+  for (const front of steps) {
+    for (const { x, y } of front) {
+      const value = sector[y][x];
+
+      if (value === "*" || value === "B" || value === ".") continue;
+
+      if (value === "P") {
+        shipDestroyed = true;
+        explosions.push({ x, y });
+        debris.push({ x, y });
+      } else if (value === "E") {
+        raidersDestroyed += 1;
+        q.enemies = Math.max(0, q.enemies - 1);
+        game.enemiesRemaining = Math.max(0, game.enemiesRemaining - 1);
+        sector[y][x] = null;
+        explosions.push({ x, y });
+        debris.push({ x, y });
+      } else if (value === "T") {
+        destroyTransportAtCell(x, y);
+        transportsDestroyed += 1;
+        explosions.push({ x, y });
+        debris.push({ x, y });
+      }
+    }
+  }
+
+  if (debris.length === 0) return;
+
+  addTemporaryDebris(q, debris, DEBRIS_DAYS);
+  showExplosions(explosions);
+  log(`Meteor shower swept ${direction.name} through quadrant ${game.player.qx + 1},${game.player.qy + 1}, leaving debris in ${debris.length} sector${debris.length === 1 ? "" : "s"}.`, false);
+
+  if (raidersDestroyed > 0) {
+    log(`Meteor impacts destroyed ${raidersDestroyed} raider${raidersDestroyed === 1 ? "" : "s"}.`, false);
+  }
+
+  if (transportsDestroyed > 0) {
+    log(`Meteor impacts destroyed ${transportsDestroyed} transport${transportsDestroyed === 1 ? "" : "s"}.`, false);
+  }
+
+  if (shipDestroyed) {
+    game.player.destroyed = true;
+    endGame("failed", "Mission failed: command vessel destroyed by meteor shower.");
     return;
   }
 
@@ -453,6 +658,195 @@ function updateStarbases(days) {
   }
 }
 
+function updateTransports(days) {
+  if (days <= 0 || game.status !== "active") return;
+
+  for (let day = 0; day < days; day++) {
+    const stardate = game.stardate - days + day + 1;
+
+    for (const transport of game.transports || []) {
+      if (!transport.alive) continue;
+
+      if (transport.rescueActive || stardate >= (transport.nextMoveStardate || STARTING_STARDATE)) {
+        moveTransport(transport, stardate);
+      }
+
+      resolveTransportDanger(transport);
+    }
+  }
+}
+
+function moveTransport(transport, stardate = game.stardate) {
+  if (!transport.rescueActive && !game.galaxy[transport.destination.y]?.[transport.destination.x]?.base) {
+    transport.destination = chooseTransportDestination(transport);
+  }
+
+  if (
+    !transport.rescueActive &&
+    transport.qx === transport.destination.x &&
+    transport.qy === transport.destination.y
+  ) {
+    transport.destination = chooseTransportDestination(transport);
+    transport.nextMoveStardate = stardate + TRANSPORT_LINGER_DAYS;
+    return;
+  }
+
+  const oldQ = game.galaxy[transport.qy][transport.qx];
+  if (oldQ?.sector) removeTransportFromSector(oldQ, transport);
+
+  transport.qx += Math.sign(transport.destination.x - transport.qx);
+  transport.qy += Math.sign(transport.destination.y - transport.qy);
+  transport.sx = randomInt(SIZE);
+  transport.sy = randomInt(SIZE);
+  transport.nextMoveStardate = stardate + TRANSPORT_MOVE_INTERVAL;
+
+  if (
+    transport.rescueActive &&
+    transport.qx === game.player.qx &&
+    transport.qy === game.player.qy
+  ) {
+    positionTransportForRescue(transport);
+    log(`Transport ${transport.id} has reached your quadrant for emergency docking.`, false);
+  } else if (
+    !transport.rescueActive &&
+    transport.qx === transport.destination.x &&
+    transport.qy === transport.destination.y
+  ) {
+    transport.nextMoveStardate = stardate + TRANSPORT_LINGER_DAYS;
+  }
+}
+
+function chooseTransportDestination(transport) {
+  const bases = [];
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (game.galaxy[y][x].base && (x !== transport.qx || y !== transport.qy)) {
+        bases.push({ x, y });
+      }
+    }
+  }
+
+  return bases.length > 0 ? bases[randomInt(bases.length)] : { x: transport.qx, y: transport.qy };
+}
+
+function resolveTransportDanger(transport) {
+  const q = game.galaxy[transport.qy][transport.qx];
+
+  if (!q || q.enemies <= 0) return;
+
+  if (game.stardate - transport.lastDistress >= TRANSPORT_DISTRESS_COOLDOWN) {
+    transport.lastDistress = game.stardate;
+    flashDistressBeacon();
+    log(`Transport ${transport.id} distress: raiders in quadrant ${transport.qx + 1},${transport.qy + 1}. Hull ${transport.health}%.`, false);
+  }
+
+  const damage = q.enemies * (randomInt(14) + 10);
+  transport.health = Math.max(0, transport.health - damage);
+
+  if (transport.health <= 0) {
+    destroyTransport(transport);
+  }
+}
+
+function destroyTransport(transport) {
+  const q = game.galaxy[transport.qy][transport.qx];
+  transport.alive = false;
+  if (transport.rescueActive) {
+    game.awaitingRescue = false;
+    transport.rescueActive = false;
+  }
+  removeTransportFromSector(q, transport);
+  log(`Transport ${transport.id} destroyed in quadrant ${transport.qx + 1},${transport.qy + 1}.`, false);
+}
+
+function destroyTransportAtCell(x, y) {
+  const transport = getTransportsInCurrentQuadrant().find((candidate) => (
+    candidate.sx === x &&
+    candidate.sy === y
+  ));
+
+  if (transport) {
+    destroyTransport(transport);
+  }
+}
+
+function positionTransportForRescue(transport) {
+  const q = getCurrentQuadrant();
+  if (!q.sector) return;
+
+  removeTransportFromSector(q, transport);
+
+  const p = game.player;
+  const candidates = [
+    { x: p.sx, y: p.sy - 1 },
+    { x: p.sx + 1, y: p.sy },
+    { x: p.sx, y: p.sy + 1 },
+    { x: p.sx - 1, y: p.sy }
+  ].filter(({ x, y }) => (
+    x >= 0 &&
+    x < SIZE &&
+    y >= 0 &&
+    y < SIZE &&
+    !q.sector[y][x]
+  ));
+
+  if (candidates.length === 0) return;
+
+  const rendezvous = candidates[randomInt(candidates.length)];
+  transport.sx = rendezvous.x;
+  transport.sy = rendezvous.y;
+  q.sector[transport.sy][transport.sx] = "T";
+}
+
+function getActiveRescueTransport() {
+  return (game.transports || []).find((transport) => transport.alive && transport.rescueActive) || null;
+}
+
+function requestTransportRescue() {
+  if (game.player.energy >= SECTOR_MOVE_COST) return false;
+
+  const activeRescue = getActiveRescueTransport();
+  if (activeRescue) {
+    log(`Distress beacon continues. Transport ${activeRescue.id} inbound from quadrant ${activeRescue.qx + 1},${activeRescue.qy + 1}.`, false);
+    return true;
+  }
+
+  const candidates = (game.transports || []).filter((transport) => transport.alive);
+  if (candidates.length === 0) {
+    endGame("failed", "Mission failed: command vessel stranded without energy, and no surviving transports could answer the distress call.");
+    return false;
+  }
+
+  candidates.sort((a, b) => (
+    Math.abs(a.qx - game.player.qx) + Math.abs(a.qy - game.player.qy) -
+    (Math.abs(b.qx - game.player.qx) + Math.abs(b.qy - game.player.qy))
+  ));
+
+  const transport = candidates[0];
+  const oldQ = game.galaxy[transport.qy]?.[transport.qx];
+  if (oldQ?.sector) removeTransportFromSector(oldQ, transport);
+
+  transport.rescueActive = true;
+  transport.qx = game.player.qx;
+  transport.qy = game.player.qy;
+  transport.destination = { x: game.player.qx, y: game.player.qy };
+  transport.nextMoveStardate = game.stardate + TRANSPORT_LINGER_DAYS;
+  positionTransportForRescue(transport);
+  game.awaitingRescue = true;
+  flashDistressBeacon();
+  log(`Distress call answered. Transport ${transport.id} jumped to your quadrant for emergency docking.`, false);
+  return true;
+}
+
+function removeTransportFromSector(q, transport) {
+  if (!q?.sector) return;
+
+  if (q.sector[transport.sy]?.[transport.sx] === "T") {
+    q.sector[transport.sy][transport.sx] = null;
+  }
+}
+
 function destroyStarbase(x, y) {
   const q = game.galaxy[y][x];
 
@@ -493,7 +887,7 @@ function isLineBlockedByMass(cells) {
   const sector = ensureCurrentSector();
 
   for (const cell of cells.slice(0, -1)) {
-    if (sector[cell.y][cell.x] === "*" || sector[cell.y][cell.x] === "B") {
+    if (sector[cell.y][cell.x] === "*" || sector[cell.y][cell.x] === "B" || sector[cell.y][cell.x] === ".") {
       return true;
     }
   }
@@ -616,7 +1010,9 @@ function advanceTime(days, reason) {
   if (game.status !== "active") return;
 
   game.stardate += days;
+  clearExpiredDebris();
   updateStarbases(days);
+  updateTransports(days);
 
   if (reason) {
     log(`${reason} Stardate advanced by ${days}.`, false);
@@ -624,6 +1020,10 @@ function advanceTime(days, reason) {
 
   if (game.status === "active" && days > 0) {
     maybeTriggerSupernova();
+  }
+
+  if (game.status === "active" && days > 0) {
+    maybeTriggerMeteorShower();
   }
 
   if (game.status !== "active") {
@@ -723,13 +1123,24 @@ function renderGalaxy() {
       if (isCurrent) cell.classList.add("current");
 
       if (q.scanned || isCurrent) {
-        cell.textContent = `${q.enemies}${q.base}${q.stars}`;
+        cell.classList.add("quadrant-score");
+        [
+          { label: "Raiders", value: q.enemies },
+          { label: "Bases", value: q.base },
+          { label: "Stars", value: q.stars },
+          { label: "Transports", value: getTransportCountInQuadrant(x, y) }
+        ].forEach(({ label, value }) => {
+          const score = document.createElement("span");
+          score.textContent = value;
+          score.title = label;
+          cell.appendChild(score);
+        });
       } else {
         cell.textContent = "";
         cell.classList.add("unscanned");
       }
 
-      cell.title = `Quadrant ${x + 1}, ${y + 1}`;
+      cell.title = `Quadrant ${x + 1}, ${y + 1}: raiders ${q.enemies}, bases ${q.base}, stars ${q.stars}, transports ${getTransportCountInQuadrant(x, y)}`;
       cell.addEventListener("click", () => moveToQuadrant(x, y));
 
       el.galaxyMap.appendChild(cell);
@@ -755,14 +1166,26 @@ function renderSector() {
         cell.textContent = HEADING_DATA[game.player.heading || "N"].glyph;
         cell.classList.add("player");
       } else if (value === "E") {
-        cell.textContent = "◆";
         cell.classList.add("enemy");
+        const raiderIcon = document.createElement("span");
+        raiderIcon.className = "raiderIcon";
+        raiderIcon.setAttribute("aria-hidden", "true");
+        cell.appendChild(raiderIcon);
       } else if (value === "B") {
         cell.textContent = "⬢";
         cell.classList.add("base");
+      } else if (value === "T") {
+        cell.classList.add("transport");
+        const transportIcon = document.createElement("span");
+        transportIcon.className = "transportIcon";
+        transportIcon.setAttribute("aria-hidden", "true");
+        cell.appendChild(transportIcon);
       } else if (value === "*") {
         cell.textContent = "✦";
         cell.classList.add("star");
+      } else if (value === ".") {
+        cell.textContent = "·";
+        cell.classList.add("debris");
       } else {
         cell.textContent = "";
         cell.classList.add("empty");
@@ -830,6 +1253,10 @@ function renderStatus() {
   el.torpedoReadout.textContent = p.torpedoes;
   el.enemyReadout.textContent = game.enemiesRemaining;
   el.baseReadout.textContent = game.basesRemaining;
+  const rescueTransport = getActiveRescueTransport();
+  el.transportReadout.textContent = rescueTransport
+    ? `${getTransportSurvivors()}/${TRANSPORT_COUNT} - transport ${rescueTransport.id} inbound`
+    : `${getTransportSurvivors()}/${TRANSPORT_COUNT}`;
   el.baseHealthReadout.textContent = q.base
     ? `${Math.ceil((q.baseHealth / STARBASE_MAX_HEALTH) * 100)}%`
     : "none";
@@ -839,6 +1266,8 @@ function renderStatus() {
   el.phaserBtn.disabled = disabled || game.player.energy < MIN_PHASER_ENERGY;
   el.torpedoBtn.disabled = disabled || game.player.torpedoes <= 0;
   el.dockBtn.disabled = disabled;
+  el.waitBtn.disabled = disabled;
+  el.waitBtn.textContent = game.player.energy < SECTOR_MOVE_COST ? "Distress / Wait" : "Wait";
   el.phaserEnergyInput.disabled = disabled || game.player.energy < MIN_PHASER_ENERGY;
 
   el.torpedoBtn.classList.toggle("armed", targetingMode === "torpedo");
@@ -877,7 +1306,7 @@ function renderScoreboards() {
     } else {
       for (const score of scores) {
         const item = document.createElement("li");
-        item.textContent = `${score.score} ${score.label} - ${score.raidersDestroyed}/${score.totalRaiders} raiders, ${score.basesRemaining}/${STARBASE_COUNT} bases`;
+        item.textContent = `${score.score} ${score.label} - ${score.raidersDestroyed}/${score.totalRaiders} raiders, ${score.basesRemaining}/${STARBASE_COUNT} bases, ${score.transportsSurviving ?? TRANSPORT_COUNT}/${TRANSPORT_COUNT} transports`;
         list.appendChild(item);
       }
     }
@@ -984,7 +1413,7 @@ function armPhasers() {
   }
 
   if (!findPhaserTarget()) {
-    log("No clear phaser solution. Stellar mass or outpost shields block every firing line.");
+    log("No clear phaser solution. Stellar mass, outpost shields, or debris block every firing line.");
     return;
   }
 
@@ -1095,7 +1524,7 @@ function fireTorpedoAt(targetX, targetY) {
       return;
     }
 
-    if (value === "*" || value === "B") {
+    if (value === "*" || value === "B" || value === ".") {
       showTorpedoTrail(track.slice(0, i + 1));
       showExplosion(point.x, point.y);
       advanceTime(1, "Torpedo track resolved.");
@@ -1105,6 +1534,12 @@ function fireTorpedoAt(targetX, targetY) {
         if (game.status === "active") {
           log(`Torpedo destroyed the starbase at sector ${point.x + 1}, ${point.y + 1}.`);
         }
+        return;
+      }
+
+      if (value === ".") {
+        log(`Torpedo detonated against debris at sector ${point.x + 1}, ${point.y + 1}.`);
+        if (game.status === "active") raiderTacticalResponse(1);
         return;
       }
 
@@ -1128,6 +1563,11 @@ function dockOrRepair() {
 
   const q = getCurrentQuadrant();
 
+  if (canDockWithRescueTransport()) {
+    dockWithRescueTransport();
+    return;
+  }
+
   if (!q.base) {
     log("No friendly outpost in this quadrant.");
     return;
@@ -1144,6 +1584,31 @@ function dockOrRepair() {
 
   log("Docked with outpost. Energy, shields, and torpedoes restored.");
   advanceTime(2, "Repair crews stood down.");
+}
+
+function canDockWithRescueTransport() {
+  const transport = getActiveRescueTransport();
+
+  return Boolean(
+    game.awaitingRescue &&
+    transport &&
+    transport.qx === game.player.qx &&
+    transport.qy === game.player.qy
+  );
+}
+
+function dockWithRescueTransport() {
+  const transport = getActiveRescueTransport();
+  if (!transport) return;
+
+  game.player.energy = Math.max(game.player.energy, TRANSPORT_RESCUE_ENERGY);
+  game.player.shields = Math.min(MAX_SHIELDS, game.player.shields + TRANSPORT_RESCUE_SHIELDS);
+  game.awaitingRescue = false;
+  transport.rescueActive = false;
+  transport.destination = chooseTransportDestination(transport);
+
+  log(`Docked with transport ${transport.id}. Emergency cells transferred.`);
+  advanceTime(1, "Rescue docking complete.");
 }
 
 function raiderTacticalResponse(exposure = 1) {
@@ -1226,9 +1691,11 @@ function getGameRating(score) {
 
 function getGameScore() {
   const raidersDestroyed = Math.max(0, (game.initialEnemies || 0) - game.enemiesRemaining);
-  const raiderScore = game.initialEnemies ? (raidersDestroyed / game.initialEnemies) * 70 : 0;
-  const baseScore = (game.basesRemaining / STARBASE_COUNT) * 30;
-  const score = Math.round(raiderScore + baseScore);
+  const transportsSurviving = getTransportSurvivors();
+  const raiderScore = game.initialEnemies ? (raidersDestroyed / game.initialEnemies) * 60 : 0;
+  const baseScore = (game.basesRemaining / STARBASE_COUNT) * 25;
+  const transportScore = (transportsSurviving / TRANSPORT_COUNT) * 15;
+  const score = Math.round(raiderScore + baseScore + transportScore);
 
   return {
     basesRemaining: game.basesRemaining,
@@ -1237,6 +1704,7 @@ function getGameScore() {
     raidersDestroyed,
     score,
     stardate: game.stardate,
+    transportsSurviving,
     totalRaiders: game.initialEnemies,
     when: new Date().toLocaleDateString()
   };
@@ -1248,13 +1716,18 @@ function finishGameReport() {
   const result = getGameScore();
   game.ratingLogged = true;
   saveScore(result);
-  log(`Final rating: ${result.label} (${result.score}). Raiders destroyed: ${result.raidersDestroyed}/${result.totalRaiders}. Starbases surviving: ${result.basesRemaining}/${STARBASE_COUNT}.`);
+  log(`Final rating: ${result.label} (${result.score}). Raiders destroyed: ${result.raidersDestroyed}/${result.totalRaiders}. Starbases surviving: ${result.basesRemaining}/${STARBASE_COUNT}. Transports surviving: ${result.transportsSurviving}/${TRANSPORT_COUNT}.`);
   showScoreDialog(result);
 }
 
 function sortScores(scores) {
   return scores
-    .sort((a, b) => b.score - a.score || b.basesRemaining - a.basesRemaining || b.raidersDestroyed - a.raidersDestroyed)
+    .sort((a, b) => (
+      b.score - a.score ||
+      b.basesRemaining - a.basesRemaining ||
+      (b.transportsSurviving ?? TRANSPORT_COUNT) - (a.transportsSurviving ?? TRANSPORT_COUNT) ||
+      b.raidersDestroyed - a.raidersDestroyed
+    ))
     .slice(0, 5);
 }
 
@@ -1318,12 +1791,12 @@ function saveScore(result) {
 function showScoreDialog(result) {
   const scores = getScores(result.difficulty);
 
-  el.scoreSummary.textContent = `${result.label} (${result.score}) - Raiders ${result.raidersDestroyed}/${result.totalRaiders}, starbases ${result.basesRemaining}/${STARBASE_COUNT}.`;
+  el.scoreSummary.textContent = `${result.label} (${result.score}) - Raiders ${result.raidersDestroyed}/${result.totalRaiders}, starbases ${result.basesRemaining}/${STARBASE_COUNT}, transports ${result.transportsSurviving}/${TRANSPORT_COUNT}.`;
   el.scoreList.innerHTML = "";
 
   for (const score of scores) {
     const item = document.createElement("li");
-    item.textContent = `${score.score} ${score.label} - ${DIFFICULTY_SETTINGS[score.difficulty]?.label || score.difficulty}, ${score.raidersDestroyed}/${score.totalRaiders} raiders, ${score.basesRemaining}/${STARBASE_COUNT} bases`;
+    item.textContent = `${score.score} ${score.label} - ${DIFFICULTY_SETTINGS[score.difficulty]?.label || score.difficulty}, ${score.raidersDestroyed}/${score.totalRaiders} raiders, ${score.basesRemaining}/${STARBASE_COUNT} bases, ${score.transportsSurviving ?? TRANSPORT_COUNT}/${TRANSPORT_COUNT} transports`;
     el.scoreList.appendChild(item);
   }
 
@@ -1363,10 +1836,28 @@ function normalizeGame(savedGame) {
   savedGame.stardate = savedGame.stardate || STARTING_STARDATE;
   savedGame.deadline = savedGame.deadline || STARTING_STARDATE + MISSION_DAYS;
   savedGame.player.heading = savedGame.player.heading || "N";
+  savedGame.player.destroyed = Boolean(savedGame.player.destroyed);
   savedGame.phaserEnergy = savedGame.phaserEnergy || DEFAULT_PHASER_ENERGY;
   savedGame.supernovaeUsed = savedGame.supernovaeUsed || 0;
   savedGame.supernovaeMax = savedGame.supernovaeMax || SUPERNOVA_MIN + randomInt(SUPERNOVA_MAX - SUPERNOVA_MIN + 1);
   savedGame.ratingLogged = Boolean(savedGame.ratingLogged);
+  savedGame.awaitingRescue = Boolean(savedGame.awaitingRescue);
+  if (!Array.isArray(savedGame.transports)) {
+    savedGame.transports = createTransports(getBaseCoords(savedGame.galaxy));
+  }
+  savedGame.transports = savedGame.transports.map((transport, index) => ({
+    id: transport.id || index + 1,
+    qx: transport.qx ?? 0,
+    qy: transport.qy ?? 0,
+    sx: transport.sx ?? randomInt(SIZE),
+    sy: transport.sy ?? randomInt(SIZE),
+    destination: transport.destination || chooseFallbackDestination(savedGame.galaxy, transport),
+    rescueActive: Boolean(transport.rescueActive),
+    nextMoveStardate: transport.nextMoveStardate || savedGame.stardate + randomInt(TRANSPORT_LINGER_DAYS + 1),
+    health: typeof transport.health === "number" ? transport.health : TRANSPORT_MAX_HEALTH,
+    alive: transport.alive !== false,
+    lastDistress: transport.lastDistress || savedGame.stardate - TRANSPORT_DISTRESS_COOLDOWN
+  }));
   if (typeof savedGame.basesRemaining !== "number") {
     savedGame.basesRemaining = savedGame.galaxy.flat().reduce((total, q) => total + q.base, 0);
   }
@@ -1384,12 +1875,42 @@ function normalizeGame(savedGame) {
       if (!Object.prototype.hasOwnProperty.call(q, "lastDistress")) {
         q.lastDistress = savedGame.stardate - STARBASE_DISTRESS_COOLDOWN;
       }
+      if (!Array.isArray(q.debris)) {
+        q.debris = [];
+      }
+      if (q.sector) {
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            if (q.sector[y][x] === ".") {
+              const existing = q.debris.find((cell) => cell.x === x && cell.y === y);
+              if (!existing) q.debris.push({ x, y, clearAt: savedGame.stardate + DEBRIS_DAYS });
+            }
+          }
+        }
+      }
     }
   }
 
   savedGame.basesRemaining = savedGame.galaxy.flat().reduce((total, q) => total + (q.base ? 1 : 0), 0);
 
   return savedGame;
+}
+
+function getBaseCoords(galaxy) {
+  const bases = [];
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (galaxy[y][x].base) bases.push({ x, y });
+    }
+  }
+
+  return bases.length > 0 ? bases : [{ x: 0, y: 0 }];
+}
+
+function chooseFallbackDestination(galaxy, transport) {
+  const bases = getBaseCoords(galaxy).filter(({ x, y }) => x !== transport.qx || y !== transport.qy);
+  return bases[0] || getBaseCoords(galaxy)[0];
 }
 
 function startNewGame() {
@@ -1479,7 +2000,7 @@ function moveWithinSector(x, y) {
   const cost = SECTOR_MOVE_COST + turnSteps * 20;
 
   if (game.player.energy < cost) {
-    log("Insufficient energy for impulse maneuver.");
+    log("Insufficient energy for impulse maneuver. Use Wait to send a distress call.");
     return;
   }
 
@@ -1506,6 +2027,26 @@ function updatePhaserEnergy() {
   renderStatus();
 }
 
+function waitTurn() {
+  if (game.status !== "active") return;
+
+  targetingMode = null;
+  clearTorpedoTrail();
+  clearPhaserBeam();
+  clearExplosion();
+
+  const rescueRequested = requestTransportRescue();
+  if (game.status !== "active") return;
+
+  log(rescueRequested ? "Holding position for rescue. Time advances." : "Holding position. Time advances.");
+  advanceTime(1, "Systems held at minimal power.");
+
+  const q = getCurrentQuadrant();
+  if (game.status === "active" && q.enemies > 0) {
+    raiderTacticalResponse(0.75);
+  }
+}
+
 el.newGameBtn.addEventListener("click", startNewGame);
 el.saveBtn.addEventListener("click", saveGame);
 el.loadBtn.addEventListener("click", loadGame);
@@ -1513,6 +2054,7 @@ el.scanBtn.addEventListener("click", longScan);
 el.phaserBtn.addEventListener("click", armPhasers);
 el.torpedoBtn.addEventListener("click", armTorpedo);
 el.dockBtn.addEventListener("click", dockOrRepair);
+el.waitBtn.addEventListener("click", waitTurn);
 el.phaserEnergyInput.addEventListener("input", updatePhaserEnergy);
 
 startNewGame();
