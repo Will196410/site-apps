@@ -36,6 +36,7 @@ const SUPERNOVA_CHANCE = 0.08;
 const SUPERNOVA_MIN = 3;
 const SUPERNOVA_MAX = 4;
 const METEOR_SHOWER_CHANCE = 0.06;
+const ASTEROID_STORM_STEP_MS = 650;
 const DEBRIS_DAYS = 10;
 const HEADING_ORDER = ["N", "E", "S", "W"];
 const HEADING_DATA = {
@@ -51,6 +52,7 @@ let torpedoTrailTimer = null;
 let explosionTimer = null;
 let phaserBeamTimer = null;
 let distressTimer = null;
+let asteroidStormTimer = null;
 
 const el = {
   galaxyMap: document.getElementById("galaxyMap"),
@@ -216,6 +218,7 @@ function createGame() {
     phaserEnergy: DEFAULT_PHASER_ENERGY,
     lastTorpedoTrack: null,
     phaserBeam: null,
+    asteroidStorm: null,
     explosions: [],
     supernovaeUsed: 0,
     supernovaeMax: SUPERNOVA_MIN + randomInt(SUPERNOVA_MAX - SUPERNOVA_MIN + 1),
@@ -498,10 +501,8 @@ function maybeTriggerSupernova() {
 }
 
 function maybeTriggerMeteorShower() {
-  if (Math.random() >= METEOR_SHOWER_CHANCE) return;
+  if (game.asteroidStorm || Math.random() >= METEOR_SHOWER_CHANCE) return;
 
-  const q = getCurrentQuadrant();
-  const sector = ensureCurrentSector();
   const directions = [
     { name: "north", dx: 0, dy: -1 },
     { name: "east", dx: 1, dy: 0 },
@@ -512,11 +513,6 @@ function maybeTriggerMeteorShower() {
   const lateralHorizontal = direction.dx === 0;
   const offset = randomInt(SIZE - 1);
   const steps = [];
-  let shipDestroyed = false;
-  let raidersDestroyed = 0;
-  let transportsDestroyed = 0;
-  const debris = [];
-  const explosions = [];
 
   for (let step = 0; step < SIZE; step++) {
     const front = lateralHorizontal
@@ -531,53 +527,123 @@ function maybeTriggerMeteorShower() {
     steps.push(front);
   }
 
-  for (const front of steps) {
-    for (const { x, y } of front) {
-      const value = sector[y][x];
+  game.asteroidStorm = {
+    activeCells: steps[0],
+    direction: direction.name,
+    index: 0,
+    qx: game.player.qx,
+    qy: game.player.qy,
+    steps
+  };
 
-      if (value === "*" || value === "B" || value === ".") continue;
+  log(`Asteroid storm entering quadrant ${game.player.qx + 1},${game.player.qy + 1} from the ${direction.name}.`, false);
+  asteroidStormTimer = setTimeout(processAsteroidStormStep, ASTEROID_STORM_STEP_MS);
+}
 
-      if (value === "P") {
-        shipDestroyed = true;
-        explosions.push({ x, y });
-        debris.push({ x, y });
-      } else if (value === "E") {
-        raidersDestroyed += 1;
-        q.enemies = Math.max(0, q.enemies - 1);
-        game.enemiesRemaining = Math.max(0, game.enemiesRemaining - 1);
-        sector[y][x] = null;
-        explosions.push({ x, y });
-        debris.push({ x, y });
-      } else if (value === "T") {
-        destroyTransportAtCell(x, y);
-        transportsDestroyed += 1;
-        explosions.push({ x, y });
-        debris.push({ x, y });
-      }
-    }
-  }
-
-  if (debris.length === 0) return;
-
-  addTemporaryDebris(q, debris, DEBRIS_DAYS);
-  showExplosions(explosions);
-  log(`Meteor shower swept ${direction.name} through quadrant ${game.player.qx + 1},${game.player.qy + 1}, leaving debris in ${debris.length} sector${debris.length === 1 ? "" : "s"}.`, false);
-
-  if (raidersDestroyed > 0) {
-    log(`Meteor impacts destroyed ${raidersDestroyed} raider${raidersDestroyed === 1 ? "" : "s"}.`, false);
-  }
-
-  if (transportsDestroyed > 0) {
-    log(`Meteor impacts destroyed ${transportsDestroyed} transport${transportsDestroyed === 1 ? "" : "s"}.`, false);
-  }
-
-  if (shipDestroyed) {
-    game.player.destroyed = true;
-    endGame("failed", "Mission failed: command vessel destroyed by meteor shower.");
+function processAsteroidStormStep() {
+  if (!game?.asteroidStorm || game.status !== "active") {
+    clearAsteroidStormTimer();
     return;
   }
 
-  checkVictory();
+  const storm = game.asteroidStorm;
+  const q = game.galaxy[storm.qy]?.[storm.qx];
+
+  if (!q || storm.index >= storm.steps.length || storm.activeCells.length === 0) {
+    game.asteroidStorm = null;
+    clearAsteroidStormTimer();
+    render();
+    return;
+  }
+
+  const sector = storm.qx === game.player.qx && storm.qy === game.player.qy
+    ? ensureCurrentSector()
+    : q.sector;
+
+  if (!sector) {
+    game.asteroidStorm = null;
+    clearAsteroidStormTimer();
+    return;
+  }
+
+  const front = storm.activeCells;
+  const result = resolveAsteroidStormFront(q, sector, front, storm.qx, storm.qy);
+  storm.index += 1;
+
+  if (result.debris.length > 0) {
+    addTemporaryDebris(q, result.debris, DEBRIS_DAYS);
+    showExplosions(result.debris);
+  }
+
+  if (result.raidersDestroyed > 0) {
+    log(`Asteroid impacts destroyed ${result.raidersDestroyed} raider${result.raidersDestroyed === 1 ? "" : "s"}.`, false);
+  }
+
+  if (result.transportsDestroyed > 0) {
+    log(`Asteroid impacts destroyed ${result.transportsDestroyed} transport${result.transportsDestroyed === 1 ? "" : "s"}.`, false);
+  }
+
+  render();
+
+  if (result.shipDestroyed) {
+    game.player.destroyed = true;
+    game.asteroidStorm = null;
+    clearAsteroidStormTimer();
+    endGame("failed", "Mission failed: command vessel destroyed by asteroid storm.");
+    return;
+  }
+
+  if (game.status === "active") checkVictory();
+
+  if (game.status !== "active") {
+    game.asteroidStorm = null;
+    clearAsteroidStormTimer();
+    return;
+  }
+
+  if (storm.index >= storm.steps.length) {
+    log("Asteroid storm has cleared the sector.", false);
+    game.asteroidStorm = null;
+    clearAsteroidStormTimer();
+    render();
+    return;
+  }
+
+  storm.activeCells = storm.steps[storm.index];
+  render();
+  asteroidStormTimer = setTimeout(processAsteroidStormStep, ASTEROID_STORM_STEP_MS);
+}
+
+function resolveAsteroidStormFront(q, sector, front, qx, qy) {
+  const result = {
+    debris: [],
+    raidersDestroyed: 0,
+    shipDestroyed: false,
+    transportsDestroyed: 0
+  };
+
+  for (const { x, y } of front) {
+    const value = sector[y][x];
+
+    if (value === "*" || value === "B" || value === ".") continue;
+
+    if (value === "P") {
+      result.shipDestroyed = true;
+      result.debris.push({ x, y });
+    } else if (value === "E") {
+      result.raidersDestroyed += 1;
+      q.enemies = Math.max(0, q.enemies - 1);
+      game.enemiesRemaining = Math.max(0, game.enemiesRemaining - 1);
+      sector[y][x] = null;
+      result.debris.push({ x, y });
+    } else if (value === "T") {
+      destroyTransportAtCellInQuadrant(qx, qy, x, y);
+      result.transportsDestroyed += 1;
+      result.debris.push({ x, y });
+    }
+  }
+
+  return result;
 }
 
 function moveRaidersTowardPlayer() {
@@ -761,7 +827,14 @@ function destroyTransport(transport) {
 }
 
 function destroyTransportAtCell(x, y) {
-  const transport = getTransportsInCurrentQuadrant().find((candidate) => (
+  destroyTransportAtCellInQuadrant(game.player.qx, game.player.qy, x, y);
+}
+
+function destroyTransportAtCellInQuadrant(qx, qy, x, y) {
+  const transport = (game.transports || []).find((candidate) => (
+    candidate.alive &&
+    candidate.qx === qx &&
+    candidate.qy === qy &&
     candidate.sx === x &&
     candidate.sy === y
   ));
@@ -1154,6 +1227,13 @@ function renderSector() {
   const trackKeys = new Set((game.lastTorpedoTrack || []).map(({ x, y }) => `${x},${y}`));
   const beamByKey = new Map((game.phaserBeam || []).map((cell) => [`${cell.x},${cell.y}`, cell]));
   const explosionKeys = new Set((game.explosions || []).map(({ x, y }) => `${x},${y}`));
+  const asteroidKeys = new Set(
+    game.asteroidStorm &&
+    game.asteroidStorm.qx === game.player.qx &&
+    game.asteroidStorm.qy === game.player.qy
+      ? game.asteroidStorm.activeCells.map(({ x, y }) => `${x},${y}`)
+      : []
+  );
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
@@ -1207,6 +1287,10 @@ function renderSector() {
       if (explosionKeys.has(`${x},${y}`)) {
         cell.classList.add("explosion");
         cell.style.setProperty("--explosion-duration", `${game.explosionDuration || EXPLOSION_DURATION_MS}ms`);
+      }
+
+      if (asteroidKeys.has(`${x},${y}`)) {
+        cell.classList.add("asteroid-storm");
       }
 
       if (
@@ -1823,6 +1907,7 @@ function loadGame() {
   targetingMode = null;
   clearTorpedoTrail();
   clearExplosion();
+  clearAsteroidStorm();
   game = normalizeGame(JSON.parse(raw));
   el.difficultySelect.value = game.difficulty || "standard";
   log("Saved game loaded.");
@@ -1863,6 +1948,7 @@ function normalizeGame(savedGame) {
   }
   savedGame.lastTorpedoTrack = savedGame.lastTorpedoTrack || null;
   savedGame.phaserBeam = null;
+  savedGame.asteroidStorm = null;
   savedGame.explosions = [];
   savedGame.explosionDuration = EXPLOSION_DURATION_MS;
 
@@ -1918,6 +2004,7 @@ function startNewGame() {
   clearTorpedoTrail();
   clearPhaserBeam();
   clearExplosion();
+  clearAsteroidStorm();
   game = createGame();
   render();
 }
@@ -1953,6 +2040,21 @@ function clearExplosion() {
   if (game) {
     game.explosions = [];
     game.explosionDuration = EXPLOSION_DURATION_MS;
+  }
+}
+
+function clearAsteroidStorm() {
+  clearAsteroidStormTimer();
+
+  if (game) {
+    game.asteroidStorm = null;
+  }
+}
+
+function clearAsteroidStormTimer() {
+  if (asteroidStormTimer) {
+    clearTimeout(asteroidStormTimer);
+    asteroidStormTimer = null;
   }
 }
 
