@@ -1,5 +1,6 @@
 const SAVE_KEY = "deepSectorSave_v1";
 const SCORE_KEY = "deepSectorScores_v1";
+const TUTORIAL_KEY = "deepSectorTutorialSeen_v1";
 const SIZE = 8;
 const STARTING_STARDATE = 4200;
 const MISSION_DAYS = 168;
@@ -53,6 +54,14 @@ let explosionTimer = null;
 let phaserBeamTimer = null;
 let distressTimer = null;
 let asteroidStormTimer = null;
+let tutorialStep = 0;
+
+const TUTORIAL_STEPS = [
+  { title: "Welcome, Commander", text: "Destroy every raider before the mission clock expires. Keep the frontier's outposts and transports alive for the best rating.", target: "status" },
+  { title: "Navigate the Galaxy", text: "Scanned quadrants show four numbers: raiders, bases, stars, and transports. Select a quadrant to warp there; longer jumps cost more energy and time.", target: "galaxy", extra: "galaxy" },
+  { title: "Fly the Sector", text: "Select an adjacent empty cell to move. Your ship's arrow shows its heading. Turns consume time and expose you to more enemy fire.", target: "sector", extra: "legend" },
+  { title: "Fight, Repair, Survive", text: "Arm a weapon, then select a highlighted target. Dock beside an outpost to fully restore your ship. Scan to reveal nearby quadrants and watch your remaining days.", target: "status", extra: "tips" }
+];
 
 const el = {
   galaxyMap: document.getElementById("galaxyMap"),
@@ -63,6 +72,15 @@ const el = {
   scoreDialog: document.getElementById("scoreDialog"),
   scoreSummary: document.getElementById("scoreSummary"),
   scoreList: document.getElementById("scoreList"),
+  helpDialog: document.getElementById("helpDialog"),
+  helpTitle: document.getElementById("helpTitle"),
+  helpText: document.getElementById("helpText"),
+  helpExtra: document.getElementById("helpExtra"),
+  tutorialStepLabel: document.getElementById("tutorialStepLabel"),
+  tutorialDots: document.getElementById("tutorialDots"),
+  tutorialSkipBtn: document.getElementById("tutorialSkipBtn"),
+  tutorialBackBtn: document.getElementById("tutorialBackBtn"),
+  tutorialNextBtn: document.getElementById("tutorialNextBtn"),
   scoreboardGrid: document.getElementById("scoreboardGrid"),
   alertReadout: document.getElementById("alertReadout"),
   stardateReadout: document.getElementById("stardateReadout"),
@@ -79,6 +97,7 @@ const el = {
   phaserEnergyInput: document.getElementById("phaserEnergyInput"),
   phaserEnergyReadout: document.getElementById("phaserEnergyReadout"),
   newGameBtn: document.getElementById("newGameBtn"),
+  helpBtn: document.getElementById("helpBtn"),
   difficultySelect: document.getElementById("difficultySelect"),
   saveBtn: document.getElementById("saveBtn"),
   loadBtn: document.getElementById("loadBtn"),
@@ -1409,6 +1428,60 @@ function render() {
   renderScoreboards();
 }
 
+function getTutorialExtra(type) {
+  if (type === "galaxy") {
+    return `<div class="galaxyKey"><span><b>1</b> Raiders</span><span><b>2</b> Bases</span><span><b>3</b> Stars</span><span><b>4</b> Transports</span></div>`;
+  }
+  if (type === "legend") {
+    return `<div class="mapLegend" aria-label="Sector map legend"><span><i class="legendSymbol player">▲</i>Your ship</span><span><i class="legendSymbol enemy">◆</i>Raider</span><span><i class="legendSymbol base">⬢</i>Outpost</span><span><i class="legendSymbol transport">▬</i>Transport</span><span><i class="legendSymbol star">✦</i>Star</span><span><i class="legendSymbol debris">·</i>Debris</span></div>`;
+  }
+  if (type === "tips") {
+    return `<ul class="tutorialTips"><li>Phasers use energy; torpedoes are limited.</li><li>Weapons can be blocked by stars, debris, or friendly ships.</li><li>Waiting can summon rescue when energy is critically low.</li></ul>`;
+  }
+  return "";
+}
+
+function clearTutorialHighlight() {
+  document.querySelectorAll(".tutorialHighlight").forEach((node) => node.classList.remove("tutorialHighlight"));
+}
+
+function renderTutorial() {
+  const step = TUTORIAL_STEPS[tutorialStep];
+  el.helpTitle.textContent = step.title;
+  el.helpText.textContent = step.text;
+  el.helpExtra.innerHTML = getTutorialExtra(step.extra);
+  el.tutorialStepLabel.textContent = `Briefing ${tutorialStep + 1} of ${TUTORIAL_STEPS.length}`;
+  el.tutorialDots.innerHTML = TUTORIAL_STEPS.map((_, index) => `<span class="${index === tutorialStep ? "active" : ""}"></span>`).join("");
+  el.tutorialBackBtn.disabled = tutorialStep === 0;
+  el.tutorialNextBtn.textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? "Start mission" : "Next";
+  clearTutorialHighlight();
+  document.querySelector(`[data-tutorial="${step.target}"]`)?.classList.add("tutorialHighlight");
+}
+
+function openTutorial(startStep = 0) {
+  tutorialStep = startStep;
+  renderTutorial();
+  if (!el.helpDialog.open) el.helpDialog.showModal();
+}
+
+function closeTutorial() {
+  localStorage.setItem(TUTORIAL_KEY, "true");
+  clearTutorialHighlight();
+  if (el.helpDialog.open) el.helpDialog.close();
+}
+
+function nextTutorialStep() {
+  if (tutorialStep >= TUTORIAL_STEPS.length - 1) return closeTutorial();
+  tutorialStep += 1;
+  renderTutorial();
+}
+
+function previousTutorialStep() {
+  if (tutorialStep <= 0) return;
+  tutorialStep -= 1;
+  renderTutorial();
+}
+
 function getAlertState(q, daysRemaining) {
   if (game.status === "won") return { label: "SECURED", className: "alert good" };
   if (game.status === "failed") return { label: "MISSION LOST", className: "alert danger" };
@@ -2150,6 +2223,14 @@ function waitTurn() {
 }
 
 el.newGameBtn.addEventListener("click", startNewGame);
+el.helpBtn.addEventListener("click", () => openTutorial(0));
+el.tutorialNextBtn.addEventListener("click", nextTutorialStep);
+el.tutorialBackBtn.addEventListener("click", previousTutorialStep);
+el.tutorialSkipBtn.addEventListener("click", closeTutorial);
+el.helpDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeTutorial();
+});
 el.saveBtn.addEventListener("click", saveGame);
 el.loadBtn.addEventListener("click", loadGame);
 el.scanBtn.addEventListener("click", longScan);
@@ -2160,3 +2241,7 @@ el.waitBtn.addEventListener("click", waitTurn);
 el.phaserEnergyInput.addEventListener("input", updatePhaserEnergy);
 
 startNewGame();
+
+if (!localStorage.getItem(TUTORIAL_KEY)) {
+  openTutorial(0);
+}
