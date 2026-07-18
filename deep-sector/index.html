@@ -4,10 +4,35 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deep Sector</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=26" />
 </head>
 <body>
   <main id="game">
+    <div id="victoryCelebration" class="victoryCelebration" aria-hidden="true"></div>
+    <dialog id="scoreDialog" class="scoreDialog">
+      <h2>Mission Report</h2>
+      <p id="scoreSummary" class="scoreSummary"></p>
+      <ol id="scoreList" class="scoreList"></ol>
+      <form method="dialog">
+        <button id="scoreCloseBtn">Close</button>
+      </form>
+    </dialog>
+    <dialog id="helpDialog" class="helpDialog" aria-labelledby="helpTitle">
+      <div class="tutorialProgress" aria-label="Tutorial progress">
+        <span id="tutorialStepLabel"></span>
+        <div id="tutorialDots" class="tutorialDots" aria-hidden="true"></div>
+      </div>
+      <h2 id="helpTitle"></h2>
+      <p id="helpText" class="helpText"></p>
+      <div id="helpExtra"></div>
+      <div class="tutorialActions">
+        <button id="tutorialSkipBtn" type="button" class="quietButton">Skip tutorial</button>
+        <div>
+          <button id="tutorialBackBtn" type="button">Back</button>
+          <button id="tutorialNextBtn" type="button">Next</button>
+        </div>
+      </div>
+    </dialog>
     <header class="topbar">
       <div>
         <h1>Deep Sector</h1>
@@ -15,36 +40,72 @@
       </div>
 
       <div class="buttons">
+        <label class="topControl" for="difficultySelect">
+          <span>Raiders</span>
+          <select id="difficultySelect">
+            <option value="light">Light</option>
+            <option value="standard" selected>Standard</option>
+            <option value="heavy">Heavy</option>
+            <option value="extreme">Extreme</option>
+          </select>
+        </label>
         <button id="newGameBtn">New Game</button>
+        <button id="helpBtn">How to Play</button>
         <button id="saveBtn">Save</button>
         <button id="loadBtn">Load</button>
       </div>
     </header>
 
     <section class="layout">
-      <section class="panel">
+      <section class="panel" data-tutorial="galaxy">
         <h2>Galaxy</h2>
         <div id="galaxyMap" class="grid galaxy"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-tutorial="sector">
         <h2>Sector View</h2>
         <div id="sectorMap" class="grid sector"></div>
       </section>
 
-      <section class="panel status">
+      <section class="panel status" data-tutorial="status">
         <h2>Ship Status</h2>
+        <div id="distressBeacon" class="distressBeacon">DISTRESS</div>
+        <p><strong>Alert:</strong> <span id="alertReadout"></span></p>
+        <div class="timeRow">
+          <div id="timePie" class="timePie"></div>
+          <p><strong>Stardate:</strong> <span id="stardateReadout"></span></p>
+        </div>
         <p><strong>Quadrant:</strong> <span id="quadrantReadout"></span></p>
-        <p><strong>Energy:</strong> <span id="energyReadout"></span></p>
+        <div class="meterRow">
+          <div class="meterLabel">
+            <strong>Energy:</strong>
+            <span id="energyReadout"></span>
+          </div>
+          <div class="meter">
+            <div id="energyMeter" class="meterFill energyFill"></div>
+          </div>
+        </div>
         <p><strong>Shields:</strong> <span id="shieldReadout"></span></p>
         <p><strong>Torpedoes:</strong> <span id="torpedoReadout"></span></p>
         <p><strong>Raiders left:</strong> <span id="enemyReadout"></span></p>
+        <p><strong>Outposts:</strong> <span id="baseReadout"></span></p>
+        <p><strong>Transports:</strong> <span id="transportReadout"></span></p>
+        <p><strong>Local base:</strong> <span id="baseHealthReadout"></span></p>
+
+        <label class="controlGroup" for="phaserEnergyInput">
+          <span class="controlLabel">
+            <strong>Phaser Energy:</strong>
+            <span id="phaserEnergyReadout"></span>
+          </span>
+          <input id="phaserEnergyInput" type="range" min="100" max="900" step="25" value="450" />
+        </label>
 
         <div class="actions">
           <button id="scanBtn">Long Scan</button>
           <button id="phaserBtn">Fire Phasers</button>
           <button id="torpedoBtn">Fire Torpedo</button>
           <button id="dockBtn">Dock / Repair</button>
+          <button id="waitBtn">Wait</button>
         </div>
       </section>
     </section>
@@ -53,8 +114,13 @@
       <h2>Command Log</h2>
       <div id="log"></div>
     </section>
+
+    <section class="panel scoreboardPanel">
+      <h2>Scoreboards</h2>
+      <div id="scoreboardGrid" class="scoreboardGrid"></div>
+    </section>
   </main>
 
-  <script src="main.js"></script>
+  <script src="main.js?v=25"></script>
 </body>
 </html>
