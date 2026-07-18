@@ -17,6 +17,22 @@
         <button id="scoreCloseBtn">Close</button>
       </form>
     </dialog>
+    <dialog id="helpDialog" class="helpDialog" aria-labelledby="helpTitle">
+      <div class="tutorialProgress" aria-label="Tutorial progress">
+        <span id="tutorialStepLabel"></span>
+        <div id="tutorialDots" class="tutorialDots" aria-hidden="true"></div>
+      </div>
+      <h2 id="helpTitle"></h2>
+      <p id="helpText" class="helpText"></p>
+      <div id="helpExtra"></div>
+      <div class="tutorialActions">
+        <button id="tutorialSkipBtn" type="button" class="quietButton">Skip tutorial</button>
+        <div>
+          <button id="tutorialBackBtn" type="button">Back</button>
+          <button id="tutorialNextBtn" type="button">Next</button>
+        </div>
+      </div>
+    </dialog>
     <header class="topbar">
       <div>
         <h1>Deep Sector</h1>
@@ -34,23 +50,24 @@
           </select>
         </label>
         <button id="newGameBtn">New Game</button>
+        <button id="helpBtn">How to Play</button>
         <button id="saveBtn">Save</button>
         <button id="loadBtn">Load</button>
       </div>
     </header>
 
     <section class="layout">
-      <section class="panel">
+      <section class="panel" data-tutorial="galaxy">
         <h2>Galaxy</h2>
         <div id="galaxyMap" class="grid galaxy"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-tutorial="sector">
         <h2>Sector View</h2>
         <div id="sectorMap" class="grid sector"></div>
       </section>
 
-      <section class="panel status">
+      <section class="panel status" data-tutorial="status">
         <h2>Ship Status</h2>
         <div id="distressBeacon" class="distressBeacon">DISTRESS</div>
         <p><strong>Alert:</strong> <span id="alertReadout"></span></p>
