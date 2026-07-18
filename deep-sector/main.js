@@ -40,6 +40,13 @@ const METEOR_SHOWER_CHANCE = 0.06;
 const ASTEROID_STORM_STEP_MS = 650;
 const DEBRIS_DAYS = 10;
 const HEADING_ORDER = ["N", "E", "S", "W"];
+const RAIDER_TYPES = {
+  E: { key: "scout", label: "Scout" },
+  R: { key: "gunship", label: "Gunship" },
+  K: { key: "siege", label: "Siege" },
+  D: { key: "disruptor", label: "Disruptor" }
+};
+const RAIDER_CODES = Object.keys(RAIDER_TYPES);
 const HEADING_DATA = {
   N: { dx: 0, dy: -1, glyph: "▲" },
   E: { dx: 1, dy: 0, glyph: "▶" },
@@ -55,6 +62,7 @@ let phaserBeamTimer = null;
 let distressTimer = null;
 let asteroidStormTimer = null;
 let tutorialStep = 0;
+let targetPreview = null;
 
 const TUTORIAL_STEPS = [
   { title: "Welcome, Commander", text: "Destroy every raider before the mission clock expires. Keep the frontier's outposts and transports alive for the best rating.", target: "status" },
@@ -68,6 +76,8 @@ const el = {
   sectorMap: document.getElementById("sectorMap"),
   log: document.getElementById("log"),
   distressBeacon: document.getElementById("distressBeacon"),
+  distressCount: document.getElementById("distressCount"),
+  distressList: document.getElementById("distressList"),
   victoryCelebration: document.getElementById("victoryCelebration"),
   scoreDialog: document.getElementById("scoreDialog"),
   scoreSummary: document.getElementById("scoreSummary"),
@@ -96,6 +106,7 @@ const el = {
   energyMeter: document.getElementById("energyMeter"),
   phaserEnergyInput: document.getElementById("phaserEnergyInput"),
   phaserEnergyReadout: document.getElementById("phaserEnergyReadout"),
+  targetPreview: document.getElementById("targetPreview"),
   newGameBtn: document.getElementById("newGameBtn"),
   helpBtn: document.getElementById("helpBtn"),
   difficultySelect: document.getElementById("difficultySelect"),
@@ -110,6 +121,14 @@ const el = {
 
 function randomInt(max) {
   return Math.floor(Math.random() * max);
+}
+
+function isRaider(value) {
+  return Object.prototype.hasOwnProperty.call(RAIDER_TYPES, value);
+}
+
+function getRandomRaiderCode() {
+  return RAIDER_CODES[randomInt(RAIDER_CODES.length)];
 }
 
 function makeEmptyGrid() {
@@ -140,7 +159,7 @@ function createSectorLayout(q, player = null) {
   }
 
   for (let i = 0; i < q.enemies; i++) {
-    placeInEmptyCell(sector, "E");
+    placeInEmptyCell(sector, getRandomRaiderCode());
   }
 
   if (q.base) {
@@ -356,7 +375,7 @@ function removeOneEnemyFromSector() {
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      if (q.sector[y][x] === "E") {
+      if (isRaider(q.sector[y][x])) {
         q.sector[y][x] = null;
         return;
       }
@@ -368,7 +387,7 @@ function removeEnemyAt(x, y) {
   const q = getCurrentQuadrant();
   const sector = ensureCurrentSector();
 
-  if (sector[y][x] !== "E") return false;
+  if (!isRaider(sector[y][x])) return false;
 
   sector[y][x] = null;
   q.enemies -= 1;
@@ -399,6 +418,17 @@ function findSectorCells(value) {
     }
   }
 
+  return cells;
+}
+
+function findRaiderCells() {
+  const sector = ensureCurrentSector();
+  const cells = [];
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (isRaider(sector[y][x])) cells.push({ x, y, code: sector[y][x] });
+    }
+  }
   return cells;
 }
 
@@ -471,7 +501,7 @@ function maybeTriggerSupernova() {
       const value = sector[y][x];
       affected.push({ x, y });
 
-      if (value === "E") {
+      if (isRaider(value)) {
         raidersDestroyed += 1;
       } else if (value === "*") {
         starsDestroyed += 1;
@@ -649,7 +679,7 @@ function resolveAsteroidStormFront(q, sector, front, qx, qy) {
     if (value === "P") {
       result.shipDestroyed = true;
       result.debris.push({ x, y });
-    } else if (value === "E") {
+    } else if (isRaider(value)) {
       result.raidersDestroyed += 1;
       q.enemies = Math.max(0, q.enemies - 1);
       game.enemiesRemaining = Math.max(0, game.enemiesRemaining - 1);
@@ -671,11 +701,11 @@ function moveRaidersTowardPlayer() {
   if (q.enemies <= 0) return 0;
 
   const sector = ensureCurrentSector();
-  const raiders = findSectorCells("E");
+  const raiders = findRaiderCells();
   let moved = 0;
 
   for (const raider of raiders) {
-    if (sector[raider.y][raider.x] !== "E") continue;
+    if (!isRaider(sector[raider.y][raider.x])) continue;
 
     const options = [
       { x: raider.x, y: raider.y - 1 },
@@ -704,8 +734,9 @@ function moveRaidersTowardPlayer() {
     ));
     const destination = bestOptions[randomInt(bestOptions.length)];
 
+    const raiderCode = sector[raider.y][raider.x];
     sector[raider.y][raider.x] = null;
-    sector[destination.y][destination.x] = "E";
+    sector[destination.y][destination.x] = raiderCode;
     moved++;
   }
 
@@ -989,7 +1020,7 @@ function isLineBlockedByMass(cells) {
 
 function findPhaserTarget() {
   const p = game.player;
-  const raiders = findSectorCells("E");
+  const raiders = findRaiderCells();
   const visibleRaiders = raiders.filter(({ x, y }) => {
     const line = getLineCells(p.sx, p.sy, x, y);
     return line && !isLineBlockedByMass(line);
@@ -1005,7 +1036,7 @@ function findPhaserTarget() {
 function isValidPhaserTarget(x, y) {
   const sector = ensureCurrentSector();
 
-  if (sector[y][x] !== "E") return false;
+  if (!isRaider(sector[y][x])) return false;
 
   const line = getLineCells(game.player.sx, game.player.sy, x, y);
   return Boolean(line && !isLineBlockedByMass(line));
@@ -1204,6 +1235,7 @@ function log(message, shouldRender = true) {
 
 function renderGalaxy() {
   el.galaxyMap.innerHTML = "";
+  const threatenedQuadrants = new Set(getActiveDistressCalls().map((call) => `${call.x},${call.y}`));
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
@@ -1213,6 +1245,7 @@ function renderGalaxy() {
 
       const isCurrent = x === game.player.qx && y === game.player.qy;
       if (isCurrent) cell.classList.add("current");
+      if (threatenedQuadrants.has(`${x},${y}`)) cell.classList.add("threatened");
 
       if (q.scanned || isCurrent) {
         cell.classList.add("quadrant-score");
@@ -1260,16 +1293,20 @@ function renderSector() {
       const cell = document.createElement("button");
       cell.className = "cell";
       cell.title = `Sector ${x + 1}, ${y + 1}`;
+      cell.dataset.sectorX = x;
+      cell.dataset.sectorY = y;
 
       if (value === "P") {
         cell.textContent = HEADING_DATA[game.player.heading || "N"].glyph;
         cell.classList.add("player");
-      } else if (value === "E") {
+      } else if (isRaider(value)) {
         cell.classList.add("enemy");
         const raiderIcon = document.createElement("span");
-        raiderIcon.className = "raiderIcon";
+        const raiderType = RAIDER_TYPES[value];
+        raiderIcon.className = `raiderIcon raider-${raiderType.key}`;
         raiderIcon.setAttribute("aria-hidden", "true");
         cell.appendChild(raiderIcon);
+        cell.title = `${raiderType.label} raider at sector ${x + 1}, ${y + 1}`;
       } else if (value === "B") {
         cell.textContent = "⬢";
         cell.classList.add("base");
@@ -1325,9 +1362,80 @@ function renderSector() {
       }
 
       cell.addEventListener("click", () => handleSectorClick(x, y));
+      cell.addEventListener("mouseenter", () => previewTargetAt(x, y));
+      cell.addEventListener("mouseleave", clearTargetPreview);
+      cell.addEventListener("focus", () => previewTargetAt(x, y));
+      cell.addEventListener("blur", clearTargetPreview);
       el.sectorMap.appendChild(cell);
     }
   }
+
+  renderTargetPreview();
+}
+
+function getCounterAttackChance(exposure = 1) {
+  return Math.min(0.92, 0.38 + getCurrentQuadrant().enemies * 0.1 + exposure * 0.18);
+}
+
+function getTorpedoPreview(targetX, targetY) {
+  const track = getTorpedoTrack(targetX, targetY);
+  if (!track) return null;
+  const sector = ensureCurrentSector();
+  let impact = null;
+  for (const point of track) {
+    if (sector[point.y][point.x]) {
+      impact = { ...point, value: sector[point.y][point.x] };
+      break;
+    }
+  }
+  const impactIndex = impact ? track.findIndex((point) => point.x === impact.x && point.y === impact.y) : -1;
+  return { track: impact ? track.slice(0, impactIndex + 1) : track, impact };
+}
+
+function previewTargetAt(x, y) {
+  if (!targetingMode) return;
+  if (targetingMode === "phaser") {
+    if (!isValidPhaserTarget(x, y)) return clearTargetPreview();
+    const range = getSectorDistance(game.player.sx, game.player.sy, x, y);
+    const energy = Math.min(game.phaserEnergy, game.player.energy);
+    targetPreview = { mode: "phaser", x, y, range, energy, hitChance: getPhaserHitChance(energy, range), counterChance: getCounterAttackChance(1) };
+  } else {
+    const preview = getTorpedoPreview(x, y);
+    if (!preview) return clearTargetPreview();
+    targetPreview = { mode: "torpedo", x, y, ...preview, counterChance: getCounterAttackChance(1) };
+  }
+  renderTargetPreview();
+}
+
+function clearTargetPreview() {
+  targetPreview = null;
+  renderTargetPreview();
+}
+
+function renderTargetPreview() {
+  document.querySelectorAll(".preview-track, .preview-impact").forEach((cell) => cell.classList.remove("preview-track", "preview-impact"));
+  if (!targetingMode) {
+    el.targetPreview.classList.remove("active");
+    el.targetPreview.innerHTML = "";
+    return;
+  }
+  el.targetPreview.classList.add("active");
+  if (!targetPreview) {
+    el.targetPreview.innerHTML = `<strong>${targetingMode === "phaser" ? "Phasers armed" : "Torpedo armed"}</strong><span>Hover or focus a highlighted sector to inspect the firing solution.</span>`;
+    return;
+  }
+  if (targetPreview.mode === "phaser") {
+    el.targetPreview.innerHTML = `<strong>Phaser solution · ${targetPreview.x + 1}, ${targetPreview.y + 1}</strong><div class="oddsGrid"><span>Hit chance <b>${Math.round(targetPreview.hitChance * 100)}%</b></span><span>Range <b>${targetPreview.range}</b></span><span>Energy <b>${targetPreview.energy}</b></span><span>Counterfire <b>${Math.round(targetPreview.counterChance * 100)}%</b></span></div>`;
+    return;
+  }
+  for (const point of targetPreview.track) {
+    document.querySelector(`[data-sector-x="${point.x}"][data-sector-y="${point.y}"]`)?.classList.add("preview-track");
+  }
+  if (targetPreview.impact) document.querySelector(`[data-sector-x="${targetPreview.impact.x}"][data-sector-y="${targetPreview.impact.y}"]`)?.classList.add("preview-impact");
+  const impactLabels = { B: "Friendly outpost", T: "Transport", "*": "Star", ".": "Debris", P: "Your ship" };
+  const impactName = targetPreview.impact ? (RAIDER_TYPES[targetPreview.impact.value]?.label ? `${RAIDER_TYPES[targetPreview.impact.value].label} raider` : impactLabels[targetPreview.impact.value] || "Object") : "Empty space";
+  const result = isRaider(targetPreview.impact?.value) ? `${Math.round(TORPEDO_HIT_CHANCE * 100)}% hit` : targetPreview.impact ? "Collision" : "No target";
+  el.targetPreview.innerHTML = `<strong>Torpedo track · ${targetPreview.x + 1}, ${targetPreview.y + 1}</strong><div class="oddsGrid"><span>Impact <b>${impactName}</b></span><span>Result <b>${result}</b></span><span>Path <b>${targetPreview.track.length}</b></span><span>Counterfire <b>${Math.round(targetPreview.counterChance * 100)}%</b></span></div>`;
 }
 
 function renderStatus() {
@@ -1387,6 +1495,58 @@ function renderLog() {
   }
 }
 
+function getActiveDistressCalls() {
+  const calls = [];
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const q = game.galaxy[y][x];
+      if (q.base && q.enemies > 0) {
+        const days = Math.max(1, Math.ceil(q.baseHealth / (q.enemies * 13)));
+        calls.push({ type: "Outpost", id: `${x + 1},${y + 1}`, x, y, health: Math.ceil((q.baseHealth / STARBASE_MAX_HEALTH) * 100), days, enemies: q.enemies, priority: q.baseHealth / STARBASE_MAX_HEALTH });
+      }
+    }
+  }
+  for (const transport of game.transports || []) {
+    if (!transport.alive) continue;
+    const q = game.galaxy[transport.qy]?.[transport.qx];
+    if (q?.enemies > 0) {
+      const days = Math.max(1, Math.ceil(transport.health / (q.enemies * 17)));
+      calls.push({ type: "Transport", id: String(transport.id), x: transport.qx, y: transport.qy, health: transport.health, days, enemies: q.enemies, priority: transport.health / TRANSPORT_MAX_HEALTH });
+    }
+  }
+  return calls.sort((a, b) => a.priority - b.priority || a.days - b.days);
+}
+
+function renderDistressCalls() {
+  const calls = getActiveDistressCalls();
+  el.distressList.innerHTML = "";
+  el.distressCount.textContent = `${calls.length} active`;
+  el.distressCount.classList.toggle("active", calls.length > 0);
+
+  if (calls.length === 0) {
+    const clear = document.createElement("p");
+    clear.className = "allClear";
+    clear.textContent = "No active distress calls. Frontier channels are clear.";
+    el.distressList.appendChild(clear);
+    return;
+  }
+
+  for (const call of calls) {
+    const card = document.createElement("article");
+    const current = call.x === game.player.qx && call.y === game.player.qy;
+    const severity = call.health <= 35 ? "critical" : call.health <= 65 ? "urgent" : "warning";
+    card.className = `distressCard ${severity}`;
+    card.innerHTML = `<div class="signalPulse" aria-hidden="true"></div><div class="distressDetails"><strong>${call.type} ${call.id}</strong><span>Quadrant ${call.x + 1}, ${call.y + 1} · ${call.enemies} raider${call.enemies === 1 ? "" : "s"}</span></div><div class="distressVitals"><span>Integrity <b>${call.health}%</b></span><span>Est. survival <b>${call.days}d</b></span></div>`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = current ? "Current sector" : "Set course";
+    button.disabled = current || game.status !== "active";
+    button.addEventListener("click", () => moveToQuadrant(call.x, call.y));
+    card.appendChild(button);
+    el.distressList.appendChild(card);
+  }
+}
+
 function renderScoreboards() {
   const scoreboards = getAllScores();
   el.scoreboardGrid.innerHTML = "";
@@ -1424,6 +1584,7 @@ function render() {
   renderGalaxy();
   renderSector();
   renderStatus();
+  renderDistressCalls();
   renderLog();
   renderScoreboards();
 }
@@ -1580,6 +1741,7 @@ function armPhasers() {
   }
 
   targetingMode = targetingMode === "phaser" ? null : "phaser";
+  targetPreview = null;
   log(targetingMode ? "Phasers armed. Select a highlighted raider." : "Phasers safed.");
 }
 
@@ -1637,6 +1799,7 @@ function armTorpedo() {
   }
 
   targetingMode = targetingMode === "torpedo" ? null : "torpedo";
+  targetPreview = null;
   clearTorpedoTrail();
   clearPhaserBeam();
   clearExplosion();
@@ -1661,7 +1824,7 @@ function fireTorpedoAt(targetX, targetY) {
     const point = track[i];
     const value = sector[point.y][point.x];
 
-    if (value === "E") {
+    if (isRaider(value)) {
       showTorpedoTrail(track.slice(0, i + 1));
       showExplosion(point.x, point.y);
       advanceTime(1, "Torpedo track resolved.");

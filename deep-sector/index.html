@@ -56,6 +56,17 @@
       </div>
     </header>
 
+    <section class="panel objectivesPanel" aria-labelledby="objectivesTitle">
+      <div class="objectivesHeader">
+        <div>
+          <h2 id="objectivesTitle">Priority Signals</h2>
+          <p>Active frontier distress calls</p>
+        </div>
+        <span id="distressCount" class="distressCount">0 active</span>
+      </div>
+      <div id="distressList" class="distressList" aria-live="polite"></div>
+    </section>
+
     <section class="layout">
       <section class="panel" data-tutorial="galaxy">
         <h2>Galaxy</h2>
@@ -65,6 +76,12 @@
       <section class="panel" data-tutorial="sector">
         <h2>Sector View</h2>
         <div id="sectorMap" class="grid sector"></div>
+        <div class="raiderLegend" aria-label="Raider ship classes">
+          <span><i class="raiderIcon raider-scout" aria-hidden="true"></i>Scout</span>
+          <span><i class="raiderIcon raider-gunship" aria-hidden="true"></i>Gunship</span>
+          <span><i class="raiderIcon raider-siege" aria-hidden="true"></i>Siege</span>
+          <span><i class="raiderIcon raider-disruptor" aria-hidden="true"></i>Disruptor</span>
+        </div>
       </section>
 
       <section class="panel status" data-tutorial="status">
@@ -99,6 +116,8 @@
           </span>
           <input id="phaserEnergyInput" type="range" min="100" max="900" step="25" value="450" />
         </label>
+
+        <div id="targetPreview" class="targetPreview" aria-live="polite"></div>
 
         <div class="actions">
           <button id="scanBtn">Long Scan</button>
