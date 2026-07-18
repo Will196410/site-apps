@@ -123,6 +123,40 @@ body::before {
   background: rgba(0, 0, 0, 0.65);
 }
 
+.helpDialog {
+  background: linear-gradient(180deg, rgba(12, 21, 28, 0.99), rgba(7, 14, 19, 0.99));
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7), 0 0 30px rgba(95, 216, 198, 0.24);
+  color: var(--text);
+  max-width: 540px;
+  padding: 22px;
+  width: min(92vw, 540px);
+}
+
+.helpDialog::backdrop { background: rgba(0, 0, 0, 0.58); }
+.helpDialog h2 { color: var(--accent); letter-spacing: 0.05em; margin: 14px 0 10px; text-transform: uppercase; }
+.tutorialProgress, .tutorialActions, .tutorialActions > div { align-items: center; display: flex; }
+.tutorialProgress, .tutorialActions { justify-content: space-between; }
+.tutorialProgress { color: var(--muted); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.tutorialDots, .tutorialActions > div { display: flex; gap: 7px; }
+.tutorialDots span { background: var(--line); border-radius: 999px; height: 7px; width: 7px; }
+.tutorialDots span.active { background: var(--accent); box-shadow: 0 0 8px rgba(95, 216, 198, 0.8); }
+.helpText { color: var(--muted); line-height: 1.55; }
+.tutorialActions { border-top: 1px solid rgba(49, 80, 90, 0.7); gap: 12px; margin-top: 20px; padding-top: 16px; }
+.quietButton { border-color: transparent; color: var(--muted); }
+.galaxyKey, .mapLegend { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; }
+.galaxyKey span, .mapLegend span { align-items: center; background: rgba(95, 216, 198, 0.07); border: 1px solid rgba(95, 216, 198, 0.15); border-radius: 5px; display: flex; gap: 9px; padding: 8px; }
+.galaxyKey b, .legendSymbol { align-items: center; display: inline-flex; font-style: normal; justify-content: center; min-width: 22px; }
+.legendSymbol.player { color: var(--accent); }
+.legendSymbol.enemy { color: var(--danger); }
+.legendSymbol.base { color: var(--good); }
+.legendSymbol.transport { color: #bff7df; }
+.legendSymbol.star { color: var(--warning); }
+.legendSymbol.debris { color: var(--amber); }
+.tutorialTips { color: var(--muted); display: grid; gap: 7px; line-height: 1.4; padding-left: 20px; }
+.tutorialHighlight { box-shadow: 0 0 0 2px var(--accent), 0 0 34px rgba(95, 216, 198, 0.5) !important; position: relative; z-index: 2; }
+
 .scoreDialog h2 {
   color: var(--accent);
   letter-spacing: 0.08em;
