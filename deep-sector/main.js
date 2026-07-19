@@ -47,6 +47,14 @@ const RAIDER_TYPES = {
   D: { key: "disruptor", label: "Disruptor" }
 };
 const RAIDER_CODES = Object.keys(RAIDER_TYPES);
+const TERRAIN_TYPES = {
+  clear: { label: "Open space", glyph: "·", cost: 1, days: 0 },
+  nebula: { label: "Sensor nebula", glyph: "≋", cost: 1.15, days: 0 },
+  asteroids: { label: "Asteroid field", glyph: "◆", cost: 1.35, days: 1 },
+  ion: { label: "Ion-rich region", glyph: "ϟ", cost: 0.85, days: 0 }
+};
+const QUADRANT_PREFIXES = ["Aster", "Cinder", "Echo", "Helix", "Orion", "Riven", "Vesper", "Zenith"];
+const QUADRANT_SUFFIXES = ["Reach", "Drift", "Veil", "March", "Expanse", "Belt", "Cloud", "Frontier"];
 const HEADING_DATA = {
   N: { dx: 0, dy: -1, glyph: "▲" },
   E: { dx: 1, dy: 0, glyph: "▶" },
@@ -67,8 +75,10 @@ let targetPreview = null;
 const TUTORIAL_STEPS = [
   { title: "Welcome, Commander", text: "Destroy every raider before the mission clock expires. Keep the frontier's outposts and transports alive for the best rating.", target: "status" },
   { title: "Navigate the Galaxy", text: "Scanned quadrants show four numbers: raiders, bases, stars, and transports. Select a quadrant to warp there; longer jumps cost more energy and time.", target: "galaxy", extra: "galaxy" },
+  { title: "Read the Frontier", text: "Space conditions change every route. Nebulae block scans, asteroid fields slow travel, and ion-rich regions can recharge your ship at a risk to shields. Red-bordered regions are raider controlled.", target: "galaxy", extra: "terrain" },
+  { title: "Answer Distress Calls", text: "Priority Signals tracks outposts and transports under attack. The lowest integrity calls appear first; use Set course to respond before their estimated survival time expires.", target: "objectives", extra: "distress" },
   { title: "Fly the Sector", text: "Select an adjacent empty cell to move. Your ship's arrow shows its heading. Turns consume time and expose you to more enemy fire.", target: "sector", extra: "legend" },
-  { title: "Fight, Repair, Survive", text: "Arm a weapon, then select a highlighted target. Dock beside an outpost to fully restore your ship. Scan to reveal nearby quadrants and watch your remaining days.", target: "status", extra: "tips" }
+  { title: "Recognize Threats", text: "Raider classes have distinct silhouettes. Arm a weapon and inspect highlighted targets for hit and counterfire odds. Dock beside an outpost to restore your ship. A rapidly flashing star detonates after your next turn—move or warp away.", target: "sector", extra: "threats" }
 ];
 
 const el = {
@@ -131,6 +141,26 @@ function getRandomRaiderCode() {
   return RAIDER_CODES[randomInt(RAIDER_CODES.length)];
 }
 
+function getRandomTerrain() {
+  const roll = randomInt(100);
+  if (roll < 18) return "nebula";
+  if (roll < 35) return "asteroids";
+  if (roll < 45) return "ion";
+  return "clear";
+}
+
+function getLegacyTerrain(x, y) {
+  const roll = (x * 17 + y * 29) % 100;
+  if (roll < 18) return "nebula";
+  if (roll < 35) return "asteroids";
+  if (roll < 45) return "ion";
+  return "clear";
+}
+
+function getQuadrantName(x, y) {
+  return `${QUADRANT_PREFIXES[(x * 3 + y) % QUADRANT_PREFIXES.length]} ${QUADRANT_SUFFIXES[(x + y * 5) % QUADRANT_SUFFIXES.length]}`;
+}
+
 function makeEmptyGrid() {
   return Array.from({ length: SIZE }, () =>
     Array.from({ length: SIZE }, () => null)
@@ -189,6 +219,8 @@ function createGame() {
         lastDistress: STARTING_STARDATE - STARBASE_DISTRESS_COOLDOWN,
         stars,
         debris: [],
+        terrain: getRandomTerrain(),
+        name: getQuadrantName(x, y),
         scanned: false,
         sector: null
       };
@@ -473,6 +505,7 @@ function maybeTriggerSupernova() {
   const q = getCurrentQuadrant();
 
   if (
+    game.pendingSupernova ||
     game.supernovaeUsed >= game.supernovaeMax ||
     q.stars <= 0 ||
     Math.random() >= SUPERNOVA_CHANCE
@@ -486,13 +519,30 @@ function maybeTriggerSupernova() {
   if (stars.length === 0) return;
 
   const star = stars[randomInt(stars.length)];
+  game.pendingSupernova = { qx: game.player.qx, qy: game.player.qy, x: star.x, y: star.y };
+  game.supernovaeUsed += 1;
+  flashDistressBeacon();
+  log(`Stellar instability warning: star at ${star.x + 1},${star.y + 1} in quadrant ${game.player.qx + 1},${game.player.qy + 1} will go supernova next turn. Escape the blast radius!`, false);
+}
+
+function resolvePendingSupernova() {
+  const pending = game.pendingSupernova;
+  if (!pending) return;
+
+  game.pendingSupernova = null;
+  const q = game.galaxy[pending.qy]?.[pending.qx];
+  const sector = q?.sector;
+  if (!q || !sector || sector[pending.y]?.[pending.x] !== "*") {
+    log("The unstable star collapsed without a supernova.", false);
+    return;
+  }
+
+  const star = { x: pending.x, y: pending.y };
   const affected = [];
   let raidersDestroyed = 0;
   let starsDestroyed = 0;
   let shipDestroyed = false;
   let baseDestroyed = false;
-
-  game.supernovaeUsed += 1;
 
   for (let y = star.y - 1; y <= star.y + 1; y++) {
     for (let x = star.x - 1; x <= star.x + 1; x++) {
@@ -508,7 +558,7 @@ function maybeTriggerSupernova() {
       } else if (value === "B") {
         baseDestroyed = true;
       } else if (value === "T") {
-        destroyTransportAtCell(x, y);
+        destroyTransportAtCellInQuadrant(pending.qx, pending.qy, x, y);
       } else if (value === "P") {
         shipDestroyed = true;
       }
@@ -525,8 +575,10 @@ function maybeTriggerSupernova() {
   }
 
   addTemporaryDebris(q, affected, DEBRIS_DAYS);
-  showExplosions(affected, SUPERNOVA_EXPLOSION_DURATION_MS);
-  log(`Supernova in quadrant ${game.player.qx + 1},${game.player.qy + 1}, sector ${star.x + 1},${star.y + 1}. Blast left debris across ${affected.length} cells.`, false);
+  if (game.player.qx === pending.qx && game.player.qy === pending.qy) {
+    showExplosions(affected, SUPERNOVA_EXPLOSION_DURATION_MS);
+  }
+  log(`Supernova in quadrant ${pending.qx + 1},${pending.qy + 1}, sector ${star.x + 1},${star.y + 1}. Blast left debris across ${affected.length} cells.`, false);
 
   if (raidersDestroyed > 0) {
     log(`Supernova destroyed ${raidersDestroyed} raider${raidersDestroyed === 1 ? "" : "s"}.`, false);
@@ -537,12 +589,12 @@ function maybeTriggerSupernova() {
   }
 
   if (baseDestroyed) {
-    destroyStarbase(game.player.qx, game.player.qy);
+    destroyStarbase(pending.qx, pending.qy);
   }
 
   if (shipDestroyed) {
     game.player.destroyed = true;
-    endGame("failed", `Mission failed: command vessel destroyed by supernova in quadrant ${game.player.qx + 1},${game.player.qy + 1}, sector ${star.x + 1},${star.y + 1}.`);
+    endGame("failed", `Mission failed: command vessel destroyed by supernova in quadrant ${pending.qx + 1},${pending.qy + 1}, sector ${star.x + 1},${star.y + 1}.`);
     return;
   }
 
@@ -1131,6 +1183,7 @@ function getTorpedoTrack(targetX, targetY) {
 
 function advanceTime(days, reason) {
   if (game.status !== "active") return;
+  const supernovaWasPending = Boolean(game.pendingSupernova);
 
   game.stardate += days;
   clearExpiredDebris();
@@ -1141,7 +1194,9 @@ function advanceTime(days, reason) {
     log(`${reason} Stardate advanced by ${days}.`, false);
   }
 
-  if (game.status === "active" && days > 0) {
+  if (game.status === "active" && supernovaWasPending) {
+    resolvePendingSupernova();
+  } else if (game.status === "active" && days > 0) {
     maybeTriggerSupernova();
   }
 
@@ -1242,10 +1297,14 @@ function renderGalaxy() {
       const q = game.galaxy[y][x];
       const cell = document.createElement("button");
       cell.className = "cell";
+      cell.classList.add(`terrain-${q.terrain || "clear"}`);
+      cell.dataset.terrainGlyph = TERRAIN_TYPES[q.terrain || "clear"].glyph;
 
       const isCurrent = x === game.player.qx && y === game.player.qy;
       if (isCurrent) cell.classList.add("current");
       if (threatenedQuadrants.has(`${x},${y}`)) cell.classList.add("threatened");
+      if (q.enemies >= 2) cell.classList.add("raider-controlled");
+      if (game.pendingSupernova?.qx === x && game.pendingSupernova?.qy === y) cell.classList.add("supernova-warning");
 
       if (q.scanned || isCurrent) {
         cell.classList.add("quadrant-score");
@@ -1265,7 +1324,7 @@ function renderGalaxy() {
         cell.classList.add("unscanned");
       }
 
-      cell.title = `Quadrant ${x + 1}, ${y + 1}: raiders ${q.enemies}, bases ${q.base}, stars ${q.stars}, transports ${getTransportCountInQuadrant(x, y)}`;
+      cell.title = `${q.name || getQuadrantName(x, y)} — ${TERRAIN_TYPES[q.terrain || "clear"].label}. Quadrant ${x + 1}, ${y + 1}: raiders ${q.enemies}, bases ${q.base}, stars ${q.stars}, transports ${getTransportCountInQuadrant(x, y)}`;
       cell.addEventListener("click", () => moveToQuadrant(x, y));
 
       el.galaxyMap.appendChild(cell);
@@ -1319,6 +1378,15 @@ function renderSector() {
       } else if (value === "*") {
         cell.textContent = "✦";
         cell.classList.add("star");
+        if (
+          game.pendingSupernova?.qx === game.player.qx &&
+          game.pendingSupernova?.qy === game.player.qy &&
+          game.pendingSupernova.x === x &&
+          game.pendingSupernova.y === y
+        ) {
+          cell.classList.add("supernova-unstable");
+          cell.title = `UNSTABLE STAR at sector ${x + 1}, ${y + 1} — supernova next turn`;
+        }
       } else if (value === ".") {
         cell.textContent = "·";
         cell.classList.add("debris");
@@ -1450,7 +1518,7 @@ function renderStatus() {
   el.timePie.style.setProperty("--time-left", `${timePercent}%`);
   el.timePie.classList.toggle("low", daysRemaining <= 8);
   el.stardateReadout.textContent = `${game.stardate}.${daysRemaining} days left`;
-  el.quadrantReadout.textContent = `${p.qx + 1}, ${p.qy + 1}`;
+  el.quadrantReadout.textContent = `${q.name} — ${TERRAIN_TYPES[q.terrain].label} (${p.qx + 1}, ${p.qy + 1})`;
   el.energyReadout.textContent = p.energy;
   el.energyMeter.style.width = `${Math.max(0, Math.min(100, (p.energy / MAX_ENERGY) * 100))}%`;
   el.energyMeter.classList.toggle("low", p.energy <= MAX_ENERGY * 0.2);
@@ -1596,6 +1664,15 @@ function getTutorialExtra(type) {
   if (type === "legend") {
     return `<div class="mapLegend" aria-label="Sector map legend"><span><i class="legendSymbol player">▲</i>Your ship</span><span><i class="legendSymbol enemy">◆</i>Raider</span><span><i class="legendSymbol base">⬢</i>Outpost</span><span><i class="legendSymbol transport">▬</i>Transport</span><span><i class="legendSymbol star">✦</i>Star</span><span><i class="legendSymbol debris">·</i>Debris</span></div>`;
   }
+  if (type === "terrain") {
+    return `<div class="tutorialTerrain"><span><i class="terrainSwatch clear"></i><b>Open</b> Standard travel</span><span><i class="terrainSwatch nebula"></i><b>Nebula</b> Blocks scans</span><span><i class="terrainSwatch asteroids"></i><b>Asteroids</b> Costs more time and energy</span><span><i class="terrainSwatch ion"></i><b>Ion-rich</b> Energy with shield risk</span></div>`;
+  }
+  if (type === "distress") {
+    return `<div class="tutorialCall"><i class="signalPulse"></i><span><b>Respond by urgency</b><small>Integrity and estimated survival update every turn.</small></span><strong>Set course →</strong></div>`;
+  }
+  if (type === "threats") {
+    return `<div class="tutorialRaiders"><span><i class="raiderIcon raider-scout"></i>Scout</span><span><i class="raiderIcon raider-gunship"></i>Gunship</span><span><i class="raiderIcon raider-siege"></i>Siege</span><span><i class="raiderIcon raider-disruptor"></i>Disruptor</span></div><div class="supernovaTutorial"><i>✦</i><span><b>SUPERNOVA WARNING</b><small>Flashing star detonates next turn.</small></span></div>`;
+  }
   if (type === "tips") {
     return `<ul class="tutorialTips"><li>Phasers use energy; torpedoes are limited.</li><li>Weapons can be blocked by stars, debris, or friendly ships.</li><li>Waiting can summon rescue when energy is critically low.</li></ul>`;
   }
@@ -1660,13 +1737,23 @@ function moveToQuadrant(x, y) {
   clearPhaserBeam();
 
   const distance = Math.abs(game.player.qx - x) + Math.abs(game.player.qy - y);
-  const cost = Math.max(100, distance * 150);
+  if (distance === 0) {
+    log("Already holding in this quadrant.");
+    return;
+  }
+  const destination = game.galaxy[y][x];
+  const terrain = TERRAIN_TYPES[destination.terrain || "clear"];
+  const cost = Math.max(100, Math.round(distance * 150 * terrain.cost));
 
   if (game.player.energy < cost) {
     log("Insufficient energy for jump.");
     return;
   }
 
+  const previousQuadrant = getCurrentQuadrant();
+  if (previousQuadrant.sector?.[game.player.sy]?.[game.player.sx] === "P") {
+    previousQuadrant.sector[game.player.sy][game.player.sx] = null;
+  }
   game.player.energy -= cost;
   game.player.qx = x;
   game.player.qy = y;
@@ -1679,8 +1766,19 @@ function moveToQuadrant(x, y) {
   const q = getCurrentQuadrant();
   q.scanned = true;
 
-  log(`Jumped to quadrant ${x + 1}, ${y + 1}. Energy cost: ${cost}.`);
-  advanceTime(Math.max(1, distance), "Warp jump complete.");
+  log(`Entered ${q.name}, ${terrain.label.toLowerCase()}. Energy cost: ${cost}.`);
+  if (q.terrain === "ion") {
+    const energyGain = Math.min(MAX_ENERGY - game.player.energy, 450);
+    game.player.energy += energyGain;
+    if (Math.random() < 0.35) {
+      const shieldDamage = Math.min(game.player.shields, 90 + randomInt(91));
+      game.player.shields -= shieldDamage;
+      log(`Ion harvesting restored ${energyGain} energy but arced across the shields for ${shieldDamage} damage.`, false);
+    } else {
+      log(`Ion collectors restored ${energyGain} energy.`, false);
+    }
+  }
+  advanceTime(Math.max(1, distance) + terrain.days, "Warp jump complete.");
 
   if (game.status === "active" && q.enemies > 0) {
     raiderTacticalResponse(1);
@@ -1703,17 +1801,23 @@ function longScan() {
 
   const px = game.player.qx;
   const py = game.player.qy;
+  let obscured = 0;
 
   for (let y = py - 1; y <= py + 1; y++) {
     for (let x = px - 1; x <= px + 1; x++) {
       if (x >= 0 && x < SIZE && y >= 0 && y < SIZE) {
-        game.galaxy[y][x].scanned = true;
+        const q = game.galaxy[y][x];
+        if (q.terrain === "nebula" && (x !== px || y !== py)) {
+          obscured += 1;
+        } else {
+          q.scanned = true;
+        }
       }
     }
   }
 
   game.player.energy -= 50;
-  log("Long-range scan completed.");
+  log(obscured > 0 ? `Long-range scan completed. ${obscured} nebula region${obscured === 1 ? "" : "s"} resisted sensors.` : "Long-range scan completed.");
   advanceTime(1, "Sensor crew burned the dark away.");
 }
 
@@ -2161,6 +2265,7 @@ function normalizeGame(savedGame) {
   savedGame.phaserEnergy = savedGame.phaserEnergy || DEFAULT_PHASER_ENERGY;
   savedGame.supernovaeUsed = savedGame.supernovaeUsed || 0;
   savedGame.supernovaeMax = savedGame.supernovaeMax || SUPERNOVA_MIN + randomInt(SUPERNOVA_MAX - SUPERNOVA_MIN + 1);
+  savedGame.pendingSupernova = savedGame.pendingSupernova || null;
   savedGame.ratingLogged = Boolean(savedGame.ratingLogged);
   savedGame.awaitingRescue = Boolean(savedGame.awaitingRescue);
   if (!Array.isArray(savedGame.transports)) {
@@ -2188,8 +2293,11 @@ function normalizeGame(savedGame) {
   savedGame.explosions = [];
   savedGame.explosionDuration = EXPLOSION_DURATION_MS;
 
-  for (const row of savedGame.galaxy) {
-    for (const q of row) {
+  for (let qy = 0; qy < savedGame.galaxy.length; qy++) {
+    for (let qx = 0; qx < savedGame.galaxy[qy].length; qx++) {
+      const q = savedGame.galaxy[qy][qx];
+      if (!TERRAIN_TYPES[q.terrain]) q.terrain = getLegacyTerrain(qx, qy);
+      if (!q.name) q.name = getQuadrantName(qx, qy);
       if (!Object.prototype.hasOwnProperty.call(q, "sector")) q.sector = null;
       if (!Object.prototype.hasOwnProperty.call(q, "baseHealth")) {
         q.baseHealth = q.base ? STARBASE_MAX_HEALTH : 0;
